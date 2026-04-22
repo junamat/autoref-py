@@ -3,6 +3,7 @@
 
 left to implement
 - Classes/Data structures
+- safe handling of IRC creds and perhaps some others
 - Logic
 - IO text interface
 - IO web interface
