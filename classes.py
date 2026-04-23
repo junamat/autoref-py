@@ -35,6 +35,7 @@ class Step(Enum):
     PICK = 1
     BAN = 2
     PROTECT = 3
+    WIN = 4
     OTHER = 11
 
 def make_client() -> aiosu.v2.Client:
@@ -49,7 +50,7 @@ class PlayableMap:
         self,
         beatmap_id: int,
         mods: aiosu.models.mods.Mods = None,
-        win_condition: WinCondition = WinCondition.SCORE_V2,
+        win_condition: WinCondition = WinCondition.INHERIT,
         comment: str = None,
     ):
         self.beatmap_id = beatmap_id
@@ -63,7 +64,7 @@ class PlayableMap:
         cls,
         beatmap_id: int,
         mods: aiosu.models.mods.Mods = None,
-        win_condition: WinCondition = WinCondition.SCORE_V2,
+        win_condition: WinCondition = WinCondition.INHERIT,
         comment: str = None,
     ) -> "PlayableMap":
         instance = cls(beatmap_id, mods, win_condition, comment)
@@ -104,10 +105,11 @@ class Team:
 
 
 class Ruleset:
-    def __init__(self, vs: int, gamemode: aiosu.models.Gamemode, enforced_nf: bool = True):
+    def __init__(self, vs: int, gamemode: aiosu.models.Gamemode, win_condition: WinCondition = WinCondition.SCORE_V2 ,enforced_mods: str = 'NF'):
         self.vs = vs
         self.gamemode = gamemode
-        self.enforced_nf = enforced_nf
+        self.win_condition = win_condition
+        self.enforced_mods =
 
 class Match:
     def __init__(self, ruleset: Ruleset, pool: Pool, next_step: Callable[[pd.DataFrame], (int, Step)], *teams: Team):
