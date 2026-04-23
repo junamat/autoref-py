@@ -10,6 +10,7 @@ import asyncio
 load_dotenv()
 
 class WinCondition(Enum):
+    INHERIT = 0
     SCORE_V2 = 1
     ACCURACY_V2 = 2
     COMBO = 3
@@ -20,6 +21,14 @@ class WinCondition(Enum):
     ACCURACY_V1 = 8
     TARGET_SCORE_V1 = 9
     TARGET_ACCURACY_V1 = 10
+    OTHER = 11
+
+class MapState(Enum):
+    INHERIT = 0
+    PICKABLE = 1
+    PROTECTED = 2
+    BANNED = 3
+    DISALLOWED = 4
     OTHER = 11
 
 class Step(Enum):
@@ -95,18 +104,18 @@ class Team:
 
 
 class Ruleset:
-    def __init__(self, vs: int, gamemode: aiosu.models.Gamemode, enforced_nf: bool = True, pipeline: MatchPipeline = None):
+    def __init__(self, vs: int, gamemode: aiosu.models.Gamemode, enforced_nf: bool = True):
         self.vs = vs
         self.gamemode = gamemode
         self.enforced_nf = enforced_nf
-        self.pipeline = pipeline
 
 class Match:
-    def __init__(self, ruleset: Ruleset, pool: Pool, next_step: Callable[[pd.DataFrame], (int, Step)], *teams: Team): #next_step(match_status) returns (team_index, Step)
+    def __init__(self, ruleset: Ruleset, pool: Pool, next_step: Callable[[pd.DataFrame], (int, Step)], *teams: Team):
         self.ruleset = ruleset
         self.pool = pool
-        self.next_step = next_step
+        self.next_step = next_step #next_step(match_status) returns (team_index, Step)
         self.teams = teams
+        self.match_status = pd.DataFrame()
 
 
 async def main():
