@@ -1,0 +1,4 @@
+aiosu
+numpy
+pandas
+python-dotenv
