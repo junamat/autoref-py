@@ -4,3 +4,4 @@ pandas
 python-dotenv
 pytest
 pytest-asyncio
+bancho.py

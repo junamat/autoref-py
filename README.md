@@ -1,5 +1,7 @@
 # autoref-py
 
+![tests](https://github.com/junamat/autoref-py/actions/workflows/tests.yml/badge.svg)
+
 
 left to implement
 - Classes/Data structures
