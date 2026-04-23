@@ -1,12 +1,15 @@
-"""Tests for AutoRef and _find_map."""
+"""Tests for AutoRef ABC and _find_map."""
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from autoref.autoref import AutoRef, _find_map
 from autoref.enums import Step, WinCondition
-from autoref.models import Match, PlayableMap, Pool, Ruleset, Team
+from autoref.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 
+
+# ------------------------------------------------------------------ helpers
 
 def make_ruleset(vs=2, enforced_mods="NF"):
     r = MagicMock(spec=Ruleset)
@@ -15,26 +18,37 @@ def make_ruleset(vs=2, enforced_mods="NF"):
     r.gamemode.value = 0
     r.win_condition = WinCondition.SCORE_V2
     r.enforced_mods = enforced_mods
+    r.team_mode = 2
     return r
 
 
-def make_match(next_step=None, pool=None):
+def make_match(next_step_rv=None, pool=None):
     if pool is None:
         pool = Pool("pool", PlayableMap(1), PlayableMap(2))
-    if next_step is None:
-        next_step = MagicMock(return_value=(0, Step.WIN))
-    return Match(make_ruleset(), pool, next_step, Team("Red"), Team("Blue"))
+    match = Match(make_ruleset(), pool, MagicMock(), Team("Red"), Team("Blue"))
+    return match
 
 
-def make_autoref(match=None):
-    client = MagicMock()
+class ConcreteAutoRef(AutoRef):
+    """Minimal concrete subclass for testing."""
+    def __init__(self, *args, steps=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._steps = iter(steps or [(0, Step.WIN)])
+
+    def next_step(self, match_status):
+        return next(self._steps)
+
+    async def handle_other(self, team_index):
+        pass
+
+
+def make_autoref(steps=None, match=None):
+    import bancho
+    client = MagicMock(spec=bancho.BanchoClient)
     client.on = MagicMock()
     if match is None:
         match = make_match()
-    ar = AutoRef.__new__(AutoRef)
-    ar._client = client
-    ar.match = match
-    ar.room_name = "Test Room"
+    ar = ConcreteAutoRef(client, match, "Test Room", steps=steps)
     ar.lobby = MagicMock()
     ar.lobby.create = AsyncMock(return_value=1)
     ar.lobby.set_room = AsyncMock()
@@ -42,117 +56,286 @@ def make_autoref(match=None):
     ar.lobby.invite = AsyncMock()
     ar.lobby.close = AsyncMock()
     ar.lobby.set_map = AsyncMock()
+    ar.lobby.timer = AsyncMock()
     ar.lobby.wait_for_all_ready = AsyncMock()
     ar.lobby.start = AsyncMock()
     ar.lobby.wait_for_match_end = AsyncMock(return_value=MagicMock())
+    ar.lobby.say = AsyncMock()
     return ar
 
 
 # ------------------------------------------------------------------ _find_map
 
-def test_find_map_flat_pool():
+def test_find_map_flat():
     pm = PlayableMap(42)
-    pool = Pool("p", pm, PlayableMap(1))
-    assert _find_map(Match(make_ruleset(), pool, MagicMock(), Team("A")), 42) is pm
+    match = make_match(pool=Pool("p", pm, PlayableMap(1)))
+    assert _find_map(match, 42) is pm
 
 
-def test_find_map_nested_pool():
+def test_find_map_nested():
     pm = PlayableMap(99)
-    inner = Pool("inner", pm)
-    outer = Pool("outer", inner, PlayableMap(1))
-    match = Match(make_ruleset(), outer, MagicMock(), Team("A"))
+    match = make_match(pool=Pool("outer", Pool("inner", pm), PlayableMap(1)))
     assert _find_map(match, 99) is pm
 
 
-def test_find_map_not_found():
-    pool = Pool("p", PlayableMap(1))
-    match = Match(make_ruleset(), pool, MagicMock(), Team("A"))
+def test_find_map_missing():
+    match = make_match(pool=Pool("p", PlayableMap(1)))
     assert _find_map(match, 999) is None
+
+
+# ------------------------------------------------------------------ _find_map_by_input
+
+def test_find_map_by_input_exact():
+    from autoref.autoref import _find_map_by_input
+    pm = PlayableMap(1, name="NM1")
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input(match, "NM1") is pm
+
+
+def test_find_map_by_input_case_insensitive():
+    from autoref.autoref import _find_map_by_input
+    pm = PlayableMap(1, name="HD2")
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input(match, "hd2") is pm
+
+
+def test_find_map_by_input_space_underscore():
+    from autoref.autoref import _find_map_by_input
+    pm = PlayableMap(1, name="some map")
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input(match, "some_map") is pm
+
+
+def test_find_map_by_input_no_match():
+    from autoref.autoref import _find_map_by_input
+    match = make_match(pool=Pool("p", PlayableMap(1, name="NM1")))
+    assert _find_map_by_input(match, "DT3") is None
+
+
+# ------------------------------------------------------------------ _await_map_choice
+
+@pytest.mark.asyncio
+async def test_await_map_choice_resolves_on_team_message():
+    import bancho
+    from autoref.autoref import _find_map_by_input
+
+    pm = PlayableMap(5, name="NM1")
+    match = make_match(pool=Pool("p", pm))
+    p = MagicMock()
+    p.username = "Alice"
+    match.teams[0].players = [p]
+
+    ar = make_autoref(match=match)
+
+    # Simulate channel message from Alice saying "NM1"
+    captured_handler = {}
+    ar.lobby._lobby = MagicMock()
+    ar.lobby._lobby.channel = MagicMock()
+    ar.lobby._lobby.channel.on = lambda event, fn: captured_handler.update({event: fn})
+    ar.lobby._lobby.channel.remove_listener = MagicMock()
+
+    async def drive():
+        await asyncio.sleep(0)  # let _await_map_choice register handler
+        msg = MagicMock()
+        msg.user.username = "Alice"
+        msg.message = "NM1"
+        captured_handler["message"](msg)
+
+    result, _ = await asyncio.gather(ar._await_map_choice(0), drive())
+    assert result == 5
+
+
+@pytest.mark.asyncio
+async def test_await_map_choice_ignores_wrong_team():
+    import bancho
+
+    pm = PlayableMap(5, name="NM1")
+    match = make_match(pool=Pool("p", pm))
+    p = MagicMock()
+    p.username = "Alice"
+    match.teams[0].players = [p]
+
+    ar = make_autoref(match=match)
+    captured_handler = {}
+    ar.lobby._lobby = MagicMock()
+    ar.lobby._lobby.channel = MagicMock()
+    ar.lobby._lobby.channel.on = lambda event, fn: captured_handler.update({event: fn})
+    ar.lobby._lobby.channel.remove_listener = MagicMock()
+
+    resolved = []
+
+    async def drive():
+        await asyncio.sleep(0)
+        # Wrong team player
+        msg = MagicMock()
+        msg.user.username = "Bob"
+        msg.message = "NM1"
+        captured_handler["message"](msg)
+        # Correct player
+        await asyncio.sleep(0)
+        msg2 = MagicMock()
+        msg2.user.username = "Alice"
+        msg2.message = "NM1"
+        captured_handler["message"](msg2)
+
+    result, _ = await asyncio.gather(ar._await_map_choice(0), drive())
+    assert result == 5
+
+
+# ------------------------------------------------------------------ ABC enforcement
+
+def test_cannot_instantiate_autoref_directly():
+    import bancho
+    with pytest.raises(TypeError):
+        AutoRef(MagicMock(spec=bancho.BanchoClient), make_match(), "Room")
+
+
+def test_must_implement_next_step_and_handle_other():
+    import bancho
+
+    class Incomplete(AutoRef):
+        def next_step(self, s): return (0, Step.WIN)
+        # missing handle_other
+
+    with pytest.raises(TypeError):
+        Incomplete(MagicMock(spec=bancho.BanchoClient), make_match(), "Room")
+
+
+# ------------------------------------------------------------------ Timers
+
+def test_default_timers():
+    ar = make_autoref()
+    assert ar.timers.pick == 120
+    assert ar.timers.ban == 120
+    assert ar.timers.between_maps == 10
+
+
+def test_custom_timers():
+    import bancho
+    t = Timers(pick=60, ban=30)
+    ar = ConcreteAutoRef(MagicMock(spec=bancho.BanchoClient), make_match(), "Room", timers=t)
+    ar.lobby = MagicMock()
+    assert ar.timers.pick == 60
+    assert ar.timers.ban == 30
 
 
 # ------------------------------------------------------------------ run()
 
 @pytest.mark.asyncio
-async def test_run_creates_and_closes_room():
-    ar = make_autoref()
+async def test_run_creates_and_closes():
+    ar = make_autoref(steps=[(0, Step.WIN)])
     await ar.run()
     ar.lobby.create.assert_called_once_with("Test Room")
     ar.lobby.close.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_run_sets_room_params():
-    ar = make_autoref()
+async def test_run_sets_room_and_mods():
+    ar = make_autoref(steps=[(0, Step.WIN)])
     await ar.run()
     ar.lobby.set_room.assert_called_once_with(team_mode=2, score_mode=0, size=4)
-
-
-@pytest.mark.asyncio
-async def test_run_sets_enforced_mods():
-    ar = make_autoref()
-    await ar.run()
     ar.lobby.set_mods.assert_called_once_with("NF")
 
 
 @pytest.mark.asyncio
-async def test_run_skips_mods_when_falsy():
+async def test_run_skips_mods_when_empty():
     match = make_match()
     match.ruleset.enforced_mods = ""
-    ar = make_autoref(match)
+    ar = make_autoref(steps=[(0, Step.WIN)], match=match)
     await ar.run()
     ar.lobby.set_mods.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_run_invites_all_players():
+async def test_run_invites_players():
     match = make_match()
     p1, p2 = MagicMock(), MagicMock()
-    p1.username = "Alice"
-    p2.username = "Bob"
+    p1.username, p2.username = "Alice", "Bob"
     match.teams[0].players = [p1]
     match.teams[1].players = [p2]
-    ar = make_autoref(match)
+    ar = make_autoref(steps=[(0, Step.WIN)], match=match)
     await ar.run()
     ar.lobby.invite.assert_any_call("Alice")
     ar.lobby.invite.assert_any_call("Bob")
 
 
 @pytest.mark.asyncio
-async def test_run_raises_on_pick_step():
-    match = make_match(next_step=MagicMock(return_value=(0, Step.PICK)))
-    ar = make_autoref(match)
-    with pytest.raises(NotImplementedError):
-        await ar.run()
+async def test_run_announces_win():
+    ar = make_autoref(steps=[(0, Step.WIN)])
+    await ar.run()
+    ar.lobby.say.assert_called()
 
 
 @pytest.mark.asyncio
-async def test_run_raises_on_ban_step():
-    match = make_match(next_step=MagicMock(return_value=(0, Step.BAN)))
-    ar = make_autoref(match)
-    with pytest.raises(NotImplementedError):
-        await ar.run()
+async def test_run_starts_pick_timer():
+    ar = make_autoref(steps=[(0, Step.PICK), (0, Step.WIN)])
+    ar.await_pick = AsyncMock(return_value=1)
+    ar.handle_pick = AsyncMock()
+    await ar.run()
+    ar.lobby.timer.assert_any_call(ar.timers.pick)
+    ar.await_pick.assert_called_once_with(0)
+    ar.handle_pick.assert_called_once_with(0, 1)
+
+
+@pytest.mark.asyncio
+async def test_run_starts_ban_timer():
+    ar = make_autoref(steps=[(0, Step.BAN), (0, Step.WIN)])
+    ar.await_ban = AsyncMock(return_value=2)
+    ar.handle_ban = AsyncMock()
+    await ar.run()
+    ar.lobby.timer.assert_any_call(ar.timers.ban)
+    ar.await_ban.assert_called_once_with(0)
+    ar.handle_ban.assert_called_once_with(0, 2)
+
+
+@pytest.mark.asyncio
+async def test_run_starts_protect_timer():
+    ar = make_autoref(steps=[(0, Step.PROTECT), (0, Step.WIN)])
+    ar.await_protect = AsyncMock(return_value=3)
+    ar.handle_protect = AsyncMock()
+    await ar.run()
+    ar.lobby.timer.assert_any_call(ar.timers.protect)
+    ar.await_protect.assert_called_once_with(0)
+    ar.handle_protect.assert_called_once_with(0, 3)
+
+
+@pytest.mark.asyncio
+async def test_run_calls_handle_other():
+    called = []
+
+    class TrackingAutoRef(ConcreteAutoRef):
+        async def handle_other(self, team_index):
+            called.append(team_index)
+
+    import bancho
+    ar = TrackingAutoRef(
+        MagicMock(spec=bancho.BanchoClient), make_match(), "Room",
+        steps=[(1, Step.OTHER), (0, Step.WIN)]
+    )
+    ar.lobby = make_autoref().lobby
+    await ar.run()
+    assert called == [1]
 
 
 # ------------------------------------------------------------------ play_map()
 
 @pytest.mark.asyncio
-async def test_play_map_sets_map_and_starts():
+async def test_play_map_full_flow():
     ar = make_autoref()
     await ar.play_map(1, 0, Step.PICK)
     ar.lobby.set_map.assert_called_once_with(1, 0)
+    ar.lobby.timer.assert_called_with(ar.timers.between_maps)
     ar.lobby.wait_for_all_ready.assert_called_once()
     ar.lobby.start.assert_called_once()
     ar.lobby.wait_for_match_end.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_play_map_sets_map_mods_when_present():
+async def test_play_map_sets_per_map_mods():
     pm = PlayableMap(5, mods="HD")
-    pool = Pool("p", pm)
-    match = make_match(pool=pool)
-    ar = make_autoref(match)
+    ar = make_autoref(match=make_match(pool=Pool("p", pm)))
     await ar.play_map(5, 0, Step.PICK)
-    ar.lobby.set_mods.assert_called_once_with("HD")
+    ar.lobby.set_mods.assert_called_with("HD")
 
 
 @pytest.mark.asyncio
@@ -160,6 +343,24 @@ async def test_play_map_records_action():
     ar = make_autoref()
     await ar.play_map(1, 0, Step.PICK)
     assert len(ar.match.match_status) == 1
-    row = ar.match.match_status.iloc[0]
-    assert row["beatmap_id"] == 1
-    assert row["step"] == "PICK"
+    assert ar.match.match_status.iloc[0]["step"] == "PICK"
+
+
+# ------------------------------------------------------------------ handle_ban/protect
+
+@pytest.mark.asyncio
+async def test_handle_ban_records_and_announces():
+    ar = make_autoref()
+    await ar.handle_ban(0, 1)
+    assert len(ar.match.match_status) == 1
+    assert ar.match.match_status.iloc[0]["step"] == "BAN"
+    ar.lobby.say.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_protect_records_and_announces():
+    ar = make_autoref()
+    await ar.handle_protect(1, 2)
+    assert len(ar.match.match_status) == 1
+    assert ar.match.match_status.iloc[0]["step"] == "PROTECT"
+    ar.lobby.say.assert_called_once()

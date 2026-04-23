@@ -86,9 +86,11 @@ class Lobby:
         await self._lobby.set_map(beatmap_id, bancho.BanchoGamemode(gamemode))
 
     async def set_mods(self, mods: str) -> None:
-        # Accept a string like "HD NF" or a Mod flag; parse via bancho enums if needed
         from bancho.lobby import _parse_mods
-        parsed, freemod = _parse_mods(mods)
+        # aiosu Mods.__str__ returns concatenated e.g. "HDNF" — insert spaces between known abbrevs
+        import re
+        spaced = re.sub(r'([A-Z]{2})', r'\1 ', mods).strip()
+        parsed, freemod = _parse_mods(spaced)
         await self._lobby.set_mods(parsed, freemod)
 
     async def set_room(self, team_mode: int, score_mode: int, size: int | None = None) -> None:

@@ -16,6 +16,7 @@ def make_ruleset() -> Ruleset:
     ruleset.gamemode.name_api = "osu"
     ruleset.win_condition = WinCondition.SCORE_V2
     ruleset.enforced_mods = MagicMock()
+    ruleset.team_mode = 2
     return ruleset
 
 
@@ -51,6 +52,82 @@ def test_modded_pool_carries_mods():
     pool = ModdedPool("HD", mods, PlayableMap(1), PlayableMap(2))
     assert pool.mods is mods
     assert len(pool.maps) == 2
+
+
+# --- Pool.flatten ---
+
+def test_flatten_flat_pool():
+    maps = [PlayableMap(i) for i in range(1, 4)]
+    pool = Pool("p", *maps)
+    assert [m.beatmap_id for m in pool.flatten()] == [1, 2, 3]
+
+
+def test_flatten_nested_preserves_order():
+    nm = Pool("NM", PlayableMap(1), PlayableMap(2))
+    hd = Pool("HD", PlayableMap(3), PlayableMap(4))
+    pool = Pool("Full", nm, hd)
+    assert [m.beatmap_id for m in pool.flatten()] == [1, 2, 3, 4]
+
+
+def test_flatten_with_order():
+    import random
+    maps = [PlayableMap(i) for i in range(1, 6)]
+    pool = Pool("p", *maps, order=lambda ms: list(reversed(ms)))
+    assert [m.beatmap_id for m in pool.flatten()] == [5, 4, 3, 2, 1]
+
+
+def test_flatten_modded_pool_propagates_mods():
+    import aiosu
+    mods = aiosu.models.mods.Mods("HD")
+    pool = ModdedPool("HD", mods, PlayableMap(1), PlayableMap(2))
+    flat = pool.flatten()
+    assert all(m.effective_mods() == mods for m in flat)
+
+
+def test_flatten_explicit_mods_override_pool_mods():
+    import aiosu
+    pool_mods = aiosu.models.mods.Mods("HD")
+    explicit = aiosu.models.mods.Mods("HR")
+    pool = ModdedPool("HD", pool_mods, PlayableMap(1, mods=explicit))
+    flat = pool.flatten()
+    assert flat[0].effective_mods() == explicit
+
+
+# --- PlayableMap.effective_mods ---
+
+def test_effective_mods_explicit():
+    import aiosu
+    mods = aiosu.models.mods.Mods("HD")
+    pm = PlayableMap(1, mods=mods)
+    assert pm.effective_mods() == mods
+
+
+def test_effective_mods_inferred_nm():
+    pm = PlayableMap(1, name="NM1")
+    result = pm.effective_mods()
+    assert str(result) == "NF" or "NF" in str(result)
+
+
+def test_effective_mods_inferred_hd():
+    pm = PlayableMap(1, name="HD2")
+    result = pm.effective_mods()
+    assert "HD" in str(result)
+
+
+def test_effective_mods_inferred_dt():
+    pm = PlayableMap(1, name="DT1")
+    result = pm.effective_mods()
+    assert "DT" in str(result)
+
+
+def test_effective_mods_none_when_unknown():
+    pm = PlayableMap(1, name="XX1")
+    assert pm.effective_mods() is None
+
+
+def test_effective_mods_none_when_no_name():
+    pm = PlayableMap(1)
+    assert pm.effective_mods() is None
 
 
 # --- Match ---
