@@ -1,48 +1,12 @@
 from collections.abc import Callable
-
-from dotenv import load_dotenv
-from os import getenv
-import aiosu
-from enum import Enum
-import pandas as pd
+from pathlib import Path
 import asyncio
 
-load_dotenv()
+import aiosu
+import pandas as pd
 
-class WinCondition(Enum):
-    INHERIT = 0
-    SCORE_V2 = 1
-    ACCURACY_V2 = 2
-    COMBO = 3
-    FEWER_MISSES = 4
-    TARGET_SCORE_V2 = 5
-    TARGET_ACCURACY_V2 = 6
-    SCORE_V1 = 7
-    ACCURACY_V1 = 8
-    TARGET_SCORE_V1 = 9
-    TARGET_ACCURACY_V1 = 10
-    OTHER = 11
-
-class MapState(Enum):
-    INHERIT = 0
-    PICKABLE = 1
-    PROTECTED = 2
-    BANNED = 3
-    DISALLOWED = 4
-    OTHER = 11
-
-class Step(Enum):
-    PICK = 1
-    BAN = 2
-    PROTECT = 3
-    WIN = 4
-    OTHER = 11
-
-def make_client() -> aiosu.v2.Client:
-    return aiosu.v2.Client(
-        client_id = getenv("CLIENT_ID"),
-        client_secret = getenv("CLIENT_SECRET"),
-    )
+from .enums import WinCondition, Step
+from .client import make_client
 
 
 class PlayableMap:
@@ -51,13 +15,13 @@ class PlayableMap:
         beatmap_id: int,
         mods: aiosu.models.mods.Mods = None,
         win_condition: WinCondition = WinCondition.INHERIT,
-        comment: str = None,
+        name: str = None,
     ):
         self.beatmap_id = beatmap_id
         self.beatmap = None
         self.mods = mods
         self.win_condition = win_condition
-        self.comment = comment
+        self.name = name  # map code used in picks/bans, e.g. "NM1", "HD2", "TB"
 
     @classmethod
     async def create(
@@ -65,9 +29,9 @@ class PlayableMap:
         beatmap_id: int,
         mods: aiosu.models.mods.Mods = None,
         win_condition: WinCondition = WinCondition.INHERIT,
-        comment: str = None,
+        name: str = None,
     ) -> "PlayableMap":
-        instance = cls(beatmap_id, mods, win_condition, comment)
+        instance = cls(beatmap_id, mods, win_condition, name)
         async with make_client() as client:
             instance.beatmap = await client.get_beatmap(beatmap_id)
         return instance
@@ -105,28 +69,51 @@ class Team:
 
 
 class Ruleset:
-    def __init__(self, vs: int, gamemode: aiosu.models.Gamemode, win_condition: WinCondition = WinCondition.SCORE_V2 ,enforced_mods: str = 'NF'):
+    def __init__(
+        self,
+        vs: int,
+        gamemode: aiosu.models.Gamemode,
+        win_condition: WinCondition = WinCondition.SCORE_V2,
+        enforced_mods: str = "NF",
+    ):
         self.vs = vs
         self.gamemode = gamemode
         self.win_condition = win_condition
-        self.enforced_mods =
+        self.enforced_mods = aiosu.models.mods.Mods(enforced_mods)
+
 
 class Match:
-    def __init__(self, ruleset: Ruleset, pool: Pool, next_step: Callable[[pd.DataFrame], (int, Step)], *teams: Team):
+    _STATUS_COLUMNS = ["turn", "team_index", "step", "beatmap_id", "timestamp"]
+
+    def __init__(
+        self,
+        ruleset: Ruleset,
+        pool: Pool,
+        next_step: Callable[[pd.DataFrame], tuple[int, Step]],
+        *teams: Team,
+    ):
         self.ruleset = ruleset
         self.pool = pool
-        self.next_step = next_step #next_step(match_status) returns (team_index, Step)
+        self.next_step = next_step  # next_step(match_status) -> (team_index, Step)
         self.teams = teams
-        self.match_status = pd.DataFrame()
+        self.match_status = pd.DataFrame(columns=self._STATUS_COLUMNS)
+        self.match_id: int | None = None  # assigned by MatchDatabase after persisting
 
+    def record_action(self, team_index: int, step: Step, beatmap_id: int) -> None:
+        row = {
+            "turn": len(self.match_status),
+            "team_index": team_index,
+            "step": step.name,
+            "beatmap_id": beatmap_id,
+            "timestamp": pd.Timestamp.now(),
+        }
+        self.match_status = pd.concat(
+            [self.match_status, pd.DataFrame([row])],
+            ignore_index=True,
+        )
 
-async def main():
-    team = await Team.create("equipo", 2)
-    print(team.to_dataframe())
+    def save(self, path: str | Path) -> None:
+        self.match_status.to_csv(path, index=False)
 
-    map1 = await PlayableMap.create(75, mods=aiosu.models.mods.Mods("HD"))
-    print(map1.beatmap)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    def resume(self, path: str | Path) -> None:
+        self.match_status = pd.read_csv(path, parse_dates=["timestamp"])

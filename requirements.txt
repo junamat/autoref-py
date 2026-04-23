@@ -2,3 +2,5 @@ aiosu
 numpy
 pandas
 python-dotenv
+pytest
+pytest-asyncio
