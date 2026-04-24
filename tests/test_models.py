@@ -72,6 +72,20 @@ def test_flatten_nested_preserves_order():
     assert [m.beatmap_id for m in pool.flatten()] == [1, 2, 3, 4]
 
 
+def test_flatten_propagates_is_tiebreaker():
+    tb = PlayableMap(99, name="TB", is_tiebreaker=True)
+    pool = Pool("p", PlayableMap(1), tb)
+    flat = pool.flatten()
+    assert [m.is_tiebreaker for m in flat] == [False, True]
+
+
+def test_flatten_nested_propagates_is_tiebreaker():
+    inner = Pool("TB", PlayableMap(99, name="TB", is_tiebreaker=True))
+    pool = Pool("Full", Pool("NM", PlayableMap(1), PlayableMap(2)), inner)
+    flat = pool.flatten()
+    assert [m.is_tiebreaker for m in flat] == [False, False, True]
+
+
 def test_flatten_with_order():
     import random
     maps = [PlayableMap(i) for i in range(1, 6)]
@@ -181,6 +195,26 @@ def test_ruleset_asymmetric_bans_protects():
     assert r.protects_for(0) == 0
     assert r.protects_for(1) == 2
     assert r.protects_for(2) == 1
+
+
+# --- OrderScheme ---
+
+def test_order_scheme_defaults():
+    from autoref.models import OrderScheme
+    s = OrderScheme("default")
+    assert s.protect_first == 0
+    assert s.ban_first == 0
+    assert s.pick_first == 0
+    assert s.ban_pattern == "ABAB"
+    assert s.split_ban_after_pick is None
+
+
+def test_ruleset_accepts_schemes():
+    import aiosu
+    from autoref.models import OrderScheme
+    schemes = [OrderScheme("a"), OrderScheme("b", pick_first=1)]
+    r = Ruleset(vs=1, gamemode=aiosu.models.Gamemode.STANDARD, schemes=schemes)
+    assert r.schemes is schemes
 
 
 # --- Match ---

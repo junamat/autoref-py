@@ -11,6 +11,25 @@ from .client import make_client
 
 
 @dataclass
+class OrderScheme:
+    """Declarative bracket-match order. Roles are roll ranks (0 = roll winner).
+
+    For the common 2-team case, "first" means the role that acts before the other;
+    subsequent actions round-robin by rank. ABAB rotates straight; ABBA rotates
+    and reverses within each doubled step (2-team only — ignored for N>2).
+
+    `split_ban_after_pick` triggers a second ban round after N picks; half the
+    total bans run before picks, the remaining half after the threshold.
+    """
+    name: str
+    protect_first: int = 0
+    ban_first: int = 0
+    pick_first: int = 0
+    ban_pattern: str = "ABAB"
+    split_ban_after_pick: int | None = None
+
+
+@dataclass
 class Timers:
     pick: int = 120        # seconds a team has to pick
     ban: int = 120         # seconds a team has to ban
@@ -40,12 +59,14 @@ class PlayableMap:
         mods=None,
         win_condition: WinCondition = WinCondition.INHERIT,
         name: str = None,
+        is_tiebreaker: bool = False,
     ):
         self.beatmap_id = beatmap_id
         self.beatmap = None
         self.mods = mods
         self.win_condition = win_condition
         self.name = name
+        self.is_tiebreaker = is_tiebreaker
         self.state = MapState.PICKABLE
 
     def effective_mods(self, pool_mods=None):
@@ -77,8 +98,9 @@ class PlayableMap:
         mods: aiosu.models.mods.Mods = None,
         win_condition: WinCondition = WinCondition.INHERIT,
         name: str = None,
+        is_tiebreaker: bool = False,
     ) -> "PlayableMap":
-        instance = cls(beatmap_id, mods, win_condition, name)
+        instance = cls(beatmap_id, mods, win_condition, name, is_tiebreaker)
         async with make_client() as client:
             instance.beatmap = await client.get_beatmap(beatmap_id)
         return instance
@@ -98,7 +120,8 @@ class Pool:
             if isinstance(item, Pool):
                 result.extend(item.flatten(_pool_mods=_pool_mods))
             else:
-                pm = PlayableMap(item.beatmap_id, item.mods, item.win_condition, item.name)
+                pm = PlayableMap(item.beatmap_id, item.mods, item.win_condition,
+                                 item.name, item.is_tiebreaker)
                 pm.beatmap = item.beatmap
                 pm._pool_mods = _pool_mods
                 result.append(pm)
@@ -148,6 +171,7 @@ class Ruleset:
         best_of: int = 1,
         bans_per_team: "int | list[int]" = 0,
         protects_per_team: "int | list[int]" = 0,
+        schemes: "list[OrderScheme] | None" = None,
     ):
         self.vs = vs
         self.gamemode = gamemode
@@ -158,6 +182,7 @@ class Ruleset:
         # int = symmetric (same for every team); list = per-team indexed
         self.bans_per_team = bans_per_team
         self.protects_per_team = protects_per_team
+        self.schemes = schemes
 
     @property
     def wins_needed(self) -> int:
