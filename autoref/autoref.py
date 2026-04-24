@@ -278,6 +278,11 @@ class AutoRef(ABC):
 
     # ---------------------------------------------------------------- main loop
 
+    async def _pre_loop(self) -> None:
+        """Hook for subclasses to run setup (roll, scheme choice, ...) after the
+        lobby is up but before entering the pick/ban/protect dispatch loop."""
+        return None
+
     async def run(self) -> None:
         ruleset = self.match.ruleset
 
@@ -298,6 +303,7 @@ class AutoRef(ABC):
         broker_task = asyncio.create_task(self._run_command_broker())
         cli_task = asyncio.create_task(self.lobby.run_cli_input())
         try:
+            await self._pre_loop()
             while True:
                 # Pause here while OFF; resumes when ref switches to assisted/auto.
                 if self.mode == RefMode.OFF:
