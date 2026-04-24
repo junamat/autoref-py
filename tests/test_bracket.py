@@ -261,3 +261,201 @@ def test_map_winner_none_on_empty():
     ar = make_bracket()
     assert ar._map_winner(MatchResult(scores=[])) is None
     assert ar._map_winner(None) is None
+
+
+# ---------------------------------------------------------------- commands
+
+def _fake_msg(username, message):
+    m = MagicMock()
+    m.user = MagicMock()
+    m.user.username = username
+    m.message = message
+    return m
+
+
+@pytest.mark.asyncio
+async def test_command_roll_with_team_names():
+    ar = make_bracket()
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    handled = await ar._dispatch_command("roll", ["Blue", "Red"], "cli")
+    assert handled
+    assert ar.ranking == [1, 0]
+    assert ar._roll_done.is_set()
+
+
+@pytest.mark.asyncio
+async def test_command_roll_with_indices():
+    ar = make_bracket()
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    await ar._dispatch_command("roll", ["1", "0"], "cli")
+    assert ar.ranking == [1, 0]
+
+
+@pytest.mark.asyncio
+async def test_command_roll_rejects_duplicate():
+    ar = make_bracket()
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    await ar._dispatch_command("roll", ["Red", "Red"], "cli")
+    assert ar.ranking is None
+
+
+@pytest.mark.asyncio
+async def test_command_roll_rejects_wrong_count():
+    ar = make_bracket()
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    await ar._dispatch_command("roll", ["Red"], "cli")
+    assert ar.ranking is None
+
+
+@pytest.mark.asyncio
+async def test_command_order_picks_scheme():
+    schemes = [OrderScheme("A"), OrderScheme("B", pick_first=1)]
+    ar = make_bracket(schemes=schemes)
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    await ar._dispatch_command("order", ["2"], "cli")
+    assert ar.scheme is schemes[1]
+    assert ar._order_done.is_set()
+
+
+@pytest.mark.asyncio
+async def test_command_order_rejects_out_of_range():
+    schemes = [OrderScheme("A")]
+    ar = make_bracket(schemes=schemes)
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    await ar._dispatch_command("order", ["5"], "cli")
+    assert ar.scheme is None
+
+
+# ---------------------------------------------------------------- roll phase
+
+def _async_none():
+    async def _(*a, **kw): return None
+    return _()
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_auto_ranks_on_all_teams_rolled():
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 1
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    # capture the registered handler
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    handler(_fake_msg("BanchoBot", "red1 rolls 42 point(s)"))
+    handler(_fake_msg("BanchoBot", "blue1 rolls 73 point(s)"))
+    await task
+    assert ar.ranking == [1, 0]  # blue rolled higher
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_ignores_non_banchobot():
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 0.05  # short timeout
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    handler(_fake_msg("red1", "red1 rolls 999 point(s)"))  # not BanchoBot
+    await task
+    # no rolls captured, fallback to default order
+    assert ar.ranking == [0, 1]
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_ignores_unknown_user():
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 0.05
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    handler(_fake_msg("BanchoBot", "spectator rolls 42 point(s)"))
+    await task
+    assert ar.ranking == [0, 1]  # nobody on a team rolled
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_first_roll_per_team_wins():
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 1
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    # two-player red team
+    ar.match.teams = (make_team("Red", "r1", "r2"), make_team("Blue", "b1"))
+    ar._wins = [0, 0]
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    handler(_fake_msg("BanchoBot", "r1 rolls 10 point(s)"))
+    handler(_fake_msg("BanchoBot", "r2 rolls 100 point(s)"))  # ignored (2nd for red)
+    handler(_fake_msg("BanchoBot", "b1 rolls 50 point(s)"))
+    await task
+    assert ar._rolls == {0: 10, 1: 50}
+    assert ar.ranking == [1, 0]
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_released_by_override_command():
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 5
+    ar.lobby.say = MagicMock(return_value=_async_none())
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: None
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    await ar._dispatch_command("roll", ["Red", "Blue"], "cli")
+    await task
+    assert ar.ranking == [0, 1]
+
+
+# ---------------------------------------------------------------- order phase
+
+@pytest.mark.asyncio
+async def test_order_phase_auto_selects_when_single():
+    ar = make_bracket()
+    ar.set_ranking([0, 1])
+    await ar._run_order_phase()
+    assert ar.scheme is ar.schemes[0]
+
+
+@pytest.mark.asyncio
+async def test_order_phase_waits_for_command():
+    import asyncio as _asyncio
+    schemes = [OrderScheme("A"), OrderScheme("B", pick_first=1)]
+    ar = make_bracket(schemes=schemes)
+    ar.set_ranking([1, 0])
+    ar.lobby.say = MagicMock(return_value=_async_none())
+
+    task = _asyncio.create_task(ar._run_order_phase())
+    await _asyncio.sleep(0.01)
+    assert ar.scheme is None
+    await ar._dispatch_command("order", ["2"], "cli")
+    await task
+    assert ar.scheme is schemes[1]

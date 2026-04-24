@@ -219,6 +219,138 @@ class BracketAutoRef(AutoRef):
         picker = (1 - self._last_map_winner) if self._last_map_winner is not None else self._rank_to_team(0)
         await self.handle_pick(picker, tb.beatmap_id)
 
+    # ------------------------------------------------------------ commands
+
+    def _resolve_team(self, token: str) -> int | None:
+        """Accept either a team_index (digits) or a normalized team name."""
+        if token.isdigit():
+            i = int(token)
+            return i if 0 <= i < len(self.match.teams) else None
+        needle = _normalize(token)
+        for i, t in enumerate(self.match.teams):
+            if _normalize(t.name) == needle:
+                return i
+        return None
+
+    async def _dispatch_command(self, cmd: str, args: list[str], source: str) -> bool:
+        if cmd == "roll" and args:
+            ranking: list[int] = []
+            for tok in args:
+                i = self._resolve_team(tok)
+                if i is None or i in ranking:
+                    await self.lobby.say(f"Unknown or duplicate team: {tok}")
+                    return True
+                ranking.append(i)
+            if len(ranking) != len(self.match.teams):
+                await self.lobby.say(
+                    f"Expected {len(self.match.teams)} teams in ranking, got {len(ranking)}"
+                )
+                return True
+            self.ranking = ranking
+            self._roll_done.set()
+            names = ", ".join(self.match.teams[i].name for i in ranking)
+            await self.lobby.say(f"Ranking set: {names}")
+            return True
+
+        if cmd == "order" and args:
+            try:
+                n = int(args[0])
+            except ValueError:
+                await self.lobby.say("Usage: >order <n>")
+                return True
+            if not (1 <= n <= len(self.schemes)):
+                await self.lobby.say(f"Scheme out of range (1..{len(self.schemes)})")
+                return True
+            self.scheme = self.schemes[n - 1]
+            self._order_done.set()
+            await self.lobby.say(f"Scheme: {self.scheme.name}")
+            return True
+
+        if cmd == "phase":
+            await self.lobby.say(
+                f"phase={self.phase.name} "
+                f"protects={self._protect_cursor}/{len(self._protect_seq)} "
+                f"bans={self._ban_cursor}/{len(self._ban_seq)} "
+                f"picks={self._pick_count} wins={self._wins}"
+            )
+            return True
+
+        return await super()._dispatch_command(cmd, args, source)
+
+    # ------------------------------------------------------------ roll phase
+
+    async def _run_roll_phase(self) -> None:
+        self.phase = Phase.ROLL
+        self._rolls = {}
+        await self.lobby.say(
+            f"All teams, please !roll. You have {self.roll_timeout}s — "
+            "ref can override with >roll <team> <team> [...]."
+        )
+
+        def on_msg(msg) -> None:
+            if getattr(msg.user, "username", None) != "BanchoBot":
+                return
+            m = _ROLL_RE.match(msg.message)
+            if not m:
+                return
+            user = _normalize(m.group("user"))
+            value = int(m.group("n"))
+            for ti, team in enumerate(self.match.teams):
+                if any(_normalize(p.username) == user for p in team.players):
+                    if ti in self._rolls:
+                        return  # first roll per team wins
+                    self._rolls[ti] = value
+                    logger.info("roll: %s (team %d) = %d", user, ti, value)
+                    if (len(self._rolls) == len(self.match.teams)
+                            and not self._roll_done.is_set()):
+                        self.ranking = sorted(
+                            self._rolls.keys(),
+                            key=lambda i: -self._rolls[i],
+                        )
+                        self._roll_done.set()
+                    return
+
+        self.lobby.channel.on("message", on_msg)
+        try:
+            try:
+                await asyncio.wait_for(self._roll_done.wait(), self.roll_timeout)
+            except asyncio.TimeoutError:
+                if self._rolls:
+                    ranked = sorted(self._rolls.keys(), key=lambda i: -self._rolls[i])
+                    missing = [i for i in range(len(self.match.teams)) if i not in self._rolls]
+                    self.ranking = ranked + missing
+                    await self.lobby.say(
+                        "Roll timeout — using partial results. Ref can override with >roll."
+                    )
+                else:
+                    self.ranking = list(range(len(self.match.teams)))
+                    await self.lobby.say(
+                        "No rolls received — defaulting to team order. Ref can override with >roll."
+                    )
+        finally:
+            self.lobby.channel.remove_listener("message", on_msg)
+
+    # ------------------------------------------------------------ order phase
+
+    async def _run_order_phase(self) -> None:
+        self.phase = Phase.ORDER
+        if len(self.schemes) == 1:
+            self.scheme = self.schemes[0]
+            return
+        winner = self.match.teams[self.ranking[0]].name
+        options = " | ".join(f"{i}) {s.name}" for i, s in enumerate(self.schemes, start=1))
+        await self.lobby.say(f"{winner}, choose a scheme with >order <n>: {options}")
+        await self._order_done.wait()
+
+    # --------------------------------------------------------------- pre-loop
+
+    async def _pre_loop(self) -> None:
+        if self.ranking is None:
+            await self._run_roll_phase()
+        if self.scheme is None:
+            await self._run_order_phase()
+        self.commit_scheme(self.scheme)
+
     def _map_winner(self, result: MatchResult) -> int | None:
         """Team_index whose players' scores sum highest. None on tie/empty."""
         if result is None or not result.scores:
