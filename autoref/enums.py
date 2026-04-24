@@ -2,32 +2,37 @@ from enum import Enum
 
 
 class WinCondition(Enum):
-    INHERIT = 0
-    SCORE_V2 = 1
-    ACCURACY_V2 = 2
-    COMBO = 3
-    FEWER_MISSES = 4
-    TARGET_SCORE_V2 = 5
-    TARGET_ACCURACY_V2 = 6
-    SCORE_V1 = 7
-    ACCURACY_V1 = 8
-    TARGET_SCORE_V1 = 9
-    TARGET_ACCURACY_V1 = 10
-    OTHER = 11
+    # 0-3 map directly to BanchoLobbyWinConditions
+    SCORE_V1       = 0
+    ACCURACY       = 1
+    COMBO          = 2
+    SCORE_V2       = 3
+    # custom — require AutoRef subclass logic, not sent to bancho directly
+    INHERIT        = -1
+    FEWER_MISSES   = 4
+    TARGET_SCORE   = 5
+    TARGET_ACCURACY = 6
+    OTHER          = 11
 
 
 class MapState(Enum):
-    INHERIT = 0
-    PICKABLE = 1
-    PROTECTED = 2
-    BANNED = 3
-    DISALLOWED = 4
-    OTHER = 11
+    INHERIT    = -1  # inherit state from parent pool
+    PICKABLE   = 0
+    PROTECTED  = 1
+    BANNED     = 2
+    DISALLOWED = 3
+    OTHER      = 11
 
 
 class Step(Enum):
-    PICK = 1
-    BAN = 2
-    PROTECT = 3
-    WIN = 4
-    OTHER = 11
+    PICK    = 0
+    BAN     = 1
+    PROTECT = 2
+    WIN     = 3
+    OTHER   = 11
+
+
+class RefMode(Enum):
+    OFF      = "off"
+    ASSISTED = "assisted"
+    AUTO     = "auto"

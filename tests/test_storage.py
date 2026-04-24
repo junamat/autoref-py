@@ -15,6 +15,9 @@ def make_ruleset() -> Ruleset:
     ruleset.gamemode.name_api = "osu"
     ruleset.win_condition = WinCondition.SCORE_V2
     ruleset.team_mode = 2
+    ruleset.best_of = 5
+    ruleset.bans_per_team = 1
+    ruleset.protects_per_team = 0
     return ruleset
 
 

@@ -18,15 +18,18 @@ class Timers:
     ready_up: int = 120    # seconds players have to ready up after map is set
     force_start: int = 10  # seconds before force-starting when ready timer expires
     between_maps: int = 10 # seconds between maps
+    closing: int = 30      # seconds between win announcement and lobby close
 
 
+NO_MODS = object()  # sentinel: explicitly no extra mods, bypasses pool/name inference
+
+# Extra mods only — NF is excluded because it is applied room-wide via Ruleset.enforced_mods.
+# play_map merges these with enforced_mods before calling set_mods.
 _MOD_INFERENCE: dict[str, str] = {
-    "NM": "NF",
-    "HD": "HDNF",
-    "HR": "HRNF",
-    "DT": "DTNF",
+    "HD": "HD",
+    "HR": "HR",
+    "DT": "DT",
     "FM": "Freemod",
-    "TB": "NF",
 }
 
 
@@ -34,7 +37,7 @@ class PlayableMap:
     def __init__(
         self,
         beatmap_id: int,
-        mods: aiosu.models.mods.Mods = None,
+        mods=None,
         win_condition: WinCondition = WinCondition.INHERIT,
         name: str = None,
     ):
@@ -45,11 +48,19 @@ class PlayableMap:
         self.name = name
         self.state = MapState.PICKABLE
 
-    def effective_mods(self, pool_mods: aiosu.models.mods.Mods = None) -> aiosu.models.mods.Mods | None:
-        """Resolve mods with priority: explicit > pool_mods > name inference."""
+    def effective_mods(self, pool_mods=None):
+        """Resolve extra mods with priority: explicit (or NO_MODS) > pool_mods > name inference.
+
+        Returns None when no extra mods apply (e.g. NM maps).
+        play_map is responsible for combining the result with Ruleset.enforced_mods.
+        """
+        if self.mods is NO_MODS:
+            return None
         if self.mods is not None:
             return self.mods
         pm = pool_mods if pool_mods is not None else getattr(self, "_pool_mods", None)
+        if pm is NO_MODS:
+            return None
         if pm is not None:
             return pm
         if self.name:
@@ -134,12 +145,31 @@ class Ruleset:
         win_condition: WinCondition = WinCondition.SCORE_V2,
         enforced_mods: str = "NF",
         team_mode: int = 2,  # 0=HeadToHead, 2=TeamVs
+        best_of: int = 1,
+        bans_per_team: "int | list[int]" = 0,
+        protects_per_team: "int | list[int]" = 0,
     ):
         self.vs = vs
         self.gamemode = gamemode
         self.win_condition = win_condition
         self.enforced_mods = aiosu.models.mods.Mods(enforced_mods) if enforced_mods else None
         self.team_mode = team_mode
+        self.best_of = best_of
+        # int = symmetric (same for every team); list = per-team indexed
+        self.bans_per_team = bans_per_team
+        self.protects_per_team = protects_per_team
+
+    @property
+    def wins_needed(self) -> int:
+        return self.best_of // 2 + 1
+
+    def bans_for(self, team_index: int) -> int:
+        v = self.bans_per_team
+        return v if isinstance(v, int) else v[team_index]
+
+    def protects_for(self, team_index: int) -> int:
+        v = self.protects_per_team
+        return v if isinstance(v, int) else v[team_index]
 
 
 class Match:

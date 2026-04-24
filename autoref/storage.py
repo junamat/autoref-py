@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 
@@ -6,12 +7,15 @@ import pandas as pd
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS matches (
-    match_id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ruleset_vs      INTEGER NOT NULL,
-    gamemode        TEXT NOT NULL,
-    win_condition   TEXT NOT NULL,
-    winner_team     TEXT
+    match_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ruleset_vs        INTEGER NOT NULL,
+    gamemode          TEXT NOT NULL,
+    win_condition     TEXT NOT NULL,
+    best_of           INTEGER NOT NULL DEFAULT 1,
+    bans_per_team     TEXT NOT NULL DEFAULT '0',      -- JSON: int or list[int]
+    protects_per_team TEXT NOT NULL DEFAULT '0',      -- JSON: int or list[int]
+    winner_team       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS match_teams (
@@ -53,11 +57,14 @@ class MatchDatabase:
             winner_name = match.teams[winner_team_index].name
 
         cursor = self._conn.execute(
-            "INSERT INTO matches (ruleset_vs, gamemode, win_condition, winner_team) VALUES (?, ?, ?, ?)",
+            "INSERT INTO matches (ruleset_vs, gamemode, win_condition, best_of, bans_per_team, protects_per_team, winner_team) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 match.ruleset.vs,
                 match.ruleset.gamemode.name_api,
                 match.ruleset.win_condition.name,
+                match.ruleset.best_of,
+                json.dumps(match.ruleset.bans_per_team),
+                json.dumps(match.ruleset.protects_per_team),
                 winner_name,
             ),
         )

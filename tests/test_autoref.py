@@ -19,6 +19,9 @@ def make_ruleset(vs=2, enforced_mods="NF"):
     r.win_condition = WinCondition.SCORE_V2
     r.enforced_mods = enforced_mods
     r.team_mode = 2
+    r.best_of = 1
+    r.bans_per_team = 0
+    r.protects_per_team = 0
     return r
 
 
@@ -58,9 +61,14 @@ def make_autoref(steps=None, match=None):
     ar.lobby.set_map = AsyncMock()
     ar.lobby.timer = AsyncMock()
     ar.lobby.wait_for_all_ready = AsyncMock()
+    ar.lobby.wait_for_timer = AsyncMock()
+    ar.lobby.run_cli_input = AsyncMock()
     ar.lobby.start = AsyncMock()
     ar.lobby.wait_for_match_end = AsyncMock(return_value=MagicMock())
     ar.lobby.say = AsyncMock()
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = MagicMock()
+    ar.lobby.channel.remove_listener = MagicMock()
     return ar
 
 
@@ -127,12 +135,8 @@ async def test_await_map_choice_resolves_on_team_message():
 
     ar = make_autoref(match=match)
 
-    # Simulate channel message from Alice saying "NM1"
     captured_handler = {}
-    ar.lobby._lobby = MagicMock()
-    ar.lobby._lobby.channel = MagicMock()
-    ar.lobby._lobby.channel.on = lambda event, fn: captured_handler.update({event: fn})
-    ar.lobby._lobby.channel.remove_listener = MagicMock()
+    ar.lobby.channel.on = lambda event, fn: captured_handler.update({event: fn})
 
     async def drive():
         await asyncio.sleep(0)  # let _await_map_choice register handler
@@ -156,11 +160,9 @@ async def test_await_map_choice_ignores_wrong_team():
     match.teams[0].players = [p]
 
     ar = make_autoref(match=match)
+
     captured_handler = {}
-    ar.lobby._lobby = MagicMock()
-    ar.lobby._lobby.channel = MagicMock()
-    ar.lobby._lobby.channel.on = lambda event, fn: captured_handler.update({event: fn})
-    ar.lobby._lobby.channel.remove_listener = MagicMock()
+    ar.lobby.channel.on = lambda event, fn: captured_handler.update({event: fn})
 
     resolved = []
 
@@ -222,7 +224,8 @@ def test_custom_timers():
 # ------------------------------------------------------------------ run()
 
 @pytest.mark.asyncio
-async def test_run_creates_and_closes():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_creates_and_closes(mock_sleep):
     ar = make_autoref(steps=[(0, Step.WIN)])
     await ar.run()
     ar.lobby.create.assert_called_once_with("Test Room")
@@ -230,15 +233,17 @@ async def test_run_creates_and_closes():
 
 
 @pytest.mark.asyncio
-async def test_run_sets_room_and_mods():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_sets_room_and_mods(mock_sleep):
     ar = make_autoref(steps=[(0, Step.WIN)])
     await ar.run()
-    ar.lobby.set_room.assert_called_once_with(team_mode=2, score_mode=0, size=4)
+    ar.lobby.set_room.assert_called_once_with(team_mode=2, score_mode=3, size=4)
     ar.lobby.set_mods.assert_called_once_with("NF")
 
 
 @pytest.mark.asyncio
-async def test_run_skips_mods_when_empty():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_skips_mods_when_empty(mock_sleep):
     match = make_match()
     match.ruleset.enforced_mods = ""
     ar = make_autoref(steps=[(0, Step.WIN)], match=match)
@@ -247,7 +252,8 @@ async def test_run_skips_mods_when_empty():
 
 
 @pytest.mark.asyncio
-async def test_run_invites_players():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_invites_players(mock_sleep):
     match = make_match()
     p1, p2 = MagicMock(), MagicMock()
     p1.username, p2.username = "Alice", "Bob"
@@ -260,14 +266,25 @@ async def test_run_invites_players():
 
 
 @pytest.mark.asyncio
-async def test_run_announces_win():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_announces_win(mock_sleep):
     ar = make_autoref(steps=[(0, Step.WIN)])
     await ar.run()
     ar.lobby.say.assert_called()
 
 
 @pytest.mark.asyncio
-async def test_run_starts_pick_timer():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_closing_sequence(mock_sleep):
+    ar = make_autoref(steps=[(0, Step.WIN)])
+    await ar.run()
+    mock_sleep.assert_awaited_once_with(ar.timers.closing)
+    ar.lobby.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_starts_pick_timer(mock_sleep):
     ar = make_autoref(steps=[(0, Step.PICK), (0, Step.WIN)])
     ar.await_pick = AsyncMock(return_value=1)
     ar.handle_pick = AsyncMock()
@@ -278,7 +295,8 @@ async def test_run_starts_pick_timer():
 
 
 @pytest.mark.asyncio
-async def test_run_starts_ban_timer():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_starts_ban_timer(mock_sleep):
     ar = make_autoref(steps=[(0, Step.BAN), (0, Step.WIN)])
     ar.await_ban = AsyncMock(return_value=2)
     ar.handle_ban = AsyncMock()
@@ -289,7 +307,8 @@ async def test_run_starts_ban_timer():
 
 
 @pytest.mark.asyncio
-async def test_run_starts_protect_timer():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_starts_protect_timer(mock_sleep):
     ar = make_autoref(steps=[(0, Step.PROTECT), (0, Step.WIN)])
     ar.await_protect = AsyncMock(return_value=3)
     ar.handle_protect = AsyncMock()
@@ -300,7 +319,8 @@ async def test_run_starts_protect_timer():
 
 
 @pytest.mark.asyncio
-async def test_run_calls_handle_other():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_calls_handle_other(mock_sleep):
     called = []
 
     class TrackingAutoRef(ConcreteAutoRef):
@@ -326,16 +346,19 @@ async def test_play_map_full_flow():
     ar.lobby.set_map.assert_called_once_with(1, 0)
     ar.lobby.timer.assert_called_with(ar.timers.between_maps)
     ar.lobby.wait_for_all_ready.assert_called_once()
-    ar.lobby.start.assert_called_once()
+    ar.lobby.wait_for_timer.assert_called_once()
+    ar.lobby.start.assert_called_once_with(delay=ar.timers.force_start)
     ar.lobby.wait_for_match_end.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_play_map_sets_per_map_mods():
-    pm = PlayableMap(5, mods="HD")
+    import aiosu
+    pm = PlayableMap(5, mods=aiosu.models.mods.Mods("HD"))
     ar = make_autoref(match=make_match(pool=Pool("p", pm)))
     await ar.play_map(5, 0, Step.PICK)
-    ar.lobby.set_mods.assert_called_with("HD")
+    # enforced_mods is "NF" in make_ruleset; extra mods "HD" + enforced "NF" = "HDNF"
+    ar.lobby.set_mods.assert_called_with("HDNF")
 
 
 @pytest.mark.asyncio

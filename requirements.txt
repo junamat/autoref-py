@@ -5,3 +5,5 @@ python-dotenv
 pytest
 pytest-asyncio
 bancho.py
+fastapi
+uvicorn[standard]

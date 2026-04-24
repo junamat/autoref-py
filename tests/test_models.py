@@ -17,6 +17,9 @@ def make_ruleset() -> Ruleset:
     ruleset.win_condition = WinCondition.SCORE_V2
     ruleset.enforced_mods = MagicMock()
     ruleset.team_mode = 2
+    ruleset.best_of = 1
+    ruleset.bans_per_team = 0
+    ruleset.protects_per_team = 0
     return ruleset
 
 
@@ -103,21 +106,30 @@ def test_effective_mods_explicit():
 
 
 def test_effective_mods_inferred_nm():
+    # NM has no extra mods — NF is enforced room-wide, not per-map
     pm = PlayableMap(1, name="NM1")
-    result = pm.effective_mods()
-    assert str(result) == "NF" or "NF" in str(result)
+    assert pm.effective_mods() is None
 
 
 def test_effective_mods_inferred_hd():
     pm = PlayableMap(1, name="HD2")
     result = pm.effective_mods()
-    assert "HD" in str(result)
+    assert str(result) == "HD"
 
 
 def test_effective_mods_inferred_dt():
     pm = PlayableMap(1, name="DT1")
     result = pm.effective_mods()
-    assert "DT" in str(result)
+    assert str(result) == "DT"
+
+
+def test_effective_mods_no_mods_sentinel():
+    from autoref.models import NO_MODS
+    import aiosu
+    pool_mods = aiosu.models.mods.Mods("HD")
+    pool = ModdedPool("HD", pool_mods, PlayableMap(1, mods=NO_MODS))
+    flat = pool.flatten()
+    assert flat[0].effective_mods() is None
 
 
 def test_effective_mods_none_when_unknown():
@@ -128,6 +140,47 @@ def test_effective_mods_none_when_unknown():
 def test_effective_mods_none_when_no_name():
     pm = PlayableMap(1)
     assert pm.effective_mods() is None
+
+
+# --- Ruleset ---
+
+def test_ruleset_defaults():
+    import aiosu
+    r = Ruleset(vs=4, gamemode=aiosu.models.Gamemode.STANDARD)
+    assert r.best_of == 1
+    assert r.bans_per_team == 0
+    assert r.protects_per_team == 0
+    assert r.bans_for(0) == 0
+    assert r.protects_for(1) == 0
+
+
+def test_ruleset_wins_needed():
+    import aiosu
+    assert Ruleset(vs=1, gamemode=aiosu.models.Gamemode.STANDARD, best_of=1).wins_needed == 1
+    assert Ruleset(vs=1, gamemode=aiosu.models.Gamemode.STANDARD, best_of=5).wins_needed == 3
+    assert Ruleset(vs=1, gamemode=aiosu.models.Gamemode.STANDARD, best_of=9).wins_needed == 5
+
+
+def test_ruleset_symmetric_bans_protects():
+    import aiosu
+    r = Ruleset(vs=4, gamemode=aiosu.models.Gamemode.STANDARD,
+                bans_per_team=2, protects_per_team=1)
+    assert r.bans_for(0) == 2
+    assert r.bans_for(1) == 2
+    assert r.protects_for(0) == 1
+    assert r.protects_for(7) == 1
+
+
+def test_ruleset_asymmetric_bans_protects():
+    import aiosu
+    r = Ruleset(vs=1, gamemode=aiosu.models.Gamemode.STANDARD,
+                bans_per_team=[3, 1, 2], protects_per_team=[0, 2, 1])
+    assert r.bans_for(0) == 3
+    assert r.bans_for(1) == 1
+    assert r.bans_for(2) == 2
+    assert r.protects_for(0) == 0
+    assert r.protects_for(1) == 2
+    assert r.protects_for(2) == 1
 
 
 # --- Match ---

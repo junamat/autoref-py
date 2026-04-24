@@ -4,35 +4,39 @@ Usage: python run_qualifiers.py
 Requires .env with BANCHO_USERNAME, BANCHO_PASSWORD, CLIENT_ID, CLIENT_SECRET
 """
 import asyncio
+import logging
 from dotenv import load_dotenv
 from os import getenv
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 import bancho
 
 from autoref.models import Match, ModdedPool, PlayableMap, Pool, Ruleset, Team, Timers
-from autoref.enums import WinCondition
+from autoref.enums import WinCondition, RefMode
 from autoref.qualifiers import QualifiersAutoRef
+from autoref.web import WebInterface
 
 load_dotenv()
 
 import aiosu
 
 POOL = Pool("Qualifiers",
-    ModdedPool("NM", aiosu.models.mods.Mods("NF"),
+    Pool("NM",
         PlayableMap(1725575, name="NM1"),
         PlayableMap(2831724, name="NM2"),
         PlayableMap(2302096, name="NM3"),
         PlayableMap(2531431, name="NM4"),
     ),
-    ModdedPool("HD", aiosu.models.mods.Mods("HDNF"),
+    ModdedPool("HD", aiosu.models.mods.Mods("HD"),
         PlayableMap(637391,  name="HD1"),
         PlayableMap(1313278, name="HD2"),
     ),
-    ModdedPool("HR", aiosu.models.mods.Mods("HRNF"),
+    ModdedPool("HR", aiosu.models.mods.Mods("HR"),
         PlayableMap(1427203, name="HR1"),
         PlayableMap(181589,  name="HR2"),
     ),
-    ModdedPool("DT", aiosu.models.mods.Mods("DTNF"),
+    ModdedPool("DT", aiosu.models.mods.Mods("DT"),
         PlayableMap(96525,   name="DT1"),
         PlayableMap(2035004, name="DT2"),
     ),
@@ -64,18 +68,30 @@ async def main():
 
     match = Match(RULESET, POOL, lambda _: (0, None), team)  # next_step overridden by QualifiersAutoRef
 
+    mode = RefMode(getenv("AUTOREF_MODE", "auto").lower())
+    prefix = getenv("AUTOREF_PREFIX", ">")
+    refs_env = getenv("AUTOREF_REFS", "")
+    refs = {r.strip() for r in refs_env.split(",") if r.strip()} or None
+
     ar = QualifiersAutoRef(
         client=client,
         match=match,
         room_name="autoref-py qualifiers PoC",
         runs=1,
         timers=TIMERS,
+        mode=mode,
+        ref_prefix=prefix,
+        refs=refs,
     )
 
+    web = WebInterface()
+    web.attach(ar.lobby)
+
+    print(f"Mode: {mode.value}  prefix: {prefix}  refs: {refs or '(any)'}")
     print("Connecting to Bancho...")
     await client.connect()
-    print("Connected. Starting qualifiers...")
-    await ar.run()
+    print("Connected. Starting qualifiers on http://localhost:8080 ...")
+    await asyncio.gather(web.start(), ar.run())
     print("Done.")
     await client.disconnect()
 

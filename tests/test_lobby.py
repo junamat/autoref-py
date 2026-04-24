@@ -40,6 +40,7 @@ async def test_create_uses_make_lobby():
     mock_bl = MagicMock(spec=bancho.BanchoLobby)
     mock_bl.id = 99
     mock_bl.on = MagicMock()
+    mock_bl.channel = MagicMock()
     client.make_lobby = AsyncMock(return_value=mock_bl)
 
     lobby = Lobby(client)
@@ -56,6 +57,7 @@ async def test_create_registers_event_handlers():
     mock_bl = MagicMock(spec=bancho.BanchoLobby)
     mock_bl.id = 1
     mock_bl.on = MagicMock()
+    mock_bl.channel = MagicMock()
     client.make_lobby = AsyncMock(return_value=mock_bl)
 
     lobby = Lobby(client)

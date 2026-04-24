@@ -1,5 +1,5 @@
 """Tests for QualifiersAutoRef."""
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import bancho
@@ -17,6 +17,9 @@ def make_ruleset():
     r.win_condition = WinCondition.SCORE_V2
     r.enforced_mods = ""
     r.team_mode = 0
+    r.best_of = 1
+    r.bans_per_team = 0
+    r.protects_per_team = 0
     return r
 
 
@@ -36,6 +39,8 @@ def make_qar(pool, runs=1):
     ar.lobby.set_map = AsyncMock()
     ar.lobby.timer = AsyncMock()
     ar.lobby.wait_for_all_ready = AsyncMock()
+    ar.lobby.wait_for_timer = AsyncMock()
+    ar.lobby.run_cli_input = AsyncMock()
     ar.lobby.start = AsyncMock()
     ar.lobby.wait_for_match_end = AsyncMock(return_value=MagicMock())
     ar.lobby.say = AsyncMock()
@@ -82,7 +87,8 @@ async def test_await_pick_returns_maps_in_order():
 # ------------------------------------------------------------------ full run
 
 @pytest.mark.asyncio
-async def test_run_plays_all_maps():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_plays_all_maps(mock_sleep):
     pool = Pool("p", PlayableMap(1, name="NM1"), PlayableMap(2, name="HD1"))
     ar = make_qar(pool)
     await ar.run()
@@ -92,7 +98,8 @@ async def test_run_plays_all_maps():
 
 
 @pytest.mark.asyncio
-async def test_run_plays_all_maps_multiple_runs():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_plays_all_maps_multiple_runs(mock_sleep):
     pool = Pool("p", PlayableMap(1), PlayableMap(2))
     ar = make_qar(pool, runs=3)
     await ar.run()
@@ -101,7 +108,8 @@ async def test_run_plays_all_maps_multiple_runs():
 
 
 @pytest.mark.asyncio
-async def test_run_announces_map_name():
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_run_announces_map_name(mock_sleep):
     pool = Pool("p", PlayableMap(1, name="NM1"))
     ar = make_qar(pool)
     await ar.run()

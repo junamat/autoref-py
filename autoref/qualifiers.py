@@ -1,8 +1,10 @@
 """QualifiersAutoRef: plays every map in pool order, no picks/bans, supports multiple runs."""
+import asyncio
+
 import bancho
 
 from .autoref import AutoRef
-from .enums import Step
+from .enums import RefMode, Step
 from .models import Match, Timers
 
 
@@ -10,8 +12,8 @@ class QualifiersAutoRef(AutoRef):
     """Plays the full pool sequentially, N times. No picks, bans, or protects."""
 
     def __init__(self, client: bancho.BanchoClient, match: Match, room_name: str,
-                 runs: int = 1, timers: Timers | None = None):
-        super().__init__(client, match, room_name, timers)
+                 runs: int = 1, timers: Timers | None = None, **kwargs):
+        super().__init__(client, match, room_name, timers, **kwargs)
         self.runs = runs
         self._maps = match.pool.flatten()
         self._map_index = 0
@@ -23,6 +25,14 @@ class QualifiersAutoRef(AutoRef):
         return (0, Step.WIN)
 
     async def await_pick(self, team_index: int) -> int:
+        if self.mode in (RefMode.ASSISTED, RefMode.OFF):
+            # Ref confirms advance with >next (args ignored; pool order is fixed).
+            self._next_future = asyncio.get_event_loop().create_future()
+            try:
+                await self._next_future
+            finally:
+                self._next_future = None
+
         pm = self._maps[self._map_index]
         self._map_index += 1
         if self._map_index >= len(self._maps) and self._run_index + 1 < self.runs:
@@ -32,6 +42,9 @@ class QualifiersAutoRef(AutoRef):
 
     async def handle_other(self, team_index: int) -> None:
         pass  # qualifiers has no OTHER steps
+
+    async def announce_pick(self, team_index: int, beatmap_id: int) -> None: 
+        pass
 
     async def announce_next_pick(self, team_index: int) -> None:
         pm = self._maps[self._map_index]

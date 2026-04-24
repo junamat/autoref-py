@@ -1,8 +1,12 @@
 """Lobby: thin wrapper around BanchoLobby for match orchestration."""
 import asyncio
+import logging
+import sys
 from dataclasses import dataclass, field
 
 import bancho
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,6 +34,27 @@ class Lobby:
 
         self.last_result: MatchResult | None = None
         self.players: set[str] = set()
+        self._message_hooks: list = []
+        self._input_hooks: list = []
+
+    def add_message_hook(self, fn) -> None:
+        self._message_hooks.append(fn)
+
+    def add_input_hook(self, fn) -> None:
+        """Hook called for every CLI/web input line. Return True to consume, False to pass through to chat."""
+        self._input_hooks.append(fn)
+
+    async def handle_input(self, text: str, source: str = "cli") -> None:
+        """Route a line of text from CLI/web through input hooks, falling back to say()."""
+        for fn in self._input_hooks:
+            if await fn(text, source):
+                return
+        await self.say(text)
+
+    @property
+    def channel(self) -> bancho.BanchoLobbyChannel:
+        assert self._lobby is not None
+        return self._lobby.channel
 
     # ---------------------------------------------------------- room lifecycle
 
@@ -61,8 +86,14 @@ class Lobby:
         self._lobby.on("matchFinished", self._on_match_finished)
         self._lobby.on("allPlayersReady", lambda: self._all_ready_event.set())
         self._lobby.on("timerEnded", lambda: self._timer_end_event.set())
+        self._lobby.channel.on("message", self._on_channel_message)
 
         return self._lobby.id
+
+    def _on_channel_message(self, msg) -> None:
+        logger.info("[%s] %s", msg.user.username, msg.message)
+        for fn in self._message_hooks:
+            asyncio.ensure_future(fn(msg.user.username, msg.message, False))
 
     def _on_match_started(self) -> None:
         self._match_finished_event.clear()
@@ -78,6 +109,7 @@ class Lobby:
         self._match_finished_event.set()
 
     async def close(self) -> None:
+        logger.info("closing lobby")
         await self._lobby.close_lobby()
 
     # ----------------------------------------------------------- room settings
@@ -131,6 +163,7 @@ class Lobby:
 
     async def start(self, delay: int | None = None) -> None:
         self._all_ready_event.clear()
+        self._match_finished_event.clear()
         await self._lobby.start_match(delay)
 
     async def abort(self) -> None:
@@ -144,7 +177,10 @@ class Lobby:
         await self._lobby.abort_timer()
 
     async def say(self, msg: str) -> None:
+        logger.info("[autoref] %s", msg)
         await self._lobby.channel.send_message(msg)
+        for fn in self._message_hooks:
+            await fn("autoref", msg, True)
 
     # ------------------------------------------------------------ await events
 
@@ -157,3 +193,23 @@ class Lobby:
 
     async def wait_for_timer(self) -> None:
         await self._timer_end_event.wait()
+
+    # ---------------------------------------------------------- cli passthrough
+
+    async def run_cli_input(self) -> None:
+        """Read lines from stdin and forward them to the lobby channel."""
+        loop = asyncio.get_event_loop()
+        reader = asyncio.StreamReader()
+        transport, _ = await loop.connect_read_pipe(
+            lambda: asyncio.StreamReaderProtocol(reader), sys.stdin
+        )
+        try:
+            while True:
+                line = await reader.readline()
+                if not line:
+                    break
+                text = line.decode().rstrip("\n")
+                if text:
+                    await self.handle_input(text, "cli")
+        finally:
+            transport.close()
