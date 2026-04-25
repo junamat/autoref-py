@@ -12,7 +12,7 @@ from .controllers.qualifiers import QualifiersAutoRef
 
 # optional: web UI (requires fastapi + uvicorn)
 try:
-    from .web.server import WebInterface
+    from .web.server import WebInterface, WebServer
 except ImportError:
     pass
 

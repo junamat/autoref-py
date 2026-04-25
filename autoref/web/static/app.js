@@ -2,114 +2,118 @@
 
 /* ── state ───────────────────────────────────────────────────── */
 let appState = {
-  mode: 'off',
-  phase: null,
-  wins: [0, 0],
-  team_names: ['Team A', 'Team B'],
-  teams: [],
-  best_of: 1,
-  maps: [],
-  events: [],
-  pending_proposal: null,
-  ref_name: null,
+  mode: 'off', phase: null, wins: [0, 0],
+  team_names: ['Team A', 'Team B'], teams: [],
+  best_of: 1, maps: [], events: [],
+  pending_proposal: null, ref_name: null,
 };
 let ws = null;
-let inMatch = false;
+let landingWs = null;
+let currentMatchId = null;
 
 /* ── DOM shortcuts ───────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
 function esc(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-/* ── Page switching ─────────────────────────────────────────── */
+/* ── Page switching ──────────────────────────────────────────── */
 function showLanding() {
-  inMatch = false;
+  currentMatchId = null;
   $('landing-page').hidden = false;
   $('match-view').hidden   = true;
   if (ws) { ws.close(); ws = null; }
-  loadLanding();
+  connectLanding();
 }
 
-function showMatch() {
-  inMatch = true;
+function showMatch(matchId) {
+  currentMatchId = matchId;
   $('landing-page').hidden = true;
   $('match-view').hidden   = false;
-  connect();
+  if (landingWs) { landingWs.close(); landingWs = null; }
+  connectMatch(matchId);
 }
 
-/* ── Landing page ────────────────────────────────────────────── */
-async function loadLanding() {
-  try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    renderMatchList(data);
-  } catch (_) {
-    renderMatchList({ active: false });
-  }
+/* ── Landing WebSocket ───────────────────────────────────────── */
+function connectLanding() {
+  if (landingWs) landingWs.close();
+  landingWs = new WebSocket(`ws://${location.host}/ws/landing`);
+
+  landingWs.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'matches') renderMatchList(msg.matches || []);
+    } catch (_) {}
+  };
+
+  landingWs.onclose = () => {
+    // reconnect after a short delay if still on landing
+    if (!currentMatchId) setTimeout(connectLanding, 3000);
+  };
 }
 
-function renderMatchList(data) {
-  const list = $('match-list');
+function renderMatchList(matches) {
+  const list  = $('match-list');
   const noMsg = $('no-matches-msg');
-  if (!data.active) {
+
+  list.querySelectorAll('.match-card').forEach(c => c.remove());
+
+  if (!matches.length) {
     noMsg.hidden = false;
-    list.querySelectorAll('.match-card').forEach(c => c.remove());
     return;
   }
   noMsg.hidden = true;
-  list.querySelectorAll('.match-card').forEach(c => c.remove());
 
-  const isQuals = !!data.qualifier;
-  const mode    = data.mode || 'off';
-  const title   = isQuals
-    ? `Qualifiers${data.phase ? ' · ' + data.phase : ''}`
-    : (data.team_names || []).join(' vs ') || 'Bracket match';
-  const meta = isQuals
-    ? `${data.maps_played ?? '?'}/${data.total_maps ?? '?'} maps played`
-    : `BO${data.best_of || '?'}`;
-  const ref = data.ref_name ? `ref: ${data.ref_name}` : '';
+  for (const data of matches) {
+    const isQuals = !!data.qualifier;
+    const mode    = data.mode || 'off';
+    const title   = isQuals
+      ? `Qualifiers${data.phase ? ' · ' + data.phase : ''}`
+      : (data.team_names || []).join(' vs ') || 'Bracket match';
+    const meta = isQuals
+      ? `${data.maps_played ?? '?'}/${data.total_maps ?? '?'} maps played`
+      : `BO${data.best_of || '?'}`;
+    const ref = data.ref_name ? ` · ref: ${data.ref_name}` : '';
 
-  const card = document.createElement('div');
-  card.className = 'match-card' + (isQuals ? ' quals' : '');
-  card.innerHTML = `
-    <div class="match-card-info">
-      <div class="match-card-title mono">${esc(title)}</div>
-      <div class="match-card-meta mono xs">${esc(meta)}${ref ? ' · ' + esc(ref) : ''}</div>
-    </div>
-    <span class="match-card-badge badge-${mode} mono">${mode.toUpperCase()}</span>
-    <button class="match-join-btn mono">join →</button>
-  `;
-  card.querySelector('.match-join-btn').addEventListener('click', showMatch);
-  list.appendChild(card);
+    const card = document.createElement('div');
+    card.className = 'match-card' + (isQuals ? ' quals' : '');
+    card.innerHTML = `
+      <div class="match-card-info">
+        <div class="match-card-title mono">${esc(title)}</div>
+        <div class="match-card-meta mono xs">${esc(meta)}${esc(ref)}</div>
+      </div>
+      <span class="match-card-badge badge-${esc(mode)} mono">${esc(mode.toUpperCase())}</span>
+      <button class="match-join-btn mono">join →</button>
+    `;
+    card.querySelector('.match-join-btn').addEventListener('click', () => showMatch(data.id));
+    list.appendChild(card);
+  }
 }
 
-/* ── WebSocket ───────────────────────────────────────────────── */
-function connect() {
-  ws = new WebSocket(`ws://${location.host}/ws`);
+/* ── Match WebSocket ─────────────────────────────────────────── */
+function connectMatch(matchId) {
+  ws = new WebSocket(`ws://${location.host}/ws/${matchId}`);
 
   ws.onopen = () => {
     setConnected(true);
     $('chat-input').disabled = false;
-    $('chat-send').disabled = false;
+    $('chat-send').disabled  = false;
     $('chat-input').focus();
   };
 
   ws.onclose = () => {
     setConnected(false);
     $('chat-input').disabled = true;
-    $('chat-send').disabled = true;
-    if (inMatch) setTimeout(connect, 3000);
+    $('chat-send').disabled  = true;
+    if (currentMatchId === matchId) setTimeout(() => connectMatch(matchId), 3000);
   };
 
   ws.onmessage = e => {
     try {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'chat') handleChat(msg);
+      if      (msg.type === 'chat')  handleChat(msg);
       else if (msg.type === 'state') handleState(msg);
+      else if (msg.type === 'reply') handleReply(msg);
     } catch (_) {}
   };
 }
@@ -120,16 +124,25 @@ function sendWS(text) {
 
 /* ── connection status ───────────────────────────────────────── */
 function setConnected(on) {
-  $('led').className       = 'led' + (on ? ' on' : '');
-  $('chat-led').className  = 'led led-sm' + (on ? ' on' : '');
+  $('led').className      = 'led' + (on ? ' on' : '');
+  $('chat-led').className = 'led led-sm' + (on ? ' on' : '');
   if (!on) $('match-info').textContent = 'disconnected';
 }
 
 /* ── chat ────────────────────────────────────────────────────── */
 function handleChat({ username, message, outgoing }) {
+  appendChatLine(username, message, outgoing ? 'out' : 'in');
+}
+
+function handleReply({ text }) {
+  // replies from >help etc — show as system messages in chat
+  appendChatLine('autoref', text, 'out');
+}
+
+function appendChatLine(username, message, cls) {
   const log = $('chat-log');
   const div = document.createElement('div');
-  div.className = 'msg ' + (outgoing ? 'out' : 'in');
+  div.className = 'msg ' + cls;
   div.innerHTML =
     `<span class="user">${esc(username)}</span>` +
     `<span class="sep">»</span>` +
@@ -186,44 +199,30 @@ function renderRefPill() {
 function renderAssistedBanner() {
   const banner = $('assisted-banner');
   const p = appState.pending_proposal;
-
-  if (!p || appState.mode !== 'assisted') {
-    banner.hidden = true;
-    return;
-  }
-
-  const stepLabel = p.step ? p.step.toLowerCase() : 'action';
-  const mapLabel  = p.map  || '?';
+  if (!p || appState.mode !== 'assisted') { banner.hidden = true; return; }
   const team = (appState.team_names || [])[p.team_index] || `team ${p.team_index}`;
-  $('assisted-desc').textContent = `${team} typed ${mapLabel} — ${stepLabel} this map?`;
+  $('assisted-desc').textContent = `${team} typed ${p.map || '?'} — ${(p.step || 'action').toLowerCase()} this map?`;
   banner.hidden = false;
 }
 
-/* strip: bracket score vs qualifiers progress */
+/* ── strip ───────────────────────────────────────────────────── */
 function renderStrip() {
   const isQuals = !!appState.qualifier;
-  $('score-panel').hidden  = isQuals;
-  $('quals-panel').hidden  = !isQuals;
-
-  if (isQuals) {
-    renderQuals();
-  } else {
-    renderScore();
-  }
+  $('score-panel').hidden = isQuals;
+  $('quals-panel').hidden = !isQuals;
+  isQuals ? renderQuals() : renderScore();
 }
 
 function renderScore() {
   const [n0, n1] = appState.team_names || ['—', '—'];
   const [w0, w1] = appState.wins || [0, 0];
   const bo       = appState.best_of || 1;
-  const needed   = Math.floor(bo / 2) + 1;
-
   $('team0-name').textContent = n0 || '—';
   $('team1-name').textContent = n1 || '—';
   $('score-0').textContent    = w0;
   $('score-1').textContent    = w1;
   $('score-bo').textContent   = `BO${bo}`;
-  $('score-need').textContent = `first to ${needed}`;
+  $('score-need').textContent = `first to ${Math.floor(bo / 2) + 1}`;
 }
 
 function renderQuals() {
@@ -234,12 +233,11 @@ function renderQuals() {
 
 function formatEta(seconds) {
   if (seconds == null || seconds === 0) return '—';
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
+  const m = Math.floor(seconds / 60), s = seconds % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/* mode */
+/* ── mode ────────────────────────────────────────────────────── */
 function renderMode() {
   const mode = appState.mode || 'off';
   const labels = {
@@ -247,12 +245,10 @@ function renderMode() {
     assisted: 'assisted — awaiting ref confirm',
     off:      'off — ref is driving',
   };
-
   document.querySelectorAll('.mode-btn').forEach(btn => {
     const m = btn.dataset.mode;
     btn.className = 'mode-btn' + (m === mode ? ` mode-${m}-active` : '');
   });
-
   $('mode-label').textContent = labels[mode] || mode;
   $('mode-led').className = 'led led-sm' + (mode !== 'off' ? ' on' : '');
   $('mode-label').className = 'mono xs ' + (
@@ -260,15 +256,11 @@ function renderMode() {
   );
 }
 
-/* mappool */
+/* ── mappool ─────────────────────────────────────────────────── */
 const MAP_CLASS = {
-  pickable:   'map-pickable',
-  protected:  'map-protected',
-  banned:     'map-banned',
-  played:     'map-played',
-  disallowed: 'map-disallowed',
-  current:    'map-current',
-  upcoming:   'map-upcoming',
+  pickable: 'map-pickable', protected: 'map-protected', banned: 'map-banned',
+  played: 'map-played', disallowed: 'map-disallowed',
+  current: 'map-current', upcoming: 'map-upcoming',
 };
 function renderMappool() {
   const grid = $('mappool-grid');
@@ -288,10 +280,8 @@ function renderMappool() {
   }
 }
 
-/* timeline */
-const STEP_CLASS = {
-  BAN: 'step-ban', PICK: 'step-pick', WIN: 'step-win', PROTECT: 'step-protect',
-};
+/* ── timeline ────────────────────────────────────────────────── */
+const STEP_CLASS = { BAN:'step-ban', PICK:'step-pick', WIN:'step-win', PROTECT:'step-protect' };
 function renderTimeline() {
   const list = $('timeline-list');
   const events = appState.events || [];
@@ -309,12 +299,11 @@ function renderTimeline() {
   }).join('');
 }
 
-/* players */
+/* ── players ─────────────────────────────────────────────────── */
 function renderPlayers() {
   const content = $('players-content');
   const teams = appState.teams || [];
   if (!teams.length) return;
-
   const cols = teams.map((team, i) => {
     const headClass = i === 0 ? 'blue' : 'red';
     const name = team.name || appState.team_names?.[i] || `Team ${i}`;
@@ -325,29 +314,23 @@ function renderPlayers() {
         ${!p.ready ? '<span class="muted mono xs" style="margin-left:auto">not ready</span>' : ''}
       </div>`
     ).join('') || '<div class="player-row"><span class="muted mono xs">—</span></div>';
-
     return `<div class="team-col">
       <div class="team-head ${headClass}">${esc(name)}</div>
       ${rows}
     </div>`;
   }).join('');
-
   content.innerHTML = `<div class="teams-grid">${cols}</div>`;
 }
 
-/* settings */
+/* ── settings ────────────────────────────────────────────────── */
 function renderSettings() {
   const s = appState;
   $('cfg-mode').textContent  = s.mode || '—';
   $('cfg-bo').textContent    = s.best_of ? `BO${s.best_of}` : '—';
   $('cfg-teams').textContent = (s.team_names || []).join(' vs ') || '—';
   const phaseRow = $('cfg-phase').closest('.setting-row');
-  if (s.phase) {
-    $('cfg-phase').textContent = s.phase;
-    phaseRow.hidden = false;
-  } else {
-    phaseRow.hidden = true;
-  }
+  if (s.phase) { $('cfg-phase').textContent = s.phase; phaseRow.hidden = false; }
+  else { phaseRow.hidden = true; }
 }
 
 /* ── drawer tabs ─────────────────────────────────────────────── */
@@ -368,13 +351,11 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => sendWS(`>mode ${btn.dataset.mode}`));
 });
 
-/* ── panic ───────────────────────────────────────────────────── */
+/* ── panic / leave ───────────────────────────────────────────── */
 $('panic-btn').addEventListener('click', () => sendWS('!panic'));
-
-/* ── leave button ────────────────────────────────────────────── */
 $('leave-btn').addEventListener('click', showLanding);
 
-/* ── assisted banner actions ─────────────────────────────────── */
+/* ── assisted banner ─────────────────────────────────────────── */
 $('assisted-confirm').addEventListener('click', () => {
   const p = appState.pending_proposal;
   if (p) sendWS(`>next ${p.map}`);
@@ -387,7 +368,6 @@ $('assisted-change').addEventListener('click', () => {
   $('assisted-input-send').hidden = !changeMode;
   if (changeMode) $('assisted-input').focus();
 });
-
 $('assisted-input-send').addEventListener('click', () => {
   const val = $('assisted-input').value.trim();
   if (val) {
@@ -401,7 +381,6 @@ $('assisted-input-send').addEventListener('click', () => {
 $('assisted-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') $('assisted-input-send').click();
 });
-
 $('assisted-dismiss').addEventListener('click', () => sendWS('>dismiss'));
 
 /* ── boot ────────────────────────────────────────────────────── */
