@@ -8,6 +8,7 @@ import bancho
 from .enums import Step, MapState, RefMode
 from .lobby import Lobby
 from .models import Match, PlayableMap, Pool, Timers
+from .storage import MatchDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +70,14 @@ class AutoRef(ABC):
         mode: RefMode = RefMode.AUTO,
         ref_prefix: str = ">",
         refs: set[str] | None = None,
+        db: MatchDatabase | None = None,
     ):
         self._client = client
         self.match = match
         self.room_name = room_name
         self.timers = timers or Timers()
         self.lobby = Lobby(client)
+        self.db = db
 
         self.mode = mode
         self.ref_prefix = ref_prefix
@@ -92,6 +95,7 @@ class AutoRef(ABC):
         self._step_cancel_future: asyncio.Future | None = None
         self._abort_event: asyncio.Event = asyncio.Event()
         self._map_in_progress: bool = False
+        self._close_event: asyncio.Event = asyncio.Event()
         self._state_hooks: list = []
         self._pending_proposal: dict | None = None
         self.lobby.add_input_hook(self._handle_input)
@@ -198,6 +202,25 @@ class AutoRef(ABC):
             return (f"{self._team_name(0)} {wins[0]} : {wins[1]} {self._team_name(1)}"
                     f" (BO{bo}, first to {needed})")
         return " | ".join(f"{self._team_name(i)}: {wins[i]}" for i in range(len(wins)))
+
+    def _winner_index(self) -> int | None:
+        """Return the winning team index if the match is decided, else None."""
+        wins = self._win_counts()
+        needed = self.match.ruleset.wins_needed
+        for i, w in enumerate(wins):
+            if w >= needed:
+                return i
+        return None
+
+    def _save_match(self) -> None:
+        """Persist match to the attached MatchDatabase, if any."""
+        if self.db is None:
+            return
+        try:
+            self.db.save_match(self.match, self._winner_index())
+            logger.info("match saved (id=%s)", self.match.match_id)
+        except Exception:
+            logger.exception("failed to save match")
 
     # ---------------------------------------------------------- step interruption
 
@@ -387,6 +410,20 @@ class AutoRef(ABC):
 
         if cmd in ("undo", "u"):
             await self._undo_last_action()
+            return True
+
+        if cmd in ("close", "cl"):
+            force = args and args[0].lower() == "force"
+            if not force:
+                self._save_match()
+            self._close_event.set()
+            return True
+
+        if cmd in ("invite", "inv"):
+            for team in self.match.teams:
+                for player in team.players:
+                    await self.lobby.invite(player.username)
+            await self.lobby.say("Invites sent.")
             return True
 
         return False
@@ -629,6 +666,9 @@ class AutoRef(ABC):
                 # Pause here while OFF; resumes when ref switches to assisted/auto.
                 if self.mode == RefMode.OFF:
                     await self._mode_event.wait()
+
+                if self._close_event.is_set():
+                    break
 
                 team_index, step = self.next_step(self.match.match_status)
 
