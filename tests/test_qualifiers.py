@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import bancho
 
-from autoref.core.enums import Step, WinCondition
+from autoref.core.enums import RefMode, Step, WinCondition
 from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 from autoref.controllers.qualifiers import QualifiersAutoRef
 
@@ -29,7 +29,7 @@ def make_match(pool):
 
 def make_qar(pool, runs=1):
     match = make_match(pool)
-    ar = QualifiersAutoRef(MagicMock(spec=bancho.BanchoClient), match, "Room", runs=runs)
+    ar = QualifiersAutoRef(MagicMock(spec=bancho.BanchoClient), match, "Room", runs=runs, mode=RefMode.AUTO)
     ar.lobby = MagicMock()
     ar.lobby.create = AsyncMock(return_value=1)
     ar.lobby.set_room = AsyncMock()

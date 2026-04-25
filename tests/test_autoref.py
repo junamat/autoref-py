@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from autoref.core.base import AutoRef, _find_map
-from autoref.core.enums import Step, WinCondition
+from autoref.core.enums import RefMode, Step, WinCondition
 from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 
 
@@ -51,7 +51,7 @@ def make_autoref(steps=None, match=None):
     client.on = MagicMock()
     if match is None:
         match = make_match()
-    ar = ConcreteAutoRef(client, match, "Test Room", steps=steps)
+    ar = ConcreteAutoRef(client, match, "Test Room", steps=steps, mode=RefMode.AUTO)
     ar.lobby = MagicMock()
     ar.lobby.create = AsyncMock(return_value=1)
     ar.lobby.set_room = AsyncMock()
@@ -330,7 +330,7 @@ async def test_run_calls_handle_other(mock_sleep):
     import bancho
     ar = TrackingAutoRef(
         MagicMock(spec=bancho.BanchoClient), make_match(), "Room",
-        steps=[(1, Step.OTHER), (0, Step.WIN)]
+        steps=[(1, Step.OTHER), (0, Step.WIN)], mode=RefMode.AUTO,
     )
     ar.lobby = make_autoref().lobby
     await ar.run()
