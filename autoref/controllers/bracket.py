@@ -227,6 +227,33 @@ class BracketAutoRef(AutoRef):
             return team_index
         return self.ranking.index(team_index)
 
+    async def _undo_last_action(self) -> bool:
+        ms = self.match.match_status
+        if ms.empty:
+            await self.lobby.say("Nothing to undo.")
+            return False
+        last = ms.iloc[-1]
+        step_name = str(last["step"])
+        if step_name == "PICK":
+            # Roll back the win that was recorded for this map and the pick counter.
+            if self._last_map_winner is not None:
+                self._wins[self._last_map_winner] = max(0, self._wins[self._last_map_winner] - 1)
+                # Recompute _last_map_winner from the remaining history.
+                self._last_map_winner = None
+                for _, row in ms.iloc[:-1].iterrows():
+                    if str(row["step"]) == "PICK":
+                        # We don't store per-map winners in match_status, so just
+                        # leave it as None — handle_other will fall back to rank-0.
+                        pass
+            self._pick_count = max(0, self._pick_count - 1)
+            if self._tb_triggered:
+                self._tb_triggered = False
+        elif step_name == "BAN":
+            self._ban_cursor = max(0, self._ban_cursor - 1)
+        elif step_name == "PROTECT":
+            self._protect_cursor = max(0, self._protect_cursor - 1)
+        return await super()._undo_last_action()
+
     # ------------------------------------------------------------ commands
 
     def _resolve_team(self, token: str) -> int | None:
@@ -281,6 +308,23 @@ class BracketAutoRef(AutoRef):
                 f"bans={self._ban_cursor}/{len(self._ban_seq)} "
                 f"picks={self._pick_count} wins={self._wins}"
             )
+            return True
+
+        if cmd in ("setscoreline", "ssl", "setsc") and args:
+            if len(args) < len(self.match.teams):
+                await self.lobby.say(
+                    f"Usage: {self.ref_prefix}setscoreline "
+                    + " ".join(f"<score_{i}>" for i in range(len(self.match.teams)))
+                )
+                return True
+            try:
+                new_wins = [int(a) for a in args[:len(self.match.teams)]]
+            except ValueError:
+                await self.lobby.say("Scores must be integers.")
+                return True
+            self._wins = new_wins
+            await self.lobby.say(f"Scoreline set: {self._format_scoreline()}")
+            await self._push_state()
             return True
 
         # >first <pick|ban|protect> <team>  /  >fp <team>  /  >fb <team>  /  >fpro <team>
