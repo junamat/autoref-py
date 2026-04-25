@@ -36,6 +36,7 @@ class Lobby:
         self.players: set[str] = set()
         self._message_hooks: list = []
         self._input_hooks: list = []
+        self._output_sinks: list = []
 
     def add_message_hook(self, fn) -> None:
         self._message_hooks.append(fn)
@@ -43,6 +44,10 @@ class Lobby:
     def add_input_hook(self, fn) -> None:
         """Hook called for every CLI/web input line. Return True to consume, False to pass through to chat."""
         self._input_hooks.append(fn)
+
+    def add_output_sink(self, fn) -> None:
+        """Register an async callable(text: str) called for every message the bot sends."""
+        self._output_sinks.append(fn)
 
     async def handle_input(self, text: str, source: str = "cli") -> None:
         """Route a line of text from CLI/web through input hooks, falling back to say()."""
@@ -181,6 +186,11 @@ class Lobby:
         await self._lobby.channel.send_message(msg)
         for fn in self._message_hooks:
             await fn("autoref", msg, True)
+        for fn in self._output_sinks:
+            try:
+                await fn(msg)
+            except Exception:
+                logger.exception("output sink error")
 
     # ------------------------------------------------------------ await events
 
