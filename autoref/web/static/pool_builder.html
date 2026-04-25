@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref — pool builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+/* ── pool builder layout ─────────────────────────────────────── */
+#pb-topbar {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+#pb-topbar .vdiv { width: 1.5px; height: 16px; background: var(--border); }
+#pb-title { font-size: 11px; font-weight: 700; }
+#pb-pool-name {
+  max-width: 220px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  margin-left: 6px;
+}
+#pb-pool-name:focus { border-color: var(--blue); }
+#pb-stats {
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--muted);
+}
+#pb-stats strong { color: var(--text); font-weight: 700; }
+#pb-actions { display: flex; gap: 5px; margin-left: 12px; }
+
+#pb-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── tree panel ──────────────────────────────────────────────── */
+#pb-tree-panel {
+  display: flex;
+  flex-direction: column;
+  border-right: 1.5px solid var(--border);
+  overflow: hidden;
+}
+#pb-tree { flex: 1; overflow-y: auto; }
+#pb-tree-legend {
+  border-top: 1px solid var(--border);
+  padding: 5px 8px;
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.pb-legend-dot {
+  width: 6px; height: 6px; border-radius: 1px; opacity: .7;
+}
+.pb-legend-item { display: flex; align-items: center; gap: 3px; font-size: 8px; color: var(--muted); }
+
+.pb-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+.pb-tree-row:hover { background: var(--head); }
+.pb-tree-row.selected {
+  background: var(--blue-dim, #1e3a5f);
+  border-left-color: var(--blue);
+}
+.pb-tree-row .drag-handle { color: var(--border); font-size: 9px; cursor: grab; flex-shrink: 0; }
+.pb-tree-row .expand-icon { font-size: 9px; flex-shrink: 0; }
+.pb-tree-row .node-name {
+  font-size: 10px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pb-tree-row .node-badge {
+  font-size: 7px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.pb-tree-row .node-len { font-size: 8px; color: var(--muted); flex-shrink: 0; }
+.pb-tree-row .node-count { font-size: 8px; color: var(--muted); flex-shrink: 0; }
+.pb-add-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border-bottom: 1px solid var(--border);
+  opacity: .5;
+  cursor: pointer;
+  font-size: 9px;
+  color: var(--muted);
+}
+.pb-add-hint:hover { opacity: .8; }
+
+/* ── detail panel ────────────────────────────────────────────── */
+#pb-detail-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#pb-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#pb-detail-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.pb-field-label {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 3px;
+}
+.pb-field-val {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.pb-field-val:focus { border-color: var(--blue); }
+.pb-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.pb-toggle-row { display: flex; gap: 3px; flex-wrap: wrap; }
+.pb-toggle-opt {
+  padding: 3px 9px;
+  font-size: 9px;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  border-radius: 2px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pb-toggle-opt.active-yellow { border-color: var(--yellow); color: var(--yellow); background: rgba(251,191,36,.08); }
+.pb-toggle-opt.active-blue   { border-color: var(--blue);   color: var(--blue);   background: var(--blue-dim, #1e3a5f); }
+.pb-toggle-opt.active-muted  { border-color: var(--border); color: var(--text);   background: var(--head); }
+
+.pb-beatmap-card {
+  background: var(--head);
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  padding: 10px 12px;
+}
+.pb-beatmap-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.pb-beatmap-sub   { font-size: 10px; color: var(--muted); }
+.pb-beatmap-bid   { font-size: 9px; color: var(--muted); margin-top: 4px; }
+.pb-stars         { font-size: 13px; color: var(--yellow); font-weight: 700; }
+
+.pb-checkbox-row { display: flex; align-items: center; gap: 7px; font-size: 10px; cursor: pointer; }
+.pb-checkbox {
+  width: 14px; height: 14px; border-radius: 2px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pb-checkbox.checked { border-color: var(--green); background: var(--green-dim, #14532d); color: var(--green); font-size: 9px; }
+
+.pb-detail-actions { display: flex; gap: 6px; margin-top: auto; }
+.pb-contains-box {
+  background: var(--head);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px 10px;
+}
+.pb-inherit-hint { font-size: 9px; color: var(--muted); font-style: italic; margin-top: 5px; }
+
+/* ── import overlay ──────────────────────────────────────────── */
+#pb-import-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+#pb-import-overlay.hidden { display: none; }
+#pb-import-box {
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#pb-import-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; }
+#pb-import-textarea {
+  width: 100%; min-height: 140px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 6px 8px;
+  font-size: 10px;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+#pb-import-textarea:focus { border-color: var(--blue); }
+</style>
+</head>
+<body>
+<div id="app" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+
+  <!-- ── Topbar ─────────────────────────────────────────────── -->
+  <div id="pb-topbar">
+    <div class="led on" id="pb-led"></div>
+    <a href="/" class="logo" style="text-decoration:none">autoref</a>
+    <div class="vdiv"></div>
+    <span id="pb-title">pool builder</span>
+    <input id="pb-pool-name" placeholder="pool name" value="Untitled Pool">
+    <div id="pb-stats">
+      <span><strong id="pb-stat-maps">0</strong> maps</span>
+      <span><strong id="pb-stat-time">0:00</strong> est.</span>
+    </div>
+    <div id="pb-actions">
+      <button class="ghost-btn" id="pb-import-btn">⬆ import</button>
+      <button class="ghost-btn" id="pb-export-btn">⬇ export</button>
+      <button class="join-btn" id="pb-save-btn">save pool</button>
+    </div>
+  </div>
+
+  <!-- ── Body ──────────────────────────────────────────────── -->
+  <div id="pb-body">
+
+    <!-- left: tree -->
+    <div id="pb-tree-panel">
+      <div class="panel-head">
+        <span>pool structure</span>
+        <div style="display:flex;gap:4px">
+          <button class="ghost-btn xs" id="pb-add-pool-btn">+ pool</button>
+          <button class="join-btn xs" id="pb-add-map-btn">+ map</button>
+        </div>
+      </div>
+      <div id="pb-tree"></div>
+      <div id="pb-tree-legend">
+        <div class="pb-legend-item"><div class="pb-legend-dot" style="background:var(--blue)"></div>pool</div>
+        <div class="pb-legend-item"><div class="pb-legend-dot" style="background:var(--yellow)"></div>modpool</div>
+        <div class="pb-legend-item"><div class="pb-legend-dot" style="background:var(--muted)"></div>map</div>
+      </div>
+    </div>
+
+    <!-- right: detail -->
+    <div id="pb-detail-panel">
+      <div class="panel-head" id="pb-detail-head">select an item</div>
+      <div id="pb-detail-empty" class="muted mono xs">← select a pool or map to edit</div>
+      <div id="pb-detail-body" style="display:none"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Import overlay ────────────────────────────────────── -->
+  <div id="pb-import-overlay" class="hidden">
+    <div id="pb-import-box">
+      <div class="panel-head">
+        import maps
+        <button class="ghost-btn xs" id="pb-import-close">✕</button>
+      </div>
+      <div id="pb-import-body">
+        <div class="mono xs muted" style="line-height:1.6">
+          Paste beatmap IDs or URLs, one per line.<br>
+          Optionally suffix with a pool name: <span style="color:var(--text)">3814680 NM</span>
+        </div>
+        <textarea id="pb-import-textarea" placeholder="3814680 NM&#10;3917432 NM&#10;https://osu.ppy.sh/b/3756290 HD"></textarea>
+        <div>
+          <div class="pb-field-label">default pool (if not specified)</div>
+          <input class="pb-field-val" id="pb-import-default-pool" placeholder="NM" style="width:80px">
+        </div>
+        <button class="join-btn" id="pb-import-submit" style="width:100%">lookup &amp; import</button>
+        <div class="mono xs muted" style="font-style:italic">Fetches titles, diffs &amp; lengths from osu! API</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="/static/pool_builder.js"></script>
+</body>
+</html>

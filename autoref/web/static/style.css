@@ -563,3 +563,107 @@ body.light .map-played    { background: #dcfce7; border-color: #86efac; color: #
 body.light .map-current   { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
 body.light .drawer-tab.active { background: #f0fdf4; }
 body.light #assisted-banner { background: #fffbeb; border-bottom-color: #fde047; }
+
+/* ── Phase tab ────────────────────────────────────────────────── */
+#phase-content { padding: 8px 7px; display: flex; flex-direction: column; gap: 10px; }
+
+.phase-pipeline { overflow-x: auto; padding-bottom: 4px; }
+.phase-pipeline-inner {
+  display: flex; align-items: flex-start; gap: 0; min-width: max-content;
+}
+
+.phase-node { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 52px; }
+.phase-node-box {
+  width: 44px; height: 44px; border-radius: 3px;
+  border: 2px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  position: relative; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.phase-node-box.done   { border-color: var(--muted); opacity: 0.8; }
+.phase-node-box.active { box-shadow: 0 0 8px currentColor; }
+.phase-node-box.upcoming { opacity: 0.4; }
+.phase-node-label { font-size: 9px; font-weight: 700; letter-spacing: 0.04em; }
+.phase-node-sub   { font-size: 8px; color: var(--muted); }
+.phase-node-check { position: absolute; top: 2px; right: 3px; font-size: 8px; color: var(--green); }
+
+.phase-arrow {
+  display: flex; align-items: center; flex-shrink: 0; padding-bottom: 12px;
+}
+.phase-arrow-line  { width: 14px; height: 1.5px; background: var(--border); opacity: 0.4; }
+.phase-arrow-head  {
+  width: 0; height: 0;
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--border); opacity: 0.4;
+}
+.phase-arrow.active .phase-arrow-line,
+.phase-arrow.active .phase-arrow-head { background: var(--green); border-left-color: var(--green); opacity: 1; }
+
+.phase-current-box {
+  background: var(--bg); border-left: 3px solid; border-radius: 2px; padding: 6px 8px;
+}
+.phase-current-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 3px;
+}
+.phase-current-desc { font-size: 10px; color: var(--text); }
+
+.phase-stats { display: flex; gap: 4px; }
+.phase-stat {
+  flex: 1; background: var(--head); border: 1px solid var(--border);
+  border-radius: 2px; padding: 4px 5px; text-align: center;
+}
+.phase-stat-val  { font-size: 18px; font-weight: 700; line-height: 1; }
+.phase-stat-key  { font-size: 8px; color: var(--muted); margin-top: 2px; }
+
+.phase-scheme {
+  background: var(--head); border: 1px solid var(--border); border-radius: 2px; padding: 5px 7px;
+}
+.phase-scheme-title {
+  font-size: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px;
+}
+.phase-scheme-row { display: flex; gap: 6px; font-size: 9px; }
+.phase-scheme-key { color: var(--muted); min-width: 80px; }
+
+.phase-hint { font-size: 9px; color: var(--muted); font-style: italic; line-height: 1.5; }
+
+/* quals phase pipeline */
+.quals-phase-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 3px 6px; border-radius: 2px;
+  border: 1px solid transparent;
+}
+.quals-phase-row.current {
+  background: #1a2640; border-color: var(--blue);
+}
+body.light .quals-phase-row.current { background: #dbeafe; }
+.quals-phase-icon  { width: 16px; text-align: center; font-size: 10px; flex-shrink: 0; }
+.quals-phase-code  { font-size: 10px; min-width: 32px; }
+.quals-phase-meta  { font-size: 9px; color: var(--muted); flex: 1; }
+.quals-phase-now   { font-size: 8px; font-weight: 700; color: var(--blue); letter-spacing: 0.06em; }
+
+/* ── Commands tab ─────────────────────────────────────────────── */
+#cmds-content { overflow-y: auto; }
+
+.cmd-section { border-bottom: 1px solid var(--border); padding: 5px 7px 6px; }
+.cmd-section-title {
+  font-size: 8px; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px;
+}
+.cmd-section-btns { display: flex; flex-wrap: wrap; gap: 3px; }
+
+.cmd-btn {
+  background: transparent; border: 1px solid var(--border); border-radius: 2px;
+  padding: 3px 6px; font-family: inherit; font-size: 9px; font-weight: 700;
+  color: var(--muted); cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 1px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.cmd-btn:hover { border-color: var(--text); color: var(--text); }
+.cmd-btn-desc { font-size: 8px; font-weight: 400; color: var(--muted); font-style: italic; }
+
+.cmd-btn.yellow { color: var(--yellow); border-color: var(--yellow); }
+.cmd-btn.red    { color: var(--red);    border-color: var(--red);    }
+.cmd-btn.green  { color: var(--green);  border-color: var(--green);  }
+.cmd-btn.blue   { color: var(--blue);   border-color: var(--blue);   }
+.cmd-btn.orange { color: var(--orange); border-color: var(--orange); }
+
+.cmd-footer { padding: 5px 7px; font-size: 9px; color: var(--muted); font-style: italic; }
