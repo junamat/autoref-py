@@ -94,7 +94,7 @@ function renderMatchList(matches) {
       : isQuals
         ? `${data.maps_played ?? '?'}/${data.total_maps ?? '?'} maps played`
         : `BO${data.best_of || '?'}`;
-    const step = data.phase || (isQuals ? 'MAP' : '');
+    const step = data.phase || '';
     const refs = data.refs || (data.ref_name ? [data.ref_name] : []);
 
     const refsHtml = !pending && refs.length

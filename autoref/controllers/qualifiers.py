@@ -125,6 +125,16 @@ class QualifiersAutoRef(AutoRef):
         state["eta_seconds"]    = eta
         state["run_index"]      = self._run_index
         state["runs"]           = self.runs
-        state["events"]         = []   # mappool grid already shows per-map state
-        state["phase"]          = f"run {self._run_index + 1}/{self.runs}" if self.runs > 1 else None
+        state["events"]         = []
+
+        # current map name for the landing card step badge
+        current_name = None
+        if self._map_index < len(self._maps):
+            pm = self._maps[self._map_index]
+            current_name = pm.name or str(pm.beatmap_id)
+
+        if self.runs > 1:
+            state["phase"] = f"{current_name} · run {self._run_index + 1}/{self.runs}" if current_name else f"run {self._run_index + 1}/{self.runs}"
+        else:
+            state["phase"] = current_name
         return state
