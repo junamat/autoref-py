@@ -91,13 +91,13 @@ async def main():
         password=getenv("BANCHO_PASSWORD"),
     )
 
-    red_player = getenv("TEAM_RED_PLAYER", "player1")
-    blue_player = getenv("TEAM_BLUE_PLAYER", "player2")
+    red_player = getenv("TEAM_RED_PLAYER", "Dario")
+    blue_player = getenv("TEAM_BLUE_PLAYER", "junamat")
 
     red = Team(red_player)
-    red.players = [type("Player", (), {"username": red_player})()]
+    red.players = [type("dario", (), {"username": red_player})()]
     blue = Team(blue_player)
-    blue.players = [type("Player", (), {"username": blue_player})()]
+    blue.players = [type("junamat", (), {"username": blue_player})()]
 
     match = Match(RULESET, POOL, lambda _: (0, Step.WIN), red, blue)
 
