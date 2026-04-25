@@ -13,10 +13,10 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 import bancho
 
-from autoref.models import Match, ModdedPool, OrderScheme, PlayableMap, Pool, Ruleset, Team, Timers
-from autoref.enums import WinCondition, RefMode
-from autoref.bracket import BracketAutoRef
-from autoref.web import WebInterface
+from autoref import Match, ModdedPool, OrderScheme, PlayableMap, Pool, Ruleset, Team, Timers
+from autoref import WinCondition, RefMode, Step
+from autoref import BracketAutoRef
+from autoref import WebInterface
 
 load_dotenv()
 
@@ -99,7 +99,7 @@ async def main():
     blue = Team(blue_player)
     blue.players = [type("Player", (), {"username": blue_player})()]
 
-    match = Match(RULESET, POOL, lambda _: (0, None), red, blue)
+    match = Match(RULESET, POOL, lambda _: (0, Step.WIN), red, blue)
 
     mode = RefMode(getenv("AUTOREF_MODE", "auto").lower())
     prefix = getenv("AUTOREF_PREFIX", ">")

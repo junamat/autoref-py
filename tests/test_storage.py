@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from autoref.enums import Step, WinCondition
-from autoref.models import Match, Pool, PlayableMap, Ruleset, Team
-from autoref.storage import MatchDatabase
+from autoref.core.enums import Step, WinCondition
+from autoref.core.models import Match, Pool, PlayableMap, Ruleset, Team
+from autoref.core.storage import MatchDatabase
 
 
 def make_ruleset() -> Ruleset:

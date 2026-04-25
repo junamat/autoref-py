@@ -57,7 +57,7 @@ class BeatmapCache:
         if not missing:
             return
 
-        from .client import make_client
+        from ..client import make_client
 
         async with make_client() as client:
             results = await asyncio.gather(

@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import bancho
 
-from autoref.enums import Step, WinCondition
-from autoref.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
-from autoref.qualifiers import QualifiersAutoRef
+from autoref.core.enums import Step, WinCondition
+from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
+from autoref.controllers.qualifiers import QualifiersAutoRef
 
 
 def make_ruleset():

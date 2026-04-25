@@ -1,4 +1,4 @@
-from autoref.enums import WinCondition, MapState, Step
+from autoref.core.enums import WinCondition, MapState, Step
 
 
 def test_win_condition_values():

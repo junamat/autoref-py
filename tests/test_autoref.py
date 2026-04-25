@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from autoref.autoref import AutoRef, _find_map
-from autoref.enums import Step, WinCondition
-from autoref.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
+from autoref.core.base import AutoRef, _find_map
+from autoref.core.enums import Step, WinCondition
+from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 
 
 # ------------------------------------------------------------------ helpers
@@ -94,28 +94,28 @@ def test_find_map_missing():
 # ------------------------------------------------------------------ _find_map_by_input
 
 def test_find_map_by_input_exact():
-    from autoref.autoref import _find_map_by_input
+    from autoref.core.base import _find_map_by_input
     pm = PlayableMap(1, name="NM1")
     match = make_match(pool=Pool("p", pm))
     assert _find_map_by_input(match, "NM1") is pm
 
 
 def test_find_map_by_input_case_insensitive():
-    from autoref.autoref import _find_map_by_input
+    from autoref.core.base import _find_map_by_input
     pm = PlayableMap(1, name="HD2")
     match = make_match(pool=Pool("p", pm))
     assert _find_map_by_input(match, "hd2") is pm
 
 
 def test_find_map_by_input_space_underscore():
-    from autoref.autoref import _find_map_by_input
+    from autoref.core.base import _find_map_by_input
     pm = PlayableMap(1, name="some map")
     match = make_match(pool=Pool("p", pm))
     assert _find_map_by_input(match, "some_map") is pm
 
 
 def test_find_map_by_input_no_match():
-    from autoref.autoref import _find_map_by_input
+    from autoref.core.base import _find_map_by_input
     match = make_match(pool=Pool("p", PlayableMap(1, name="NM1")))
     assert _find_map_by_input(match, "DT3") is None
 
@@ -125,7 +125,7 @@ def test_find_map_by_input_no_match():
 @pytest.mark.asyncio
 async def test_await_map_choice_resolves_on_team_message():
     import bancho
-    from autoref.autoref import _find_map_by_input
+    from autoref.core.base import _find_map_by_input
 
     pm = PlayableMap(5, name="NM1")
     match = make_match(pool=Pool("p", pm))

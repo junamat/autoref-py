@@ -7,7 +7,7 @@ import aiosu
 import pandas as pd
 
 from .enums import WinCondition, MapState, Step
-from .client import make_client
+from ..client import make_client
 
 
 @dataclass

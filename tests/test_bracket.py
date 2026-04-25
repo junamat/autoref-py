@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import bancho
 
-from autoref.bracket import BracketAutoRef, Phase
-from autoref.enums import MapState, Step, WinCondition
-from autoref.lobby import MatchResult, PlayerResult
-from autoref.models import (
+from autoref.controllers.bracket import BracketAutoRef, Phase
+from autoref.core.enums import MapState, Step, WinCondition
+from autoref.core.lobby import MatchResult, PlayerResult
+from autoref.core.models import (
     Match, OrderScheme, PlayableMap, Pool, Ruleset, Team,
 )
 

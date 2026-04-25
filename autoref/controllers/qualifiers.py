@@ -3,10 +3,10 @@ import asyncio
 
 import bancho
 
-from .autoref import AutoRef
-from .beatmap_cache import BeatmapCache
-from .enums import RefMode, Step
-from .models import Match, Timers
+from ..core.base import AutoRef
+from ..core.beatmap_cache import BeatmapCache
+from ..core.enums import RefMode, Step
+from ..core.models import Match, Timers
 
 
 class QualifiersAutoRef(AutoRef):

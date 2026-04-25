@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 import pytest
 
-from autoref.enums import Step, WinCondition
-from autoref.models import Match, ModdedPool, PlayableMap, Pool, Ruleset, Team
+from autoref.core.enums import Step, WinCondition
+from autoref.core.models import Match, ModdedPool, PlayableMap, Pool, Ruleset, Team
 
 
 def make_ruleset() -> Ruleset:
@@ -138,7 +138,7 @@ def test_effective_mods_inferred_dt():
 
 
 def test_effective_mods_no_mods_sentinel():
-    from autoref.models import NO_MODS
+    from autoref.core.models import NO_MODS
     import aiosu
     pool_mods = aiosu.models.mods.Mods("HD")
     pool = ModdedPool("HD", pool_mods, PlayableMap(1, mods=NO_MODS))
@@ -200,7 +200,7 @@ def test_ruleset_asymmetric_bans_protects():
 # --- OrderScheme ---
 
 def test_order_scheme_defaults():
-    from autoref.models import OrderScheme
+    from autoref.core.models import OrderScheme
     s = OrderScheme("default")
     assert s.protect_first == 0
     assert s.ban_first == 0
@@ -211,7 +211,7 @@ def test_order_scheme_defaults():
 
 def test_ruleset_accepts_schemes():
     import aiosu
-    from autoref.models import OrderScheme
+    from autoref.core.models import OrderScheme
     schemes = [OrderScheme("a"), OrderScheme("b", pick_first=1)]
     r = Ruleset(vs=1, gamemode=aiosu.models.Gamemode.STANDARD, schemes=schemes)
     assert r.schemes is schemes
@@ -272,7 +272,7 @@ async def test_team_create_fetches_players():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("autoref.models.make_client", return_value=mock_client):
+    with patch("autoref.core.models.make_client", return_value=mock_client):
         team = await Team.create("TestTeam", 123)
 
     assert team.name == "TestTeam"
@@ -292,7 +292,7 @@ async def test_playable_map_create_fetches_beatmap():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("autoref.models.make_client", return_value=mock_client):
+    with patch("autoref.core.models.make_client", return_value=mock_client):
         pmap = await PlayableMap.create(75)
 
     assert pmap.beatmap_id == 75

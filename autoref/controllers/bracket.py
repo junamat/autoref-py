@@ -11,10 +11,10 @@ import logging
 import re
 from enum import Enum
 
-from .autoref import AutoRef, _normalize, _find_map
-from .enums import MapState, Step
-from .lobby import MatchResult, PlayerResult
-from .models import OrderScheme
+from ..core.base import AutoRef, _normalize, _find_map
+from ..core.enums import MapState, Step
+from ..core.lobby import MatchResult, PlayerResult
+from ..core.models import OrderScheme
 
 logger = logging.getLogger(__name__)
 

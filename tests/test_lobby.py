@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import bancho
-from autoref.lobby import Lobby, MatchResult, PlayerResult
+from autoref.core.lobby import Lobby, MatchResult, PlayerResult
 
 
 def make_lobby() -> tuple[Lobby, MagicMock]:
