@@ -398,7 +398,7 @@ function updatePlayersAge() {
 setInterval(updatePlayersAge, 5000);
 
 $('players-refresh-btn').addEventListener('click', () => {
-  sendWS('>invite');  // triggers a re-invite which causes a state push
+  sendWS('>refresh');
 });
 
 /* ── settings ────────────────────────────────────────────────── */

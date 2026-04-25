@@ -21,6 +21,15 @@ class MatchResult:
     scores: list[PlayerResult] = field(default_factory=list)
 
 
+@dataclass
+class SlotInfo:
+    username: str
+    ready: bool
+    user_id: int
+    team: str | None   # "Blue", "Red", or None
+    is_host: bool
+
+
 class Lobby:
     """Manages a single !mp room via BanchoClient."""
 
@@ -34,6 +43,7 @@ class Lobby:
 
         self.last_result: MatchResult | None = None
         self.players: set[str] = set()
+        self.slot_info: list[SlotInfo] = []
         self._message_hooks: list = []
         self._input_hooks: list = []
         self._output_sinks: list = []
@@ -210,6 +220,70 @@ class Lobby:
 
     async def abort_timer(self) -> None:
         await self._lobby.abort_timer()
+
+    async def fetch_settings(self, timeout: float = 5.0) -> list[SlotInfo]:
+        """Send !mp settings and parse BanchoBot's response.
+
+        Returns a list of SlotInfo for occupied slots and updates self.slot_info.
+        The multi-line response ends when we've seen all expected player lines
+        or the timeout expires.
+        """
+        import re
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future[list[SlotInfo]] = loop.create_future()
+
+        slots: list[SlotInfo] = []
+        expected: int | None = None
+
+        # Slot line: "Slot N  Ready/Not Ready  https://osu.ppy.sh/u/ID  username       [options]"
+        _SLOT_RE = re.compile(
+            r'^Slot \d+\s+(Ready|Not Ready)\s+https://osu\.ppy\.sh/u/(\d+)\s+(.{15})\s*(?:\[(.+)\])?$'
+        )
+        _PLAYERS_RE = re.compile(r'^Players: (\d+)$')
+
+        def on_msg(msg) -> None:
+            if future.done():
+                return
+            if getattr(msg.user, 'username', None) != 'BanchoBot':
+                return
+            text = msg.message
+
+            m = _PLAYERS_RE.match(text)
+            if m:
+                nonlocal expected
+                expected = int(m.group(1))
+                if expected == 0:
+                    future.set_result([])
+                return
+
+            m = _SLOT_RE.match(text)
+            if m:
+                options = m.group(4) or ''
+                team = None
+                if 'Blue' in options:
+                    team = 'Blue'
+                elif 'Red' in options:
+                    team = 'Red'
+                slots.append(SlotInfo(
+                    username=m.group(3).strip(),
+                    ready=m.group(1) == 'Ready',
+                    user_id=int(m.group(2)),
+                    team=team,
+                    is_host='Host' in options,
+                ))
+                if expected is not None and len(slots) >= expected:
+                    if not future.done():
+                        future.set_result(slots)
+
+        self.channel.on('message', on_msg)
+        await self.say('!mp settings')
+        try:
+            self.slot_info = await asyncio.wait_for(future, timeout)
+        except asyncio.TimeoutError:
+            self.slot_info = slots  # use whatever we got
+        finally:
+            self.channel.remove_listener('message', on_msg)
+        return self.slot_info
 
     async def say(self, msg: str) -> None:
         logger.info("[autoref] %s", msg)

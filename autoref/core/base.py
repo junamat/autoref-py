@@ -143,8 +143,16 @@ class AutoRef(ABC):
             map_code = pm.name if pm and pm.name else str(row["beatmap_id"])
             events.append({"step": str(row["step"]), "team": team_name, "map": map_code})
 
+        # Build a username→ready lookup from the latest !mp settings fetch
+        ready_map: dict[str, bool] = {
+            _normalize(s.username): s.ready for s in self.lobby.slot_info
+        }
+
         teams = [
-            {"name": t.name, "players": [{"username": p.username} for p in t.players]}
+            {"name": t.name, "players": [
+                {"username": p.username, "ready": ready_map.get(_normalize(p.username), False)}
+                for p in t.players
+            ]}
             for t in self.match.teams
         ]
 
@@ -320,6 +328,7 @@ class AutoRef(ABC):
         ">startmap [delay]   — force-start the map",
         ">setmap <id> [mode] — change the map",
         ">invite / >inv      — re-invite all players",
+        ">refresh / >rf      — fetch !mp settings and update player ready state",
         "── info ──────────────────────────────────",
         ">status / >st       — full match status",
         ">scoreline / >sc    — score only",
@@ -477,6 +486,11 @@ class AutoRef(ABC):
                 for player in team.players:
                     await self.lobby.invite(player.username)
             await self.lobby.say("Invites sent.")
+            return True
+
+        if cmd in ("refresh", "rf"):
+            await self.lobby.fetch_settings()
+            await self._push_state()
             return True
 
         return False

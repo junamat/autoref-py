@@ -2,7 +2,7 @@
 from .core.enums import WinCondition, MapState, Step, RefMode
 from .core.models import PlayableMap, Pool, ModdedPool, Team, Ruleset, Match, Timers, NO_MODS, OrderScheme
 from .core.storage import MatchDatabase
-from .core.lobby import Lobby, MatchResult, PlayerResult
+from .core.lobby import Lobby, MatchResult, PlayerResult, SlotInfo
 from .core.output import OutputSink
 from .core.base import AutoRef
 
