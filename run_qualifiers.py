@@ -68,7 +68,7 @@ async def main():
 
     match = Match(RULESET, POOL, lambda _: (0, Step.WIN), team)  # next_step overridden by QualifiersAutoRef
 
-    mode = RefMode(getenv("AUTOREF_MODE", "auto").lower())
+    mode = RefMode(getenv("AUTOREF_MODE", "off").lower())
     prefix = getenv("AUTOREF_PREFIX", ">")
     refs_env = getenv("AUTOREF_REFS", "")
     refs = {r.strip() for r in refs_env.split(",") if r.strip()} or None
