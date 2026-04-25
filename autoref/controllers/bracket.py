@@ -217,6 +217,16 @@ class BracketAutoRef(AutoRef):
         picker = (1 - self._last_map_winner) if self._last_map_winner is not None else self._rank_to_team(0)
         await self.handle_pick(picker, tb.beatmap_id)
 
+    # ------------------------------------------------------------ overrides
+
+    def _win_counts(self) -> list[int]:
+        return list(self._wins)
+
+    def _team_to_rank(self, team_index: int) -> int:
+        if self.ranking is None:
+            return team_index
+        return self.ranking.index(team_index)
+
     # ------------------------------------------------------------ commands
 
     def _resolve_team(self, token: str) -> int | None:
@@ -271,6 +281,57 @@ class BracketAutoRef(AutoRef):
                 f"bans={self._ban_cursor}/{len(self._ban_seq)} "
                 f"picks={self._pick_count} wins={self._wins}"
             )
+            return True
+
+        # >first <pick|ban|protect> <team>  /  >fp <team>  /  >fb <team>  /  >fpro <team>
+        step_key: str | None = None
+        team_token: str | None = None
+        if cmd in ("fp", "firstpick") and args:
+            step_key, team_token = "pick", " ".join(args)
+        elif cmd in ("fb", "firstban") and args:
+            step_key, team_token = "ban", " ".join(args)
+        elif cmd in ("fpro", "firstprotect", "firstprot") and args:
+            step_key, team_token = "protect", " ".join(args)
+        elif cmd == "first" and len(args) >= 2:
+            step_key = args[0].lower()
+            team_token = " ".join(args[1:])
+
+        if step_key is not None and team_token is not None:
+            team_idx = self._resolve_team(team_token)
+            if team_idx is None:
+                await self.lobby.say(f"Unknown team: {team_token}")
+                return True
+
+            # Ensure we have a ranking to work with
+            if self.ranking is None:
+                others = [i for i in range(len(self.match.teams)) if i != team_idx]
+                self.ranking = [team_idx] + others
+
+            rank = self._team_to_rank(team_idx)
+
+            if step_key in ("pick", "p"):
+                if self.scheme is None:
+                    self.scheme = self.schemes[0] if self.schemes else None
+                if self.scheme is not None:
+                    import dataclasses
+                    self.scheme = dataclasses.replace(self.scheme, pick_first=rank)
+            elif step_key in ("ban", "b"):
+                if self.scheme is not None:
+                    import dataclasses
+                    self.scheme = dataclasses.replace(self.scheme, ban_first=rank)
+                    self._ban_seq = self._compute_seq(
+                        rank, self.match.ruleset.bans_for, pattern=self.scheme.ban_pattern
+                    )
+                    self._ban_cursor = 0
+            elif step_key in ("protect", "prot", "pro"):
+                if self.scheme is not None:
+                    import dataclasses
+                    self.scheme = dataclasses.replace(self.scheme, protect_first=rank)
+                    self._protect_seq = self._compute_seq(rank, self.match.ruleset.protects_for)
+                    self._protect_cursor = 0
+
+            tname = self.match.teams[team_idx].name
+            await self.lobby.say(f"{tname} goes first for {step_key}s.")
             return True
 
         return await super()._dispatch_command(cmd, args, source)

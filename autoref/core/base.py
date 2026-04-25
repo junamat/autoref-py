@@ -85,6 +85,9 @@ class AutoRef(ABC):
         if mode != RefMode.OFF:
             self._mode_event.set()
 
+        self._timeout_event = asyncio.Event()
+        self._timeout_event.set()
+
         self._next_future: asyncio.Future | None = None
         self._state_hooks: list = []
         self._pending_proposal: dict | None = None
@@ -159,6 +162,55 @@ class AutoRef(ABC):
             except Exception:
                 pass
 
+    # ---------------------------------------------------------- informational helpers
+
+    def _win_counts(self) -> list[int]:
+        """Return map wins per team. Override in subclasses that track wins."""
+        return [0] * len(self.match.teams)
+
+    def _team_name(self, team_index: int) -> str:
+        if team_index < len(self.match.teams):
+            return self.match.teams[team_index].name
+        return str(team_index)
+
+    def _format_step_history(self, step_name: str) -> str:
+        ms = self.match.match_status
+        if ms.empty:
+            return "none"
+        rows = ms[ms["step"] == step_name]
+        if rows.empty:
+            return "none"
+        parts = []
+        for _, row in rows.iterrows():
+            pm = _find_map(self.match, int(row["beatmap_id"]))
+            code = pm.name if pm and pm.name else str(row["beatmap_id"])
+            parts.append(f"{self._team_name(int(row['team_index']))} {code}")
+        return ", ".join(parts)
+
+    def _format_scoreline(self) -> str:
+        wins = self._win_counts()
+        bo = self.match.ruleset.best_of
+        needed = bo // 2 + 1
+        if len(wins) == 2:
+            return (f"{self._team_name(0)} {wins[0]} : {wins[1]} {self._team_name(1)}"
+                    f" (BO{bo}, first to {needed})")
+        return " | ".join(f"{self._team_name(i)}: {wins[i]}" for i in range(len(wins)))
+
+    # ---------------------------------------------------------- timeout
+
+    async def _do_timeout(self, duration: int = 120) -> None:
+        if not self._timeout_event.is_set():
+            return  # already paused
+        self._timeout_event.clear()
+        mins = duration // 60
+        secs = duration % 60
+        label = f"{mins}m" if not secs else f"{mins}m{secs}s" if mins else f"{secs}s"
+        await self.lobby.say(f"Timeout — {label} break. Resuming automatically.")
+        await asyncio.sleep(duration)
+        self._timeout_event.set()
+        await self.lobby.say("Timeout over, resuming.")
+        await self._push_state()
+
     # ---------------------------------------------------------------- abstract
 
     @abstractmethod
@@ -186,6 +238,8 @@ class AutoRef(ABC):
 
     async def _dispatch_command(self, cmd: str, args: list[str], source: str) -> bool:
         """Execute a parsed ref command. Returns True if recognised."""
+
+        # ── mode / flow ──────────────────────────────────────────────────────
         if cmd == "mode" and args:
             try:
                 await self._set_mode(RefMode(args[0].lower()))
@@ -193,14 +247,103 @@ class AutoRef(ABC):
             except ValueError:
                 pass
             return True
+
         if cmd == "next":
             if self._next_future is not None and not self._next_future.done():
                 self._next_future.set_result(args)
             return True
+
         if cmd == "dismiss":
             self._pending_proposal = None
             await self._push_state()
             return True
+
+        # ── timeout (also routed here from CLI/web; channel path bypasses ref check) ──
+        if cmd in ("timeout", "to", "pause"):
+            duration = 120
+            if args:
+                try:
+                    duration = int(args[0])
+                except ValueError:
+                    pass
+            asyncio.ensure_future(self._do_timeout(duration))
+            return True
+
+        # ── informational ────────────────────────────────────────────────────
+        if cmd in ("scoreline", "score", "sc"):
+            await self.lobby.say(self._format_scoreline())
+            return True
+
+        if cmd in ("picks", "pk"):
+            await self.lobby.say(f"picks: {self._format_step_history('PICK')}")
+            return True
+
+        if cmd in ("bans", "bn"):
+            await self.lobby.say(f"bans: {self._format_step_history('BAN')}")
+            return True
+
+        if cmd in ("protects", "pro", "prot"):
+            await self.lobby.say(f"protects: {self._format_step_history('PROTECT')}")
+            return True
+
+        if cmd in ("status", "st"):
+            bo = self.match.ruleset.best_of
+            await self.lobby.say(
+                f"[status] BO{bo} | {self.mode.value} mode | {self._format_scoreline()}"
+            )
+            bans = self._format_step_history("BAN")
+            pros = self._format_step_history("PROTECT")
+            pks  = self._format_step_history("PICK")
+            if pros != "none":
+                await self.lobby.say(f"protects: {pros} | bans: {bans}")
+            else:
+                await self.lobby.say(f"bans: {bans}")
+            await self.lobby.say(f"picks: {pks}")
+            return True
+
+        # ── lobby control ────────────────────────────────────────────────────
+        if cmd in ("setmap", "sm", "map") and args:
+            try:
+                bid = int(args[0])
+                gm  = int(args[1]) if len(args) > 1 else self.match.ruleset.gamemode.value
+                await self.lobby.set_map(bid, gm)
+            except (ValueError, IndexError):
+                await self.lobby.say(f"Usage: {self.ref_prefix}setmap <beatmap_id> [gamemode]")
+            return True
+
+        if cmd in ("timer", "t", "ti") and args:
+            _named = {
+                "pick": self.timers.pick,
+                "ban": self.timers.ban,
+                "protect": self.timers.protect, "pro": self.timers.protect,
+                "between": self.timers.between_maps, "btw": self.timers.between_maps,
+                "ready": self.timers.ready_up,
+                "force": self.timers.force_start, "fs": self.timers.force_start,
+                "closing": self.timers.closing,
+            }
+            raw = args[0].lower()
+            seconds = _named.get(raw)
+            if seconds is None:
+                try:
+                    seconds = int(args[0])
+                except ValueError:
+                    await self.lobby.say(
+                        f"Usage: {self.ref_prefix}timer <seconds|pick|ban|protect|between|ready|force|closing>"
+                    )
+                    return True
+            asyncio.ensure_future(self.lobby.timer(seconds))
+            return True
+
+        if cmd in ("startmap", "start", "go"):
+            delay = self.timers.force_start
+            if args:
+                try:
+                    delay = int(args[0])
+                except ValueError:
+                    pass
+            asyncio.ensure_future(self.lobby.start(delay=delay))
+            return True
+
         return False
 
     async def _handle_input(self, text: str, source: str) -> bool:
@@ -231,10 +374,15 @@ class AutoRef(ABC):
                 if text == "!panic":
                     await self._set_mode(RefMode.OFF)
                     await self.lobby.say(f"!panic by {msg.user.username} — switching to off mode.")
-                elif text.startswith(self.ref_prefix) and self._is_ref(msg.user.username):
+                elif text.startswith(self.ref_prefix):
                     parts = text[len(self.ref_prefix):].split()
                     if parts:
-                        await self._dispatch_command(parts[0].lower(), parts[1:], msg.user.username)
+                        cmd = parts[0].lower()
+                        # timeout is usable by anyone, not just registered refs
+                        if cmd in ("timeout", "to", "pause"):
+                            await self._dispatch_command(cmd, parts[1:], msg.user.username)
+                        elif self._is_ref(msg.user.username):
+                            await self._dispatch_command(cmd, parts[1:], msg.user.username)
         except asyncio.CancelledError:
             pass
         finally:
@@ -418,6 +566,8 @@ class AutoRef(ABC):
             await self._pre_loop()
             await self._push_state()
             while True:
+                # Pause during an active timeout (any user can trigger >timeout).
+                await self._timeout_event.wait()
                 # Pause here while OFF; resumes when ref switches to assisted/auto.
                 if self.mode == RefMode.OFF:
                     await self._mode_event.wait()
