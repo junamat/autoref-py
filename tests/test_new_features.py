@@ -166,14 +166,14 @@ async def test_undo_resets_played_to_pickable():
 
 # ── _map_winner ───────────────────────────────────────────────────────────────
 
-def test_map_winner_counts_failed_scores():
-    """Failed players' scores still count toward team total."""
+def test_map_winner_excludes_failed_scores():
+    """Failed players' scores are excluded from team totals."""
     ar, _ = make_bracket()
     result = MatchResult(scores=[
-        PlayerResult("r1", 800_000, False),   # failed but score counts
+        PlayerResult("r1", 800_000, False),   # failed — excluded
         PlayerResult("b1", 600_000, True),
     ])
-    assert ar._map_winner(result) == 0  # red wins despite failing
+    assert ar._map_winner(result) == 1  # blue wins because red failed
 
 def test_map_winner_both_zero_is_tie():
     ar, _ = make_bracket()

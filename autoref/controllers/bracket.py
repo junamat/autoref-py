@@ -483,6 +483,8 @@ class BracketAutoRef(AutoRef):
             for p in team.players:
                 u2t[_normalize(p.username)] = i
         for pr in result.scores:
+            if not pr.passed:
+                continue
             ti = u2t.get(_normalize(pr.username))
             if ti is not None:
                 totals[ti] += pr.score
