@@ -189,6 +189,10 @@ body {
 /* ── Pool builder ─────────────────────────────────────────────── */
 #pool-builder { display: flex; flex-direction: column; height: 100%; }
 #pool-map-list { flex: 1; overflow-y: auto; }
+.qs-team-block {
+  border: 1px solid var(--border); border-radius: 2px;
+  margin-bottom: 4px; padding: 2px 6px;
+}
 .pool-map-row {
   display: flex; align-items: center; gap: 5px;
   padding: 3px 8px; border-bottom: 1px solid var(--border); font-size: 10px;
