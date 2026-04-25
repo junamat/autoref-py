@@ -358,6 +358,7 @@ function connectMatch(matchId) {
       else if (msg.type === 'state') handleState(msg);
       else if (msg.type === 'reply') handleReply(msg);
       else if (msg.type === 'error') { appendChatLine('autoref', msg.message, 'out'); showLanding(); }
+      else if (msg.type === 'done')  { currentMatchId = null; showLanding(); }
     } catch (_) {}
   };
 }

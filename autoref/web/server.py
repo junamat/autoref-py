@@ -101,6 +101,7 @@ class WebServer:
     def unregister(self, iface: WebInterface) -> None:
         self._matches.pop(iface.match_id, None)
         self._tasks.pop(iface.match_id, None)
+        asyncio.ensure_future(iface._broadcast(json.dumps({"type": "done"})))
         self._notify_landing()
 
     def _notify_landing(self) -> None:
