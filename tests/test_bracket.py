@@ -1,5 +1,5 @@
 """Tests for BracketAutoRef state machine."""
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import bancho
