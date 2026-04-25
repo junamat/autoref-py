@@ -11,6 +11,40 @@ logger = logging.getLogger(__name__)
 _STATIC_DIR = Path(__file__).parent / "static"
 
 
+_POOLS_FILE = Path.home() / ".cache" / "autoref" / "pools.json"
+
+
+def _load_pools() -> dict:
+    try:
+        return json.loads(_POOLS_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_pools(pools: dict) -> None:
+    _POOLS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _POOLS_FILE.write_text(json.dumps(pools, indent=2))
+
+
+
+def _flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
+    """Flatten a pool builder tree into the flat map-entry format _create_match expects."""
+    entries = []
+    for node in nodes:
+        if node.get("type") == "map":
+            entries.append({
+                "beatmap_id": node.get("bid", ""),
+                "name":       node.get("code") or node.get("name", ""),
+                "mod_group":  node.get("code", "MAP").rstrip("0123456789") or "NM",
+                "mods":       node.get("mods") or parent_mods,
+                "is_tiebreaker": node.get("tb", False),
+            })
+        elif node.get("children"):
+            mods = node.get("mods") or parent_mods
+            entries.extend(_flatten_pool_tree(node["children"], mods))
+    return entries
+
+
 class WebInterface:
     """Attaches to one AutoRef instance; registered into a WebServer."""
 
@@ -146,10 +180,14 @@ class WebServer:
         bans       = int(payload.get("bans_per_team", 0))
         protects   = int(payload.get("protects_per_team", 0))
 
-        # Build pool from flat map list grouped by mod_group
-        # Each entry: {beatmap_id, name, mod_group, mods}
-        # mod_group is used to group into ModdedPool; mods is the actual mod string
+        # Build pool from flat map list grouped by mod_group, or from saved pool
         map_entries = payload.get("maps", [])
+        pool_id = payload.get("pool_id")
+        if pool_id:
+            saved = _load_pools().get(pool_id)
+            if saved:
+                map_entries = _flatten_pool_tree(saved.get("tree", []))
+
         groups: dict[str, list] = {}
         for e in map_entries:
             g = e.get("mod_group", "NM")
@@ -245,6 +283,39 @@ class WebServer:
         @app.get("/")
         async def index():
             return FileResponse(self.static_dir / "index.html")
+
+        @app.get("/pool-builder")
+        async def pool_builder():
+            return FileResponse(self.static_dir / "pool_builder.html")
+
+        @app.get("/api/pools")
+        async def list_pools():
+            return JSONResponse(list(_load_pools().values()))
+
+        @app.post("/api/pools")
+        async def save_pool(request: Request):
+            try:
+                body = await request.json()
+                name = body.get("name", "").strip()
+                if not name:
+                    return JSONResponse({"error": "name required"}, status_code=400)
+                pools = _load_pools()
+                # use name as key (overwrite if same name)
+                pool_id = body.get("id") or name.lower().replace(" ", "_")
+                pools[pool_id] = {**body, "id": pool_id}
+                _save_pools(pools)
+                return JSONResponse({"id": pool_id}, status_code=201)
+            except Exception as e:
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.delete("/api/pools/{pool_id}")
+        async def delete_pool(pool_id: str):
+            pools = _load_pools()
+            if pool_id not in pools:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            del pools[pool_id]
+            _save_pools(pools)
+            return JSONResponse({"ok": True})
 
         @app.get("/api/matches")
         async def api_matches():

@@ -21,6 +21,7 @@
       <span class="muted mono xs" id="landing-status">connecting…</span>
       <div style="flex:1"></div>
       <button class="ghost-btn" id="theme-toggle" title="toggle light/dark">◑</button>
+      <a href="/pool-builder" class="ghost-btn" style="text-decoration:none">pool builder</a>
     </div>
     <div id="landing-body">
 
@@ -40,10 +41,7 @@
 
       <!-- right: quick-start panel -->
       <div id="landing-quickstart">
-        <div id="qs-tabs">
-          <div class="qs-tab active" data-tab="match">match</div>
-          <div class="qs-tab" data-tab="pool">pool</div>
-        </div>
+        <div id="qs-tabs"></div>
 
         <!-- match tab -->
         <div id="qs-pane-match" class="qs-pane">
@@ -83,19 +81,11 @@
                 <div class="qs-opt" data-val="auto">auto</div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- pool tab -->
-        <div id="qs-pane-pool" class="qs-pane" hidden>
-          <div id="pool-builder">
-            <div id="pool-map-list"></div>
-            <div id="pool-add-row">
-              <input class="qs-input" id="pool-bid"   placeholder="beatmap ID" style="width:90px">
-              <input class="qs-input" id="pool-name"  placeholder="NM1"        style="width:46px">
-              <input class="qs-input" id="pool-group" placeholder="NM"         style="width:36px">
-              <input class="qs-input" id="pool-mods"  placeholder="mods"       style="width:46px">
-              <button class="ghost-btn xs" id="pool-add-btn">+</button>
+            <div class="qs-field">
+              <div class="qs-label">pool <a href="/pool-builder" class="mono xs" style="color:var(--blue);text-decoration:none;margin-left:6px">+ new</a></div>
+              <select class="qs-input" id="qs-pool" style="width:100%">
+                <option value="">— no pool —</option>
+              </select>
             </div>
           </div>
         </div>
@@ -211,6 +201,8 @@
           <div class="drawer-tab active" data-tab="players">players</div>
           <div class="drawer-tab" data-tab="mappool">mappool</div>
           <div class="drawer-tab" data-tab="timeline">timeline</div>
+          <div class="drawer-tab" data-tab="phase">phase</div>
+          <div class="drawer-tab" data-tab="cmds">cmds</div>
           <div class="drawer-tab" data-tab="settings">settings</div>
         </div>
         <div id="drawer-body">
@@ -231,6 +223,14 @@
 
           <div id="tab-timeline" class="tab-pane" hidden>
             <div id="timeline-list"></div>
+          </div>
+
+          <div id="tab-phase" class="tab-pane" hidden>
+            <div id="phase-content"></div>
+          </div>
+
+          <div id="tab-cmds" class="tab-pane" hidden>
+            <div id="cmds-content"></div>
           </div>
 
           <div id="tab-settings" class="tab-pane" hidden>

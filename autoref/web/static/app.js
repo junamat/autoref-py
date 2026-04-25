@@ -35,6 +35,7 @@ function showLanding() {
   if (ws) { ws.close(); ws = null; }
   history.pushState(null, '', '/');
   connectLanding();
+  loadPools();
 }
 
 function showMatch(matchId) {
@@ -159,15 +160,6 @@ function renderMatchList(matches) {
   }
 }
 
-/* ── Quick-start tabs ────────────────────────────────────────── */
-document.querySelectorAll('.qs-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const name = tab.dataset.tab;
-    document.querySelectorAll('.qs-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-    document.querySelectorAll('.qs-pane').forEach(p => { p.hidden = p.id !== `qs-pane-${name}`; });
-  });
-});
-
 /* ── Quick-start toggle opts ─────────────────────────────────── */
 document.querySelectorAll('.qs-toggle').forEach(toggle => {
   toggle.addEventListener('click', e => {
@@ -252,66 +244,34 @@ function addQsTeam() {
 $('qs-team-add').addEventListener('click', addQsTeam);
 $('qs-team-input').addEventListener('keydown', e => { if (e.key === 'Enter') addQsTeam(); });
 
-/* ── Pool builder ────────────────────────────────────────────── */
-let poolMaps = [];  // [{beatmap_id, name, mod_group, mods}]
-
-function renderPoolList() {
-  const list = $('pool-map-list');
-  if (!poolMaps.length) {
-    list.innerHTML = '<span class="muted mono xs pad">no maps added</span>';
-    return;
-  }
-  list.innerHTML = poolMaps.map((m, i) => `
-    <div class="pool-map-row mono">
-      <span class="pool-code">${esc(m.name)}</span>
-      <span class="pool-bid">${esc(String(m.beatmap_id))}</span>
-      <span class="pool-grp">${esc(m.mod_group)}${m.mods ? ' · ' + esc(m.mods) : ''}</span>
-      <button class="pool-del" data-i="${i}">✕</button>
-    </div>
-  `).join('');
-  list.querySelectorAll('.pool-del').forEach(btn => {
-    btn.addEventListener('click', () => {
-      poolMaps.splice(parseInt(btn.dataset.i), 1);
-      renderPoolList();
-    });
-  });
-}
-renderPoolList();
-
-$('pool-add-btn').addEventListener('click', () => {
-  const bid = $('pool-bid').value.trim();
-  if (!bid || isNaN(parseInt(bid))) return;
-  poolMaps.push({
-    beatmap_id: parseInt(bid),
-    name:       $('pool-name').value.trim()  || `MAP${poolMaps.length + 1}`,
-    mod_group:  $('pool-group').value.trim() || 'NM',
-    mods:       $('pool-mods').value.trim(),
-  });
-  $('pool-bid').value = $('pool-name').value = $('pool-mods').value = '';
-  // auto-increment name suffix
-  const grp = $('pool-group').value.trim() || 'NM';
-  const count = poolMaps.filter(m => m.mod_group === grp).length + 1;
-  $('pool-name').value = grp + count;
-  renderPoolList();
-  $('pool-bid').focus();
-});
-['pool-bid','pool-name','pool-group','pool-mods'].forEach(id => {
-  $(id).addEventListener('keydown', e => { if (e.key === 'Enter') $('pool-add-btn').click(); });
-});
-
 /* ── Create match (pending) ──────────────────────────────────── */
+async function loadPools() {
+  try {
+    const pools = await fetch('/api/pools').then(r => r.json());
+    const sel = $('qs-pool');
+    sel.innerHTML = '<option value="">— no pool —</option>';
+    for (const p of pools) {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    }
+  } catch (_) {}
+}
+
 $('qs-submit').addEventListener('click', async () => {
   const type  = $('qs-type').querySelector('.active')?.dataset.val || 'bracket';
   const mode  = $('qs-mode').querySelector('.active')?.dataset.val || 'off';
   const name  = $('qs-name').value.trim() || 'autoref match';
   const bo    = parseInt($('qs-bo').value)  || 1;
   const bans  = parseInt($('qs-bans').value) || 0;
+  const poolId = $('qs-pool').value || null;
 
   const payload = {
     type, mode, room_name: name,
     best_of: bo, bans_per_team: bans,
     teams: qsTeams,
-    maps: poolMaps,
+    ...(poolId ? { pool_id: poolId } : {}),
   };
 
   $('qs-submit').textContent = 'creating…';
@@ -411,6 +371,8 @@ function handleState(s) {
   renderTimeline();
   renderPlayers();
   renderSettings();
+  renderPhase();
+  renderCmds();
   renderRefPill();
   renderAssistedBanner();
   updateMatchInfo();
@@ -603,6 +565,173 @@ setInterval(updatePlayersAge, 5000);
 $('players-refresh-btn').addEventListener('click', () => {
   sendWS('>refresh');
 });
+
+/* ── phase tab ───────────────────────────────────────────────── */
+const PHASE_ORDER_BRACKET = ['ROLL','ORDER','PROTECT','BAN_1','PICK','TB','DONE'];
+const PHASE_COLORS = {
+  ROLL:'#a78bfa', ORDER:'#a78bfa',
+  PROTECT:'var(--yellow)', BAN_1:'var(--red)',
+  PICK:'var(--blue)', TB:'var(--orange)', DONE:'var(--green)',
+};
+const PHASE_ACTION = {
+  ROLL:    'Waiting for team rolls. Ref can override with >roll.',
+  ORDER:   'Roll winner chooses a scheme. Use >order <n>.',
+  PROTECT: 'Protect phase active — 120s timer.',
+  BAN_1:   'Ban phase active — 120s timer.',
+  PICK:    'Pick phase active — 120s timer.',
+  TB:      'Tiebreaker triggered! TB map queued.',
+  DONE:    'Match complete.',
+};
+
+function renderPhase() {
+  const el = $('phase-content');
+  if (!el) return;
+  const s = appState;
+
+  if (s.qualifier) {
+    renderQualsPhase(el, s);
+  } else {
+    renderBracketPhase(el, s);
+  }
+}
+
+function renderBracketPhase(el, s) {
+  const phase = (s.phase || 'PICK').toUpperCase();
+  const cur   = PHASE_ORDER_BRACKET.indexOf(phase);
+  const nodeState = name => {
+    const idx = PHASE_ORDER_BRACKET.indexOf(name);
+    return idx < cur ? 'done' : idx === cur ? 'active' : 'upcoming';
+  };
+  const activeColor = PHASE_COLORS[phase] || 'var(--text)';
+
+  const nodes = [
+    { key:'ROLL',    label:'ROLL', sub: nodeState('ROLL')==='done' ? 'done' : null },
+    { key:'ORDER',   label:'ORDER', sub: nodeState('ORDER')==='done' ? 'done' : null },
+    { key:'PROTECT', label:'PROT', sub: null },
+    { key:'BAN_1',   label:'BAN',  sub: null },
+    { key:'PICK',    label:'PICK', sub: `${(s.wins||[0,0]).reduce((a,b)=>a+b,0)} played` },
+    { key:'TB',      label:'TB',   sub: null },
+    { key:'DONE',    label:'DONE', sub: null },
+  ];
+
+  const pipelineHtml = nodes.map((n, i) => {
+    const ns    = nodeState(n.key);
+    const color = PHASE_COLORS[n.key] || 'var(--text)';
+    const borderColor = ns === 'active' ? color : ns === 'done' ? 'var(--muted)' : 'var(--border)';
+    const textColor   = ns === 'active' ? color : ns === 'done' ? 'var(--muted)' : 'var(--border)';
+    const bgStyle     = ns === 'active' ? `background:${color}22;box-shadow:0 0 8px ${color}55;` : '';
+    const opacityStyle = ns === 'upcoming' ? 'opacity:0.4;' : '';
+    const check = ns === 'done' ? `<span class="phase-node-check">✓</span>` : '';
+    const sub   = n.sub ? `<span class="phase-node-sub">${esc(n.sub)}</span>` : '';
+    const arrow = i < nodes.length - 1
+      ? `<div class="phase-arrow${nodeState(nodes[i+1].key) !== 'upcoming' ? ' active' : ''}">
+           <div class="phase-arrow-line"></div><div class="phase-arrow-head"></div>
+         </div>`
+      : '';
+    return `
+      <div class="phase-node">
+        <div class="phase-node-box ${ns}" style="border-color:${borderColor};${bgStyle}${opacityStyle}">
+          ${check}
+          <span class="phase-node-label" style="color:${textColor}">${n.label}</span>
+          ${sub}
+        </div>
+      </div>${arrow}`;
+  }).join('');
+
+  const [w0, w1] = s.wins || [0, 0];
+  const need = s.best_of ? Math.ceil(s.best_of / 2) : '?';
+  const [n0, n1] = s.team_names || ['Team A', 'Team B'];
+
+  const schemeHtml = s.scheme ? `
+    <div class="phase-scheme">
+      <div class="phase-scheme-title">scheme — ${esc(s.scheme)}</div>
+      ${(s.scheme_orders || []).map(([k,v]) =>
+        `<div class="phase-scheme-row"><span class="phase-scheme-key">${esc(k)}</span><span>${esc(v)}</span></div>`
+      ).join('')}
+    </div>` : '';
+
+  el.innerHTML = `
+    <div class="phase-pipeline"><div class="phase-pipeline-inner">${pipelineHtml}</div></div>
+    <div class="phase-current-box" style="border-color:${activeColor}33;border-left-color:${activeColor}">
+      <div class="phase-current-label" style="color:${activeColor}">CURRENT — ${esc(phase)}</div>
+      <div class="phase-current-desc">${esc(PHASE_ACTION[phase] || '—')}</div>
+    </div>
+    <div class="phase-stats">
+      <div class="phase-stat"><div class="phase-stat-val blue">${w0}</div><div class="phase-stat-key">${esc(n0)} wins</div></div>
+      <div class="phase-stat"><div class="phase-stat-val red">${w1}</div><div class="phase-stat-key">${esc(n1)} wins</div></div>
+      <div class="phase-stat"><div class="phase-stat-val muted">${need}</div><div class="phase-stat-key">needed</div></div>
+    </div>
+    ${schemeHtml}
+    <div class="phase-hint">&gt;phase — show raw cursors &nbsp;·&nbsp; &gt;undo — step back</div>
+  `;
+}
+
+function renderQualsPhase(el, s) {
+  const maps    = s.maps || [];
+  const played  = maps.filter(m => m.state === 'played').length;
+  const remaining = maps.filter(m => m.state === 'upcoming' || m.state === 'current').length;
+  const eta     = formatEta(s.eta_seconds);
+
+  const icons = { played: '✓', current: '▶', upcoming: '·' };
+  const rowsHtml = maps.map(m => {
+    const isActive = m.state === 'current';
+    const isDone   = m.state === 'played';
+    const col = isActive ? 'var(--blue)' : isDone ? 'var(--green)' : 'var(--border)';
+    const nowBadge = isActive ? `<span class="quals-phase-now">NOW</span>` : '';
+    const meta = isDone ? 'done' : (m.length ? formatEta(m.length) : '—');
+    return `<div class="quals-phase-row${isActive ? ' current' : ''}">
+      <span class="quals-phase-icon" style="color:${col}">${icons[m.state] || '·'}</span>
+      <span class="quals-phase-code" style="color:${col};font-weight:${isActive?700:400}">${esc(m.code)}</span>
+      <span class="quals-phase-meta">${esc(meta)}</span>
+      ${nowBadge}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="phase-stats">
+      <div class="phase-stat"><div class="phase-stat-val green">${played}</div><div class="phase-stat-key">played</div></div>
+      <div class="phase-stat"><div class="phase-stat-val">${remaining}</div><div class="phase-stat-key">remaining</div></div>
+      <div class="phase-stat"><div class="phase-stat-val yellow">${eta}</div><div class="phase-stat-key">ETA</div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1px">${rowsHtml}</div>
+    <div class="phase-hint">auto-advancing · &gt;abort to replay · &gt;startmap to force-start</div>
+  `;
+}
+
+/* ── commands tab ────────────────────────────────────────────── */
+function renderCmds() {
+  const el = $('cmds-content');
+  if (!el) return;
+  const isQuals = !!appState.qualifier;
+  const cmds = (appState.commands || []).filter(c => !isQuals || !c.bracket_only);
+
+  // group by section preserving order
+  const sections = [];
+  const seen = {};
+  for (const c of cmds) {
+    if (!seen[c.section]) { seen[c.section] = []; sections.push(c.section); }
+    seen[c.section].push(c);
+  }
+
+  const scopeClass = { ref: '', anyone: 'green' };
+
+  el.innerHTML = sections.map(sec => `
+    <div class="cmd-section">
+      <div class="cmd-section-title">${esc(sec)}</div>
+      <div class="cmd-section-btns">
+        ${seen[sec].map(c => `
+          <button class="cmd-btn${c.scope === 'anyone' ? ' green' : ''}" data-cmd="${esc((c.noprefix ? '' : '>') + c.name)}">
+            <span>${esc(c.label)}</span>
+            ${c.desc ? `<span class="cmd-btn-desc">${esc(c.desc)}</span>` : ''}
+          </button>`).join('')}
+      </div>
+    </div>`).join('') +
+    `<div class="cmd-footer">ref prefix: &gt; &nbsp;|&nbsp; green = anyone</div>`;
+
+  el.querySelectorAll('.cmd-btn[data-cmd]').forEach(b => {
+    b.addEventListener('click', () => sendWS(b.dataset.cmd));
+  });
+}
 
 /* ── settings ────────────────────────────────────────────────── */
 function renderSettings() {
