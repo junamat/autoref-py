@@ -227,6 +227,16 @@ class BracketAutoRef(AutoRef):
             return team_index
         return self.ranking.index(team_index)
 
+    def _help_ref_lines(self) -> list[str]:
+        return super()._help_ref_lines() + [
+            "── bracket ───────────────────────────────",
+            ">roll <team> [team…]     — set roll ranking manually",
+            ">order <n>               — choose an order scheme",
+            ">phase                   — show current phase/cursors",
+            ">fp / >fb / >fpro <team> — set who goes first for pick/ban/protect",
+            ">first <pick|ban|protect> <team>",
+        ]
+
     async def _undo_last_action(self) -> bool:
         ms = self.match.match_status
         if ms.empty:

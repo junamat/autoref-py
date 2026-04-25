@@ -292,8 +292,60 @@ class AutoRef(ABC):
         """True if username is allowed to use ref commands (or refs list is empty)."""
         return not self.refs or _normalize(username) in self.refs
 
+    def _trusted_sources(self) -> set[str]:
+        """Sources that are not Bancho chat — reply sinks are registered for these."""
+        return set(self.lobby._reply_sinks.keys())
+
+    # Commands shown to everyone in the lobby when >help is typed in chat.
+    _HELP_PUBLIC: list[str] = [
+        "!panic              — switch to OFF mode immediately",
+        ">timeout [secs]     — request a break (default 120s)",
+        ">scoreline / >sc    — show current score",
+        ">status  / >st      — show full match status",
+    ]
+
+    # Full ref command list, sent only to the originating trusted source.
+    _HELP_REF: list[str] = [
+        "── flow ──────────────────────────────────",
+        ">mode <off|assisted|auto>",
+        ">next <map>         — confirm pick/ban/protect (assisted/off)",
+        ">dismiss            — discard pending proposal",
+        ">abort / >ab        — abort map and replay it",
+        ">undo  / >u         — undo last pick/ban/protect",
+        ">close [force]      — end match (saves unless force)",
+        "── timers / lobby ────────────────────────",
+        ">timeout [secs]     — pause (default 120s)",
+        ">timer <secs|name>  — start a named or custom timer",
+        ">startmap [delay]   — force-start the map",
+        ">setmap <id> [mode] — change the map",
+        ">invite / >inv      — re-invite all players",
+        "── info ──────────────────────────────────",
+        ">status / >st       — full match status",
+        ">scoreline / >sc    — score only",
+        ">picks / >pk        — pick history",
+        ">bans  / >bn        — ban history",
+        ">protects / >prot   — protect history",
+        "── score override ────────────────────────",
+        ">setscoreline <s0> <s1>  (alias >ssl)",
+    ]
+
+    def _help_ref_lines(self) -> list[str]:
+        """Subclasses can override or extend to add their own commands."""
+        return list(self._HELP_REF)
+
     async def _dispatch_command(self, cmd: str, args: list[str], source: str) -> bool:
         """Execute a parsed ref command. Returns True if recognised."""
+
+        # ── help ─────────────────────────────────────────────────────────────
+        if cmd in ("help", "commands", "cmds", "h"):
+            trusted = source in self._trusted_sources()
+            if trusted:
+                for line in self._help_ref_lines():
+                    await self.lobby.reply(line, source)
+            # Always show the short public list in the lobby.
+            for line in self._HELP_PUBLIC:
+                await self.lobby.say(line)
+            return True
 
         # ── mode / flow ──────────────────────────────────────────────────────
         if cmd == "mode" and args:

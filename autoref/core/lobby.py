@@ -37,6 +37,7 @@ class Lobby:
         self._message_hooks: list = []
         self._input_hooks: list = []
         self._output_sinks: list = []
+        self._reply_sinks: dict = {}
 
     def add_message_hook(self, fn) -> None:
         self._message_hooks.append(fn)
@@ -48,6 +49,31 @@ class Lobby:
     def add_output_sink(self, fn) -> None:
         """Register an async callable(text: str) called for every message the bot sends."""
         self._output_sinks.append(fn)
+
+    def register_reply_sink(self, source: str, fn) -> None:
+        """Register an async callable(text: str) as the reply channel for a named source.
+
+        When AutoRef calls lobby.reply(text, source), the registered sink is used
+        instead of broadcasting to the Bancho lobby.  Useful for sending ref-only
+        output (e.g. >help) to CLI stdout, a Discord DM, or a web panel without
+        cluttering the match room.
+        """
+        self._reply_sinks[source] = fn
+
+    async def reply(self, text: str, source: str) -> None:
+        """Send text back to the originating source only.
+
+        Falls back to lobby.say() when no sink is registered for that source
+        (e.g. a Bancho username that typed a command in chat).
+        """
+        sink = self._reply_sinks.get(source)
+        if sink:
+            try:
+                await sink(text)
+            except Exception:
+                logger.exception("reply sink error for source %r", source)
+        else:
+            await self.say(text)
 
     async def handle_input(self, text: str, source: str = "cli") -> None:
         """Route a line of text from CLI/web through input hooks, falling back to say()."""
@@ -213,6 +239,11 @@ class Lobby:
         transport, _ = await loop.connect_read_pipe(
             lambda: asyncio.StreamReaderProtocol(reader), sys.stdin
         )
+
+        async def _cli_reply(text: str) -> None:
+            print(text)
+
+        self.register_reply_sink("cli", _cli_reply)
         try:
             while True:
                 line = await reader.readline()
