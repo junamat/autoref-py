@@ -82,45 +82,76 @@ function renderMatchList(matches) {
   noMsg.hidden = true;
 
   for (const data of matches) {
+    const pending   = data.status === 'pending';
     const isQuals   = !!data.qualifier;
     const mode      = data.mode || 'off';
     const connected = data.connected || false;
     const title     = isQuals
       ? `Qualifiers${data.phase ? ' · ' + data.phase : ''}`
       : (data.team_names || []).join(' vs ') || 'Bracket match';
-    const meta = isQuals
-      ? `${data.maps_played ?? '?'}/${data.total_maps ?? '?'} maps played`
-      : `BO${data.best_of || '?'}`;
+    const meta = pending
+      ? 'pending — not started'
+      : isQuals
+        ? `${data.maps_played ?? '?'}/${data.total_maps ?? '?'} maps played`
+        : `BO${data.best_of || '?'}`;
     const step = data.phase || (isQuals ? 'MAP' : '');
     const refs = data.refs || (data.ref_name ? [data.ref_name] : []);
 
-    const refsHtml = refs.length
+    const refsHtml = !pending && refs.length
       ? refs.map(r => `<span class="match-ref-tag mono">${esc(r)}</span>`).join('')
-      : `<span class="muted mono xs">no refs connected</span>`;
+      : '';
 
     const card = document.createElement('div');
-    card.className = 'match-card mono' + (isQuals ? ' quals' : '');
+    card.className = 'match-card mono' + (isQuals ? ' quals' : '') + (pending ? ' pending' : '');
     card.innerHTML = `
       <div class="match-card-accent"></div>
       <div class="match-card-body">
         <div class="match-card-status">
           <span class="match-card-badge badge-${esc(mode)}">${esc(mode.toUpperCase())}</span>
-          ${step ? `<span class="match-card-step">${esc(step)}</span>` : ''}
+          ${step && !pending ? `<span class="match-card-step">${esc(step)}</span>` : ''}
+          ${pending ? `<span class="match-card-step" style="color:var(--muted)">PENDING</span>` : ''}
         </div>
         <div class="match-card-info">
           <div class="match-card-title">${esc(title)}</div>
           <div class="match-card-meta">${esc(meta)}</div>
-          <div class="match-card-refs">${refsHtml}</div>
+          ${refsHtml ? `<div class="match-card-refs">${refsHtml}</div>` : ''}
         </div>
-        <div class="match-card-actions"></div>
+        <div class="match-card-actions" style="display:flex;gap:5px"></div>
       </div>
     `;
 
-    const btn = document.createElement('button');
-    btn.className = connected ? 'rejoin-btn' : 'join-btn';
-    btn.textContent = connected ? '→ rejoin' : '→ join';
-    btn.addEventListener('click', () => showMatch(data.id));
-    card.querySelector('.match-card-actions').appendChild(btn);
+    const actions = card.querySelector('.match-card-actions');
+
+    if (pending) {
+      const startBtn = document.createElement('button');
+      startBtn.className = 'join-btn';
+      startBtn.textContent = '▶ start';
+      startBtn.addEventListener('click', async () => {
+        startBtn.disabled = true;
+        startBtn.textContent = '…';
+        const res = await fetch(`/api/matches/${data.id}/start`, { method: 'POST' });
+        const d = await res.json();
+        if (res.ok) showMatch(d.id);
+        else { alert('Error: ' + (d.error || res.status)); startBtn.disabled = false; startBtn.textContent = '▶ start'; }
+      });
+      actions.appendChild(startBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'ghost-btn';
+      delBtn.textContent = '✕';
+      delBtn.style.color = 'var(--red)';
+      delBtn.style.borderColor = 'var(--red)';
+      delBtn.addEventListener('click', async () => {
+        await fetch(`/api/matches/${data.id}`, { method: 'DELETE' });
+      });
+      actions.appendChild(delBtn);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = connected ? 'rejoin-btn' : 'join-btn';
+      btn.textContent = connected ? '→ rejoin' : '→ join';
+      btn.addEventListener('click', () => showMatch(data.id));
+      actions.appendChild(btn);
+    }
 
     list.appendChild(card);
   }
@@ -199,7 +230,7 @@ $('pool-add-btn').addEventListener('click', () => {
   $(id).addEventListener('keydown', e => { if (e.key === 'Enter') $('pool-add-btn').click(); });
 });
 
-/* ── Create & start ──────────────────────────────────────────── */
+/* ── Create match (pending) ──────────────────────────────────── */
 $('qs-submit').addEventListener('click', async () => {
   const type  = $('qs-type').querySelector('.active')?.dataset.val || 'bracket';
   const mode  = $('qs-mode').querySelector('.active')?.dataset.val || 'off';
@@ -216,7 +247,7 @@ $('qs-submit').addEventListener('click', async () => {
     maps: poolMaps,
   };
 
-  $('qs-submit').textContent = 'starting…';
+  $('qs-submit').textContent = 'creating…';
   $('qs-submit').disabled = true;
   try {
     const res = await fetch('/api/matches', {
@@ -225,15 +256,12 @@ $('qs-submit').addEventListener('click', async () => {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (res.ok) {
-      showMatch(data.id);
-    } else {
-      alert('Error: ' + (data.error || res.status));
-    }
+    if (!res.ok) alert('Error: ' + (data.error || res.status));
+    // landing WS will push the updated list automatically
   } catch (e) {
-    alert('Failed to create match: ' + e.message);
+    alert('Failed: ' + e.message);
   } finally {
-    $('qs-submit').textContent = 'create & start';
+    $('qs-submit').textContent = 'create';
     $('qs-submit').disabled = false;
   }
 });

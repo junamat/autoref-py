@@ -86,6 +86,7 @@ class WebServer:
         self.port = port
         self.static_dir = Path(static_dir) if static_dir else _STATIC_DIR
         self._matches: dict[str, WebInterface] = {}
+        self._pending: dict[str, dict] = {}   # match_id -> raw payload, not yet started
         self._landing_clients: set = set()
         self._bancho_username = bancho_username or os.getenv("BANCHO_USERNAME", "")
         self._bancho_password = bancho_password or os.getenv("BANCHO_PASSWORD", "")
@@ -104,7 +105,11 @@ class WebServer:
 
     def _notify_landing(self) -> None:
         """Push updated match list to all landing-page clients."""
-        payload = json.dumps({"type": "matches", "matches": [m.summary() for m in self._matches.values()]})
+        all_matches = (
+            [self._pending_summary(mid, p) for mid, p in self._pending.items()] +
+            [m.summary() for m in self._matches.values()]
+        )
+        payload = json.dumps({"type": "matches", "matches": all_matches})
         dead = set()
         for client in self._landing_clients:
             try:
@@ -113,7 +118,18 @@ class WebServer:
                 dead.add(client)
         self._landing_clients -= dead
 
-    async def _create_match(self, payload: dict) -> WebInterface:
+    def _pending_summary(self, match_id: str, payload: dict) -> dict:
+        teams = payload.get("teams", [])
+        return {
+            "id":         match_id,
+            "status":     "pending",
+            "qualifier":  payload.get("type") == "qualifiers",
+            "mode":       payload.get("mode", "off"),
+            "team_names": [t["name"] for t in teams],
+            "best_of":    payload.get("best_of"),
+        }
+
+    async def _create_match(self, payload: dict, match_id: str | None = None) -> WebInterface:
         """Spin up an AutoRef from a web payload and register it."""
         import bancho
         import aiosu
@@ -185,7 +201,7 @@ class WebServer:
             password=self._bancho_password,
         )
 
-        iface = WebInterface()
+        iface = WebInterface(match_id=match_id)
         self.register(iface)
 
         if match_type == "qualifiers":
@@ -229,20 +245,43 @@ class WebServer:
 
         @app.get("/api/matches")
         async def api_matches():
-            return JSONResponse([m.summary() for m in server._matches.values()])
+            all_matches = (
+                [server._pending_summary(mid, p) for mid, p in server._pending.items()] +
+                [m.summary() for m in server._matches.values()]
+            )
+            return JSONResponse(all_matches)
 
         @app.post("/api/matches")
         async def create_match(request):
             try:
                 body = await request.json()
-                iface = await server._create_match(body)
-                return JSONResponse({"id": iface.match_id}, status_code=201)
+                match_id = str(uuid.uuid4())[:8]
+                server._pending[match_id] = body
+                server._notify_landing()
+                return JSONResponse({"id": match_id, "status": "pending"}, status_code=201)
             except Exception as e:
                 logger.exception("failed to create match")
                 return JSONResponse({"error": str(e)}, status_code=500)
 
+        @app.post("/api/matches/{match_id}/start")
+        async def start_match(match_id: str):
+            payload = server._pending.pop(match_id, None)
+            if payload is None:
+                return JSONResponse({"error": "not found or already started"}, status_code=404)
+            try:
+                iface = await server._create_match(payload, match_id=match_id)
+                return JSONResponse({"id": iface.match_id, "status": "running"})
+            except Exception as e:
+                server._pending[match_id] = payload  # restore on failure
+                logger.exception("failed to start match")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
         @app.delete("/api/matches/{match_id}")
         async def delete_match(match_id: str):
+            if match_id in server._pending:
+                del server._pending[match_id]
+                server._notify_landing()
+                return JSONResponse({"ok": True})
             iface = server._matches.get(match_id)
             if iface is None:
                 return JSONResponse({"error": "not found"}, status_code=404)

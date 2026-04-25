@@ -96,6 +96,8 @@ body {
   width: 3px; flex-shrink: 0; background: var(--blue);
 }
 .match-card.quals .match-card-accent { background: var(--yellow); }
+.match-card.pending .match-card-accent { background: var(--muted); }
+.match-card.pending { opacity: 0.8; }
 .match-card-body {
   flex: 1; padding: 8px 10px; display: flex; align-items: center; gap: 12px;
 }
