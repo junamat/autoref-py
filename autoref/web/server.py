@@ -1,6 +1,8 @@
 """Web interface: per-match WebInterface + shared WebServer registry."""
+import asyncio
 import json
 import logging
+import os
 import uuid
 from pathlib import Path
 
@@ -77,12 +79,17 @@ class WebServer:
     """Shared FastAPI server. Register WebInterface instances before calling start()."""
 
     def __init__(self, host: str = "0.0.0.0", port: int = 8080,
-                 static_dir: str | Path | None = None):
+                 static_dir: str | Path | None = None,
+                 bancho_username: str | None = None,
+                 bancho_password: str | None = None):
         self.host = host
         self.port = port
         self.static_dir = Path(static_dir) if static_dir else _STATIC_DIR
         self._matches: dict[str, WebInterface] = {}
         self._landing_clients: set = set()
+        self._bancho_username = bancho_username or os.getenv("BANCHO_USERNAME", "")
+        self._bancho_password = bancho_password or os.getenv("BANCHO_PASSWORD", "")
+        self._tasks: dict[str, asyncio.Task] = {}
 
     def register(self, iface: WebInterface) -> WebInterface:
         """Add a WebInterface to the registry. Returns the interface for chaining."""
@@ -92,10 +99,11 @@ class WebServer:
 
     def unregister(self, iface: WebInterface) -> None:
         self._matches.pop(iface.match_id, None)
+        self._tasks.pop(iface.match_id, None)
+        self._notify_landing()
 
     def _notify_landing(self) -> None:
         """Push updated match list to all landing-page clients."""
-        import asyncio
         payload = json.dumps({"type": "matches", "matches": [m.summary() for m in self._matches.values()]})
         dead = set()
         for client in self._landing_clients:
@@ -104,6 +112,105 @@ class WebServer:
             except Exception:
                 dead.add(client)
         self._landing_clients -= dead
+
+    async def _create_match(self, payload: dict) -> WebInterface:
+        """Spin up an AutoRef from a web payload and register it."""
+        import bancho
+        import aiosu
+        from ..core.models import Match, Pool, PlayableMap, ModdedPool, Ruleset, Team, Timers, OrderScheme
+        from ..core.enums import WinCondition, RefMode
+        from ..controllers.bracket import BracketAutoRef
+        from ..controllers.qualifiers import QualifiersAutoRef
+
+        match_type = payload.get("type", "bracket")
+        room_name  = payload.get("room_name", "autoref match")
+        mode       = RefMode(payload.get("mode", "off"))
+        best_of    = int(payload.get("best_of", 1))
+        bans       = int(payload.get("bans_per_team", 0))
+        protects   = int(payload.get("protects_per_team", 0))
+
+        # Build pool from flat map list grouped by mod_group
+        # Each entry: {beatmap_id, name, mod_group, mods}
+        # mod_group is used to group into ModdedPool; mods is the actual mod string
+        map_entries = payload.get("maps", [])
+        groups: dict[str, list] = {}
+        for e in map_entries:
+            g = e.get("mod_group", "NM")
+            groups.setdefault(g, []).append(e)
+
+        pool_children = []
+        for group_name, entries in groups.items():
+            mods_str = entries[0].get("mods", "") if entries else ""
+            maps = [PlayableMap(
+                int(e["beatmap_id"]),
+                name=e.get("name") or f"{group_name}{i+1}",
+                is_tiebreaker=e.get("is_tiebreaker", False),
+            ) for i, e in enumerate(entries)]
+            if mods_str and mods_str.lower() not in ("", "nm", "nomod"):
+                if mods_str.lower() == "freemod":
+                    pool_children.append(ModdedPool(group_name, "Freemod", *maps))
+                else:
+                    pool_children.append(ModdedPool(group_name, aiosu.models.mods.Mods(mods_str), *maps))
+            else:
+                pool_children.append(Pool(group_name, *maps))
+
+        pool = Pool(room_name, *pool_children)
+
+        # Teams
+        team_defs = payload.get("teams", [{"name": "Team 1"}, {"name": "Team 2"}])
+        teams = []
+        for td in team_defs:
+            t = Team(td["name"])
+            t.players = [type("Player", (), {"username": p})()
+                         for p in td.get("players", [])]
+            teams.append(t)
+
+        ruleset = Ruleset(
+            vs=int(payload.get("vs", 1)),
+            gamemode=aiosu.models.Gamemode.STANDARD,
+            win_condition=WinCondition.SCORE_V2,
+            enforced_mods="NF",
+            team_mode=0 if match_type == "qualifiers" else 2,
+            best_of=best_of,
+            bans_per_team=bans,
+            protects_per_team=protects,
+            schemes=[OrderScheme("standard", ban_pattern="ABBA")] if match_type == "bracket" else None,
+        )
+
+        from ..core.enums import Step
+        match = Match(ruleset, pool, lambda _: (0, Step.WIN), *teams)
+
+        client = bancho.BanchoClient(
+            username=self._bancho_username,
+            password=self._bancho_password,
+        )
+
+        iface = WebInterface()
+        self.register(iface)
+
+        if match_type == "qualifiers":
+            ar = QualifiersAutoRef(client=client, match=match,
+                                   room_name=room_name, mode=mode)
+        else:
+            ar = BracketAutoRef(client=client, match=match,
+                                room_name=room_name, mode=mode)
+
+        iface.attach(ar.lobby)
+        iface.attach_autoref(ar)
+
+        async def _run():
+            try:
+                await client.connect()
+                await ar.run()
+            except Exception:
+                logger.exception("match %s crashed", iface.match_id)
+            finally:
+                await client.disconnect()
+                self.unregister(iface)
+
+        task = asyncio.create_task(_run())
+        self._tasks[iface.match_id] = task
+        return iface
 
     async def start(self) -> None:
         from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -124,18 +231,36 @@ class WebServer:
         async def api_matches():
             return JSONResponse([m.summary() for m in server._matches.values()])
 
+        @app.post("/api/matches")
+        async def create_match(request):
+            try:
+                body = await request.json()
+                iface = await server._create_match(body)
+                return JSONResponse({"id": iface.match_id}, status_code=201)
+            except Exception as e:
+                logger.exception("failed to create match")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.delete("/api/matches/{match_id}")
+        async def delete_match(match_id: str):
+            iface = server._matches.get(match_id)
+            if iface is None:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            if iface._lobby:
+                await iface._lobby.handle_input(">close force", "web")
+            return JSONResponse({"ok": True})
+
         @app.websocket("/ws/landing")
         async def ws_landing(websocket: WebSocket):
             await websocket.accept()
             server._landing_clients.add(websocket)
-            # send current state immediately
             await websocket.send_text(json.dumps({
                 "type": "matches",
                 "matches": [m.summary() for m in server._matches.values()],
             }))
             try:
                 while True:
-                    await websocket.receive_text()  # keep alive
+                    await websocket.receive_text()
             except WebSocketDisconnect:
                 pass
             finally:

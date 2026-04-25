@@ -144,8 +144,20 @@ body {
   background: var(--panel); border: 1.5px solid var(--border); border-radius: 3px;
   display: flex; flex-direction: column; overflow: hidden;
 }
+#qs-tabs {
+  display: flex; border-bottom: 1.5px solid var(--border); flex-shrink: 0;
+}
+.qs-tab {
+  flex: 1; padding: 5px 0; text-align: center;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.qs-tab:hover { color: var(--text); }
+.qs-tab.active { color: var(--green); border-bottom-color: var(--green); background: #0d1f17; }
+.qs-pane { flex: 1; overflow-y: auto; }
 #quickstart-form {
-  padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1;
+  padding: 10px; display: flex; flex-direction: column; gap: 8px;
 }
 .qs-field { display: flex; flex-direction: column; gap: 3px; }
 .qs-label {
@@ -170,6 +182,27 @@ body {
 }
 #qs-mode .qs-opt.active {
   background: #14532d; color: var(--green); border-color: var(--green);
+}
+
+/* ── Pool builder ─────────────────────────────────────────────── */
+#pool-builder { display: flex; flex-direction: column; height: 100%; }
+#pool-map-list { flex: 1; overflow-y: auto; }
+.pool-map-row {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-bottom: 1px solid var(--border); font-size: 10px;
+}
+.pool-map-row .pool-code { font-weight: 700; min-width: 36px; }
+.pool-map-row .pool-bid  { color: var(--muted); flex: 1; }
+.pool-map-row .pool-grp  { font-size: 9px; color: var(--blue); min-width: 28px; }
+.pool-map-row .pool-del  {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  font-size: 11px; padding: 0 2px; line-height: 1;
+}
+.pool-map-row .pool-del:hover { color: var(--red); }
+#pool-add-row {
+  display: flex; gap: 4px; align-items: center;
+  padding: 6px 8px; border-top: 1.5px solid var(--border);
+  background: var(--head); flex-shrink: 0;
 }
 
 /* ── Players refresh row ──────────────────────────────────────── */

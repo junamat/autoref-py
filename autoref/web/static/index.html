@@ -40,41 +40,67 @@
 
       <!-- right: quick-start panel -->
       <div id="landing-quickstart">
-        <div class="panel-head">quick start</div>
-        <div id="quickstart-form">
-          <div class="qs-field">
-            <div class="qs-label">match type</div>
-            <div class="qs-toggle" id="qs-type">
-              <div class="qs-opt active" data-val="bracket">bracket</div>
-              <div class="qs-opt" data-val="qualifiers">qualifiers</div>
-            </div>
-          </div>
-          <div class="qs-field">
-            <div class="qs-label">room name</div>
-            <input class="qs-input" id="qs-name" placeholder="QF: Blue vs Red">
-          </div>
-          <div class="qs-field">
-            <div class="qs-label">best of</div>
-            <input class="qs-input" id="qs-bo" placeholder="9" style="width:60px">
-          </div>
-          <div class="qs-field">
-            <div class="qs-label">team 1</div>
-            <input class="qs-input" id="qs-t1" placeholder="Blue">
-          </div>
-          <div class="qs-field">
-            <div class="qs-label">team 2</div>
-            <input class="qs-input" id="qs-t2" placeholder="Red">
-          </div>
-          <div class="qs-field">
-            <div class="qs-label">ref mode</div>
-            <div class="qs-toggle" id="qs-mode">
-              <div class="qs-opt active" data-val="auto">auto</div>
-              <div class="qs-opt" data-val="assisted">assisted</div>
-              <div class="qs-opt" data-val="off">off</div>
-            </div>
-          </div>
-          <button class="join-btn" id="qs-submit" style="width:100%;margin-top:4px">create &amp; start</button>
+        <div id="qs-tabs">
+          <div class="qs-tab active" data-tab="match">match</div>
+          <div class="qs-tab" data-tab="pool">pool</div>
         </div>
+
+        <!-- match tab -->
+        <div id="qs-pane-match" class="qs-pane">
+          <div id="quickstart-form">
+            <div class="qs-field">
+              <div class="qs-label">match type</div>
+              <div class="qs-toggle" id="qs-type">
+                <div class="qs-opt active" data-val="bracket">bracket</div>
+                <div class="qs-opt" data-val="qualifiers">qualifiers</div>
+              </div>
+            </div>
+            <div class="qs-field">
+              <div class="qs-label">room name</div>
+              <input class="qs-input" id="qs-name" placeholder="QF: Blue vs Red">
+            </div>
+            <div class="qs-field" id="qs-bo-field">
+              <div class="qs-label">best of</div>
+              <input class="qs-input" id="qs-bo" placeholder="9" style="width:60px">
+            </div>
+            <div class="qs-field" id="qs-bans-field">
+              <div class="qs-label">bans per team</div>
+              <input class="qs-input" id="qs-bans" placeholder="2" style="width:60px">
+            </div>
+            <div class="qs-field">
+              <div class="qs-label">team 1</div>
+              <input class="qs-input" id="qs-t1" placeholder="Blue">
+            </div>
+            <div class="qs-field">
+              <div class="qs-label">team 2</div>
+              <input class="qs-input" id="qs-t2" placeholder="Red">
+            </div>
+            <div class="qs-field">
+              <div class="qs-label">ref mode</div>
+              <div class="qs-toggle" id="qs-mode">
+                <div class="qs-opt active" data-val="off">off</div>
+                <div class="qs-opt" data-val="assisted">assisted</div>
+                <div class="qs-opt" data-val="auto">auto</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- pool tab -->
+        <div id="qs-pane-pool" class="qs-pane" hidden>
+          <div id="pool-builder">
+            <div id="pool-map-list"></div>
+            <div id="pool-add-row">
+              <input class="qs-input" id="pool-bid"   placeholder="beatmap ID" style="width:90px">
+              <input class="qs-input" id="pool-name"  placeholder="NM1"        style="width:46px">
+              <input class="qs-input" id="pool-group" placeholder="NM"         style="width:36px">
+              <input class="qs-input" id="pool-mods"  placeholder="mods"       style="width:46px">
+              <button class="ghost-btn xs" id="pool-add-btn">+</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="join-btn" id="qs-submit" style="width:calc(100% - 20px);margin:0 10px 10px">create &amp; start</button>
       </div>
 
     </div>

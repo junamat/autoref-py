@@ -126,6 +126,15 @@ function renderMatchList(matches) {
   }
 }
 
+/* ── Quick-start tabs ────────────────────────────────────────── */
+document.querySelectorAll('.qs-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const name = tab.dataset.tab;
+    document.querySelectorAll('.qs-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.qs-pane').forEach(p => { p.hidden = p.id !== `qs-pane-${name}`; });
+  });
+});
+
 /* ── Quick-start toggle opts ─────────────────────────────────── */
 document.querySelectorAll('.qs-toggle').forEach(toggle => {
   toggle.addEventListener('click', e => {
@@ -134,6 +143,99 @@ document.querySelectorAll('.qs-toggle').forEach(toggle => {
     toggle.querySelectorAll('.qs-opt').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
   });
+});
+
+// hide BO/bans for qualifiers
+$('qs-type').addEventListener('click', () => {
+  const isQuals = $('qs-type').querySelector('.active')?.dataset.val === 'qualifiers';
+  $('qs-bo-field').hidden   = isQuals;
+  $('qs-bans-field').hidden = isQuals;
+});
+
+/* ── Pool builder ────────────────────────────────────────────── */
+let poolMaps = [];  // [{beatmap_id, name, mod_group, mods}]
+
+function renderPoolList() {
+  const list = $('pool-map-list');
+  if (!poolMaps.length) {
+    list.innerHTML = '<span class="muted mono xs pad">no maps added</span>';
+    return;
+  }
+  list.innerHTML = poolMaps.map((m, i) => `
+    <div class="pool-map-row mono">
+      <span class="pool-code">${esc(m.name)}</span>
+      <span class="pool-bid">${esc(String(m.beatmap_id))}</span>
+      <span class="pool-grp">${esc(m.mod_group)}${m.mods ? ' · ' + esc(m.mods) : ''}</span>
+      <button class="pool-del" data-i="${i}">✕</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('.pool-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      poolMaps.splice(parseInt(btn.dataset.i), 1);
+      renderPoolList();
+    });
+  });
+}
+renderPoolList();
+
+$('pool-add-btn').addEventListener('click', () => {
+  const bid = $('pool-bid').value.trim();
+  if (!bid || isNaN(parseInt(bid))) return;
+  poolMaps.push({
+    beatmap_id: parseInt(bid),
+    name:       $('pool-name').value.trim()  || `MAP${poolMaps.length + 1}`,
+    mod_group:  $('pool-group').value.trim() || 'NM',
+    mods:       $('pool-mods').value.trim(),
+  });
+  $('pool-bid').value = $('pool-name').value = $('pool-mods').value = '';
+  // auto-increment name suffix
+  const grp = $('pool-group').value.trim() || 'NM';
+  const count = poolMaps.filter(m => m.mod_group === grp).length + 1;
+  $('pool-name').value = grp + count;
+  renderPoolList();
+  $('pool-bid').focus();
+});
+['pool-bid','pool-name','pool-group','pool-mods'].forEach(id => {
+  $(id).addEventListener('keydown', e => { if (e.key === 'Enter') $('pool-add-btn').click(); });
+});
+
+/* ── Create & start ──────────────────────────────────────────── */
+$('qs-submit').addEventListener('click', async () => {
+  const type  = $('qs-type').querySelector('.active')?.dataset.val || 'bracket';
+  const mode  = $('qs-mode').querySelector('.active')?.dataset.val || 'off';
+  const name  = $('qs-name').value.trim() || 'autoref match';
+  const bo    = parseInt($('qs-bo').value)  || 1;
+  const bans  = parseInt($('qs-bans').value) || 0;
+  const t1    = $('qs-t1').value.trim() || 'Team 1';
+  const t2    = $('qs-t2').value.trim() || 'Team 2';
+
+  const payload = {
+    type, mode, room_name: name,
+    best_of: bo, bans_per_team: bans,
+    teams: [{ name: t1, players: [] }, { name: t2, players: [] }],
+    maps: poolMaps,
+  };
+
+  $('qs-submit').textContent = 'starting…';
+  $('qs-submit').disabled = true;
+  try {
+    const res = await fetch('/api/matches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showMatch(data.id);
+    } else {
+      alert('Error: ' + (data.error || res.status));
+    }
+  } catch (e) {
+    alert('Failed to create match: ' + e.message);
+  } finally {
+    $('qs-submit').textContent = 'create & start';
+    $('qs-submit').disabled = false;
+  }
 });
 
 /* ── Match WebSocket ─────────────────────────────────────────── */
