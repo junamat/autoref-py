@@ -67,7 +67,7 @@ class AutoRef(ABC):
         match: Match,
         room_name: str,
         timers: Timers | None = None,
-        mode: RefMode = RefMode.AUTO,
+        mode: RefMode = RefMode.OFF,
         ref_prefix: str = ">",
         refs: set[str] | None = None,
         db: MatchDatabase | None = None,
