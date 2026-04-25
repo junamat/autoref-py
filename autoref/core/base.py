@@ -157,6 +157,7 @@ class AutoRef(ABC):
             "events": events,
             "pending_proposal": self._pending_proposal,
             "ref_name": getattr(self._client, "username", None),
+            "room_id": self.lobby.room_id,
         }
 
     async def _push_state(self) -> None:

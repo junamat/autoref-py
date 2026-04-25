@@ -87,6 +87,10 @@ class Lobby:
         assert self._lobby is not None
         return self._lobby.channel
 
+    @property
+    def room_id(self) -> int | None:
+        return self._lobby.id if self._lobby else None
+
     # ---------------------------------------------------------- room lifecycle
 
     async def create(self, name: str, private: bool = False) -> int:

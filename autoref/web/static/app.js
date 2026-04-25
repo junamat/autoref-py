@@ -6,6 +6,7 @@ let appState = {
   team_names: ['Team A', 'Team B'], teams: [],
   best_of: 1, maps: [], events: [],
   pending_proposal: null, ref_name: null,
+  room_id: null,
 };
 let ws = null;
 let landingWs = null;
@@ -16,6 +17,15 @@ const $ = id => document.getElementById(id);
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+/* ── Theme ───────────────────────────────────────────────────── */
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'light') document.body.classList.add('light');
+
+$('theme-toggle').addEventListener('click', () => {
+  document.body.classList.toggle('light');
+  localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+});
 
 /* ── Page switching ──────────────────────────────────────────── */
 function showLanding() {
@@ -39,6 +49,10 @@ function connectLanding() {
   if (landingWs) landingWs.close();
   landingWs = new WebSocket(`ws://${location.host}/ws/landing`);
 
+  landingWs.onopen = () => {
+    $('landing-led').className = 'led on';
+  };
+
   landingWs.onmessage = e => {
     try {
       const msg = JSON.parse(e.data);
@@ -47,7 +61,8 @@ function connectLanding() {
   };
 
   landingWs.onclose = () => {
-    // reconnect after a short delay if still on landing
+    $('landing-led').className = 'led';
+    $('landing-status').textContent = 'disconnected';
     if (!currentMatchId) setTimeout(connectLanding, 3000);
   };
 }
@@ -58,37 +73,68 @@ function renderMatchList(matches) {
 
   list.querySelectorAll('.match-card').forEach(c => c.remove());
 
-  if (!matches.length) {
-    noMsg.hidden = false;
-    return;
-  }
+  const count = matches.length;
+  $('landing-status').textContent = count
+    ? `connected · ${count} active match${count !== 1 ? 'es' : ''}`
+    : 'connected · no active matches';
+
+  if (!count) { noMsg.hidden = false; return; }
   noMsg.hidden = true;
 
   for (const data of matches) {
-    const isQuals = !!data.qualifier;
-    const mode    = data.mode || 'off';
-    const title   = isQuals
+    const isQuals   = !!data.qualifier;
+    const mode      = data.mode || 'off';
+    const connected = data.connected || false;
+    const title     = isQuals
       ? `Qualifiers${data.phase ? ' · ' + data.phase : ''}`
       : (data.team_names || []).join(' vs ') || 'Bracket match';
     const meta = isQuals
       ? `${data.maps_played ?? '?'}/${data.total_maps ?? '?'} maps played`
       : `BO${data.best_of || '?'}`;
-    const ref = data.ref_name ? ` · ref: ${data.ref_name}` : '';
+    const step = data.phase || (isQuals ? 'MAP' : '');
+    const refs = data.refs || (data.ref_name ? [data.ref_name] : []);
+
+    const refsHtml = refs.length
+      ? refs.map(r => `<span class="match-ref-tag mono">${esc(r)}</span>`).join('')
+      : `<span class="muted mono xs">no refs connected</span>`;
 
     const card = document.createElement('div');
-    card.className = 'match-card' + (isQuals ? ' quals' : '');
+    card.className = 'match-card mono' + (isQuals ? ' quals' : '');
     card.innerHTML = `
-      <div class="match-card-info">
-        <div class="match-card-title mono">${esc(title)}</div>
-        <div class="match-card-meta mono xs">${esc(meta)}${esc(ref)}</div>
+      <div class="match-card-accent"></div>
+      <div class="match-card-body">
+        <div class="match-card-status">
+          <span class="match-card-badge badge-${esc(mode)}">${esc(mode.toUpperCase())}</span>
+          ${step ? `<span class="match-card-step">${esc(step)}</span>` : ''}
+        </div>
+        <div class="match-card-info">
+          <div class="match-card-title">${esc(title)}</div>
+          <div class="match-card-meta">${esc(meta)}</div>
+          <div class="match-card-refs">${refsHtml}</div>
+        </div>
+        <div class="match-card-actions"></div>
       </div>
-      <span class="match-card-badge badge-${esc(mode)} mono">${esc(mode.toUpperCase())}</span>
-      <button class="match-join-btn mono">join →</button>
     `;
-    card.querySelector('.match-join-btn').addEventListener('click', () => showMatch(data.id));
+
+    const btn = document.createElement('button');
+    btn.className = connected ? 'rejoin-btn' : 'join-btn';
+    btn.textContent = connected ? '→ rejoin' : '→ join';
+    btn.addEventListener('click', () => showMatch(data.id));
+    card.querySelector('.match-card-actions').appendChild(btn);
+
     list.appendChild(card);
   }
 }
+
+/* ── Quick-start toggle opts ─────────────────────────────────── */
+document.querySelectorAll('.qs-toggle').forEach(toggle => {
+  toggle.addEventListener('click', e => {
+    const opt = e.target.closest('.qs-opt');
+    if (!opt) return;
+    toggle.querySelectorAll('.qs-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+  });
+});
 
 /* ── Match WebSocket ─────────────────────────────────────────── */
 function connectMatch(matchId) {
@@ -135,7 +181,6 @@ function handleChat({ username, message, outgoing }) {
 }
 
 function handleReply({ text }) {
-  // replies from >help etc — show as system messages in chat
   appendChatLine('autoref', text, 'out');
 }
 
@@ -170,18 +215,28 @@ function handleState(s) {
   renderRefPill();
   renderAssistedBanner();
   updateMatchInfo();
+  updateChatHead();
 }
 
 function updateMatchInfo() {
   const teams = (appState.team_names || []).join(' vs ');
+  const roomId = appState.room_id ? `#mp_${appState.room_id}` : '';
   if (appState.qualifier) {
     const total = appState.total_maps || 0;
     const done  = appState.maps_played || 0;
-    $('match-info').textContent = [teams, `${done}/${total} maps`].filter(Boolean).join(' · ') || 'connected';
+    const parts = [teams, `${done}/${total} maps`, roomId].filter(Boolean);
+    $('match-info').textContent = parts.join(' · ') || 'connected';
   } else {
     const bo = appState.best_of ? `BO${appState.best_of}` : '';
-    $('match-info').textContent = [teams, bo].filter(Boolean).join(' · ') || 'connected';
+    const phase = appState.phase || '';
+    const parts = [phase, teams, bo, roomId].filter(Boolean);
+    $('match-info').textContent = parts.join(' · ') || 'connected';
   }
+}
+
+function updateChatHead() {
+  const roomId = appState.room_id ? ` — #mp_${appState.room_id}` : '';
+  $('chat-head-label').textContent = `lobby chat${roomId}`;
 }
 
 /* ── ref pill ────────────────────────────────────────────────── */
@@ -201,7 +256,11 @@ function renderAssistedBanner() {
   const p = appState.pending_proposal;
   if (!p || appState.mode !== 'assisted') { banner.hidden = true; return; }
   const team = (appState.team_names || [])[p.team_index] || `team ${p.team_index}`;
-  $('assisted-desc').textContent = `${team} typed ${p.map || '?'} — ${(p.step || 'action').toLowerCase()} this map?`;
+  const step = (p.step || 'action').toLowerCase();
+  const map  = p.map || '?';
+  $('assisted-desc').textContent = `${team} typed ${map} — ${step} this map?`;
+  // include map name in confirm button
+  $('assisted-confirm').textContent = `✓ confirm ${map} ${step}`;
   banner.hidden = false;
 }
 
@@ -300,10 +359,19 @@ function renderTimeline() {
 }
 
 /* ── players ─────────────────────────────────────────────────── */
+let playersLastUpdated = null;
+
 function renderPlayers() {
   const content = $('players-content');
   const teams = appState.teams || [];
   if (!teams.length) return;
+
+  // show refresh row
+  const refreshRow = $('players-refresh');
+  refreshRow.hidden = false;
+  playersLastUpdated = Date.now();
+  updatePlayersAge();
+
   const cols = teams.map((team, i) => {
     const headClass = i === 0 ? 'blue' : 'red';
     const name = team.name || appState.team_names?.[i] || `Team ${i}`;
@@ -321,6 +389,17 @@ function renderPlayers() {
   }).join('');
   content.innerHTML = `<div class="teams-grid">${cols}</div>`;
 }
+
+function updatePlayersAge() {
+  if (!playersLastUpdated) return;
+  const secs = Math.round((Date.now() - playersLastUpdated) / 1000);
+  $('players-refresh-label').textContent = `last updated ${secs}s ago`;
+}
+setInterval(updatePlayersAge, 5000);
+
+$('players-refresh-btn').addEventListener('click', () => {
+  sendWS('>invite');  // triggers a re-invite which causes a state push
+});
 
 /* ── settings ────────────────────────────────────────────────── */
 function renderSettings() {

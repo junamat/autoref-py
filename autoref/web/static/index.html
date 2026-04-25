@@ -12,15 +12,24 @@
 <div id="app">
 
   <!-- ══════════════════════════════════════════════════════════════
-       LANDING PAGE  (shown before joining a match)
+       LANDING PAGE
   ══════════════════════════════════════════════════════════════════ -->
   <div id="landing-page">
     <div id="landing-topbar">
+      <div class="led" id="landing-led"></div>
       <span class="logo">autoref</span>
+      <span class="muted mono xs" id="landing-status">connecting…</span>
+      <div style="flex:1"></div>
+      <button class="ghost-btn" id="theme-toggle" title="toggle light/dark">◑</button>
     </div>
     <div id="landing-body">
+
+      <!-- left: match list -->
       <div id="landing-matches">
-        <div class="landing-section-head">active matches</div>
+        <div class="landing-section-head">
+          <span>active matches</span>
+          <button class="join-btn" id="new-match-btn" style="display:none">+ new match</button>
+        </div>
         <div id="match-list">
           <span class="muted mono xs pad" id="no-matches-msg">no active matches</span>
         </div>
@@ -28,11 +37,51 @@
           matches started via CLI appear here automatically
         </div>
       </div>
+
+      <!-- right: quick-start panel -->
+      <div id="landing-quickstart">
+        <div class="panel-head">quick start</div>
+        <div id="quickstart-form">
+          <div class="qs-field">
+            <div class="qs-label">match type</div>
+            <div class="qs-toggle" id="qs-type">
+              <div class="qs-opt active" data-val="bracket">bracket</div>
+              <div class="qs-opt" data-val="qualifiers">qualifiers</div>
+            </div>
+          </div>
+          <div class="qs-field">
+            <div class="qs-label">room name</div>
+            <input class="qs-input" id="qs-name" placeholder="QF: Blue vs Red">
+          </div>
+          <div class="qs-field">
+            <div class="qs-label">best of</div>
+            <input class="qs-input" id="qs-bo" placeholder="9" style="width:60px">
+          </div>
+          <div class="qs-field">
+            <div class="qs-label">team 1</div>
+            <input class="qs-input" id="qs-t1" placeholder="Blue">
+          </div>
+          <div class="qs-field">
+            <div class="qs-label">team 2</div>
+            <input class="qs-input" id="qs-t2" placeholder="Red">
+          </div>
+          <div class="qs-field">
+            <div class="qs-label">ref mode</div>
+            <div class="qs-toggle" id="qs-mode">
+              <div class="qs-opt active" data-val="auto">auto</div>
+              <div class="qs-opt" data-val="assisted">assisted</div>
+              <div class="qs-opt" data-val="off">off</div>
+            </div>
+          </div>
+          <button class="join-btn" id="qs-submit" style="width:100%;margin-top:4px">create &amp; start</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       MATCH VIEW  (shown after joining)
+       MATCH VIEW
   ══════════════════════════════════════════════════════════════════ -->
   <div id="match-view" hidden>
 
@@ -40,7 +89,7 @@
     <div id="topbar">
       <div class="led" id="led"></div>
       <span class="logo">autoref</span>
-      <span class="muted mono sm" id="match-info">connecting…</span>
+      <span class="muted mono xs" id="match-info">connecting…</span>
       <div id="topbar-right">
         <span class="ref-pill mono xs" id="ref-pill" hidden></span>
         <button class="ghost-btn" id="leave-btn" title="back to matches">← leave</button>
@@ -67,7 +116,6 @@
 
     <!-- ── Score + mode strip ──────────────────────────────────── -->
     <div id="strip">
-      <!-- bracket score (shown when qualifier=false) -->
       <div id="score-panel">
         <div class="score-side" id="score-left">
           <span class="team-name blue" id="team0-name">—</span>
@@ -85,7 +133,6 @@
         </div>
       </div>
 
-      <!-- qualifiers progress (shown when qualifier=true) -->
       <div id="quals-panel" hidden>
         <div class="quals-stat">
           <span class="quals-num" id="quals-remaining">—</span>
@@ -121,10 +168,9 @@
     <!-- ── Main area ───────────────────────────────────────────── -->
     <div id="main">
 
-      <!-- Chat panel -->
       <div id="chat-panel">
         <div class="panel-head">
-          <span>lobby chat</span>
+          <span id="chat-head-label">lobby chat</span>
           <div class="led led-sm" id="chat-led"></div>
         </div>
         <div id="chat-log"></div>
@@ -134,7 +180,6 @@
         </div>
       </div>
 
-      <!-- Tabbed drawer -->
       <div id="drawer">
         <div id="drawer-tabs">
           <div class="drawer-tab active" data-tab="players">players</div>
@@ -145,6 +190,10 @@
         <div id="drawer-body">
 
           <div id="tab-players" class="tab-pane">
+            <div id="players-refresh" class="players-refresh" hidden>
+              <span class="muted mono xs" id="players-refresh-label">—</span>
+              <button class="ghost-btn xs" id="players-refresh-btn">↻ refresh</button>
+            </div>
             <div id="players-content">
               <span class="muted mono xs pad">no team data</span>
             </div>
