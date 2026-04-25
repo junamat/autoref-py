@@ -87,6 +87,7 @@ class AutoRef(ABC):
 
         self._next_future: asyncio.Future | None = None
         self._state_hooks: list = []
+        self._pending_proposal: dict | None = None
         self.lobby.add_input_hook(self._handle_input)
 
     # ------------------------------------------------------------ state hooks
@@ -144,6 +145,8 @@ class AutoRef(ABC):
             "best_of": self.match.ruleset.best_of,
             "maps": maps,
             "events": events,
+            "pending_proposal": self._pending_proposal,
+            "ref_name": getattr(self._client, "username", None),
         }
 
     async def _push_state(self) -> None:
@@ -193,6 +196,10 @@ class AutoRef(ABC):
         if cmd == "next":
             if self._next_future is not None and not self._next_future.done():
                 self._next_future.set_result(args)
+            return True
+        if cmd == "dismiss":
+            self._pending_proposal = None
+            await self._push_state()
             return True
         return False
 
@@ -269,18 +276,48 @@ class AutoRef(ABC):
                     return pm.beatmap_id
             await self.lobby.say(f"Unknown map. Usage: {self.ref_prefix}next <map_code>")
 
+    async def _await_map_assisted(self, team_index: int, step: Step) -> int:
+        """ASSISTED mode: watch for a player's map choice, surface as proposal, wait for ref confirm."""
+        team_usernames = {_normalize(p.username) for p in self.match.teams[team_index].players}
+
+        def on_message(msg) -> None:
+            if _normalize(getattr(msg.user, "username", "")) not in team_usernames:
+                return
+            pm = _find_map_by_input(self.match, msg.message)
+            if pm is not None:
+                self._pending_proposal = {
+                    "step": step.name,
+                    "team_index": team_index,
+                    "map": pm.name or str(pm.beatmap_id),
+                    "beatmap_id": pm.beatmap_id,
+                }
+                asyncio.ensure_future(self._push_state())
+
+        self.lobby.channel.on("message", on_message)
+        try:
+            return await self._await_map_from_ref()
+        finally:
+            self.lobby.channel.remove_listener("message", on_message)
+            self._pending_proposal = None
+
     async def await_pick(self, team_index: int) -> int:
-        if self.mode in (RefMode.ASSISTED, RefMode.OFF):
+        if self.mode == RefMode.ASSISTED:
+            return await self._await_map_assisted(team_index, Step.PICK)
+        if self.mode == RefMode.OFF:
             return await self._await_map_from_ref()
         return await self._await_map_choice(team_index)
 
     async def await_ban(self, team_index: int) -> int:
-        if self.mode in (RefMode.ASSISTED, RefMode.OFF):
+        if self.mode == RefMode.ASSISTED:
+            return await self._await_map_assisted(team_index, Step.BAN)
+        if self.mode == RefMode.OFF:
             return await self._await_map_from_ref()
         return await self._await_map_choice(team_index)
 
     async def await_protect(self, team_index: int) -> int:
-        if self.mode in (RefMode.ASSISTED, RefMode.OFF):
+        if self.mode == RefMode.ASSISTED:
+            return await self._await_map_assisted(team_index, Step.PROTECT)
+        if self.mode == RefMode.OFF:
             return await self._await_map_from_ref()
         return await self._await_map_choice(team_index)
 
