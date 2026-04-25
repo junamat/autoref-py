@@ -10,8 +10,11 @@ let appState = {
   best_of: 1,
   maps: [],
   events: [],
+  pending_proposal: null,
+  ref_name: null,
 };
 let ws = null;
+let inMatch = false;
 
 /* ── DOM shortcuts ───────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
@@ -20,6 +23,68 @@ function esc(s) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/* ── Page switching ─────────────────────────────────────────── */
+function showLanding() {
+  inMatch = false;
+  $('landing-page').hidden = false;
+  $('match-view').hidden   = true;
+  if (ws) { ws.close(); ws = null; }
+  loadLanding();
+}
+
+function showMatch() {
+  inMatch = true;
+  $('landing-page').hidden = true;
+  $('match-view').hidden   = false;
+  connect();
+}
+
+/* ── Landing page ────────────────────────────────────────────── */
+async function loadLanding() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    renderMatchList(data);
+  } catch (_) {
+    renderMatchList({ active: false });
+  }
+}
+
+function renderMatchList(data) {
+  const list = $('match-list');
+  const noMsg = $('no-matches-msg');
+  if (!data.active) {
+    noMsg.hidden = false;
+    list.querySelectorAll('.match-card').forEach(c => c.remove());
+    return;
+  }
+  noMsg.hidden = true;
+  list.querySelectorAll('.match-card').forEach(c => c.remove());
+
+  const isQuals = !!data.qualifier;
+  const mode    = data.mode || 'off';
+  const title   = isQuals
+    ? `Qualifiers${data.phase ? ' · ' + data.phase : ''}`
+    : (data.team_names || []).join(' vs ') || 'Bracket match';
+  const meta = isQuals
+    ? `${data.maps_played ?? '?'}/${data.total_maps ?? '?'} maps played`
+    : `BO${data.best_of || '?'}`;
+  const ref = data.ref_name ? `ref: ${data.ref_name}` : '';
+
+  const card = document.createElement('div');
+  card.className = 'match-card' + (isQuals ? ' quals' : '');
+  card.innerHTML = `
+    <div class="match-card-info">
+      <div class="match-card-title mono">${esc(title)}</div>
+      <div class="match-card-meta mono xs">${esc(meta)}${ref ? ' · ' + esc(ref) : ''}</div>
+    </div>
+    <span class="match-card-badge badge-${mode} mono">${mode.toUpperCase()}</span>
+    <button class="match-join-btn mono">join →</button>
+  `;
+  card.querySelector('.match-join-btn').addEventListener('click', showMatch);
+  list.appendChild(card);
 }
 
 /* ── WebSocket ───────────────────────────────────────────────── */
@@ -37,7 +102,7 @@ function connect() {
     setConnected(false);
     $('chat-input').disabled = true;
     $('chat-send').disabled = true;
-    setTimeout(connect, 3000);
+    if (inMatch) setTimeout(connect, 3000);
   };
 
   ws.onmessage = e => {
@@ -89,6 +154,8 @@ function handleState(s) {
   renderTimeline();
   renderPlayers();
   renderSettings();
+  renderRefPill();
+  renderAssistedBanner();
   updateMatchInfo();
 }
 
@@ -102,6 +169,34 @@ function updateMatchInfo() {
     const bo = appState.best_of ? `BO${appState.best_of}` : '';
     $('match-info').textContent = [teams, bo].filter(Boolean).join(' · ') || 'connected';
   }
+}
+
+/* ── ref pill ────────────────────────────────────────────────── */
+function renderRefPill() {
+  const pill = $('ref-pill');
+  if (appState.ref_name) {
+    pill.textContent = `ref: ${appState.ref_name}`;
+    pill.hidden = false;
+  } else {
+    pill.hidden = true;
+  }
+}
+
+/* ── assisted banner ─────────────────────────────────────────── */
+function renderAssistedBanner() {
+  const banner = $('assisted-banner');
+  const p = appState.pending_proposal;
+
+  if (!p || appState.mode !== 'assisted') {
+    banner.hidden = true;
+    return;
+  }
+
+  const stepLabel = p.step ? p.step.toLowerCase() : 'action';
+  const mapLabel  = p.map  || '?';
+  const team = (appState.team_names || [])[p.team_index] || `team ${p.team_index}`;
+  $('assisted-desc').textContent = `${team} typed ${mapLabel} — ${stepLabel} this map?`;
+  banner.hidden = false;
 }
 
 /* strip: bracket score vs qualifiers progress */
@@ -276,5 +371,38 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 /* ── panic ───────────────────────────────────────────────────── */
 $('panic-btn').addEventListener('click', () => sendWS('!panic'));
 
+/* ── leave button ────────────────────────────────────────────── */
+$('leave-btn').addEventListener('click', showLanding);
+
+/* ── assisted banner actions ─────────────────────────────────── */
+$('assisted-confirm').addEventListener('click', () => {
+  const p = appState.pending_proposal;
+  if (p) sendWS(`>next ${p.map}`);
+});
+
+let changeMode = false;
+$('assisted-change').addEventListener('click', () => {
+  changeMode = !changeMode;
+  $('assisted-input').hidden      = !changeMode;
+  $('assisted-input-send').hidden = !changeMode;
+  if (changeMode) $('assisted-input').focus();
+});
+
+$('assisted-input-send').addEventListener('click', () => {
+  const val = $('assisted-input').value.trim();
+  if (val) {
+    sendWS(`>next ${val}`);
+    $('assisted-input').value = '';
+    changeMode = false;
+    $('assisted-input').hidden      = true;
+    $('assisted-input-send').hidden = true;
+  }
+});
+$('assisted-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('assisted-input-send').click();
+});
+
+$('assisted-dismiss').addEventListener('click', () => sendWS('>dismiss'));
+
 /* ── boot ────────────────────────────────────────────────────── */
-connect();
+showLanding();

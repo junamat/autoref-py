@@ -73,6 +73,24 @@ class WebInterface:
         async def index():
             return FileResponse(static_dir / "index.html")
 
+        @app.get("/api/status")
+        async def api_status():
+            from fastapi.responses import JSONResponse
+            if iface._last_state:
+                s = iface._last_state
+                return JSONResponse({
+                    "active": True,
+                    "qualifier": s.get("qualifier", False),
+                    "mode": s.get("mode", "off"),
+                    "team_names": s.get("team_names", []),
+                    "best_of": s.get("best_of"),
+                    "ref_name": s.get("ref_name"),
+                    "maps_played": s.get("maps_played"),
+                    "total_maps": s.get("total_maps"),
+                    "phase": s.get("phase"),
+                })
+            return JSONResponse({"active": False})
+
         @app.websocket("/ws")
         async def ws_endpoint(websocket: WebSocket):
             await websocket.accept()
