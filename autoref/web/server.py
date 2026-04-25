@@ -231,7 +231,7 @@ class WebServer:
         return iface
 
     async def start(self) -> None:
-        from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+        from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
         from fastapi.responses import FileResponse, JSONResponse
         from fastapi.staticfiles import StaticFiles
         import uvicorn
@@ -254,7 +254,7 @@ class WebServer:
             return JSONResponse(all_matches)
 
         @app.post("/api/matches")
-        async def create_match(request):
+        async def create_match(request: Request):
             try:
                 body = await request.json()
                 match_id = str(uuid.uuid4())[:8]
@@ -266,7 +266,7 @@ class WebServer:
                 return JSONResponse({"error": str(e)}, status_code=500)
 
         @app.post("/api/matches/{match_id}/start")
-        async def start_match(match_id: str):
+        async def start_match(match_id: str, request: Request):
             payload = server._pending.pop(match_id, None)
             if payload is None:
                 return JSONResponse({"error": "not found or already started"}, status_code=404)
@@ -330,7 +330,7 @@ class WebServer:
             finally:
                 iface._clients.discard(websocket)
 
-        config = uvicorn.Config(app, host=self.host, port=self.port, log_level="warning")
+        config = uvicorn.Config(app, host=self.host, port=self.port, log_level="info")
         srv = uvicorn.Server(config)
         logger.info("web server at http://%s:%d", self.host, self.port)
         await srv.serve()
