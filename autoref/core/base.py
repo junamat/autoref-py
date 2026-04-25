@@ -89,6 +89,9 @@ class AutoRef(ABC):
         self._timeout_event.set()
 
         self._next_future: asyncio.Future | None = None
+        self._step_cancel_future: asyncio.Future | None = None
+        self._abort_event: asyncio.Event = asyncio.Event()
+        self._map_in_progress: bool = False
         self._state_hooks: list = []
         self._pending_proposal: dict | None = None
         self.lobby.add_input_hook(self._handle_input)
@@ -195,6 +198,36 @@ class AutoRef(ABC):
             return (f"{self._team_name(0)} {wins[0]} : {wins[1]} {self._team_name(1)}"
                     f" (BO{bo}, first to {needed})")
         return " | ".join(f"{self._team_name(i)}: {wins[i]}" for i in range(len(wins)))
+
+    # ---------------------------------------------------------- step interruption
+
+    def _cancel_step(self) -> None:
+        """Wake up any active await_pick/ban/protect so the main loop can re-evaluate."""
+        if self._next_future and not self._next_future.done():
+            self._next_future.set_result(["__undo__"])
+        if self._step_cancel_future and not self._step_cancel_future.done():
+            self._step_cancel_future.set_result(None)
+
+    async def _undo_last_action(self) -> bool:
+        ms = self.match.match_status
+        if ms.empty:
+            await self.lobby.say("Nothing to undo.")
+            return False
+        last = ms.iloc[-1]
+        step_name = str(last["step"])
+        beatmap_id = int(last["beatmap_id"])
+        team_idx = int(last["team_index"])
+        self.match.match_status = ms.iloc[:-1].reset_index(drop=True)
+        pm = _find_map(self.match, beatmap_id)
+        if pm is not None:
+            pm.state = MapState.PICKABLE
+        code = pm.name if pm and pm.name else str(beatmap_id)
+        await self.lobby.say(
+            f"Undone: {self._team_name(team_idx)} {step_name.lower()} {code}. Step will repeat."
+        )
+        self._cancel_step()
+        await self._push_state()
+        return True
 
     # ---------------------------------------------------------- timeout
 
@@ -344,6 +377,18 @@ class AutoRef(ABC):
             asyncio.ensure_future(self.lobby.start(delay=delay))
             return True
 
+        if cmd in ("abort", "ab"):
+            if self._map_in_progress:
+                await self.lobby.abort()
+                self._abort_event.set()
+            else:
+                await self.lobby.say("No map in progress.")
+            return True
+
+        if cmd in ("undo", "u"):
+            await self._undo_last_action()
+            return True
+
         return False
 
     async def _handle_input(self, text: str, source: str) -> bool:
@@ -390,41 +435,54 @@ class AutoRef(ABC):
 
     # ------------------------------------------------- awaiting player input
 
-    async def _await_map_choice(self, team_index: int) -> int:
-        """Wait for a player on team_index to name a map in chat. Returns beatmap_id."""
+    async def _await_map_choice(self, team_index: int) -> int | None:
+        """Wait for a player on team_index to name a map in chat. Returns beatmap_id or None on undo."""
         team_usernames = {_normalize(p.username) for p in self.match.teams[team_index].players}
-        future: asyncio.Future[int] = asyncio.get_event_loop().create_future()
+        loop = asyncio.get_event_loop()
+        map_future: asyncio.Future[int] = loop.create_future()
+        self._step_cancel_future = loop.create_future()
 
         def on_message(msg: bancho.ChannelMessage) -> None:
-            if future.done():
+            if map_future.done():
                 return
             if _normalize(msg.user.username) not in team_usernames:
                 return
             pm = _find_map_by_input(self.match, msg.message)
             if pm:
-                future.set_result(pm.beatmap_id)
+                map_future.set_result(pm.beatmap_id)
 
         self.lobby.channel.on("message", on_message)
         try:
-            return await future
+            done, pending = await asyncio.wait(
+                {map_future, self._step_cancel_future},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for f in pending:
+                f.cancel()
+            if self._step_cancel_future in done:
+                return None
+            return map_future.result()
         finally:
+            self._step_cancel_future = None
             self.lobby.channel.remove_listener("message", on_message)
 
-    async def _await_map_from_ref(self) -> int:
-        """Wait for >next <map_code> from any source (channel, CLI, web). Retries on unknown map."""
+    async def _await_map_from_ref(self) -> int | None:
+        """Wait for >next <map_code> from any source. Returns beatmap_id or None on undo."""
         while True:
             self._next_future = asyncio.get_event_loop().create_future()
             try:
                 args = await self._next_future
             finally:
                 self._next_future = None
+            if args == ["__undo__"]:
+                return None
             if args:
                 pm = _find_map_by_input(self.match, " ".join(args))
                 if pm:
                     return pm.beatmap_id
             await self.lobby.say(f"Unknown map. Usage: {self.ref_prefix}next <map_code>")
 
-    async def _await_map_assisted(self, team_index: int, step: Step) -> int:
+    async def _await_map_assisted(self, team_index: int, step: Step) -> int | None:
         """ASSISTED mode: watch for a player's map choice, surface as proposal, wait for ref confirm."""
         team_usernames = {_normalize(p.username) for p in self.match.teams[team_index].players}
 
@@ -448,21 +506,21 @@ class AutoRef(ABC):
             self.lobby.channel.remove_listener("message", on_message)
             self._pending_proposal = None
 
-    async def await_pick(self, team_index: int) -> int:
+    async def await_pick(self, team_index: int) -> int | None:
         if self.mode == RefMode.ASSISTED:
             return await self._await_map_assisted(team_index, Step.PICK)
         if self.mode == RefMode.OFF:
             return await self._await_map_from_ref()
         return await self._await_map_choice(team_index)
 
-    async def await_ban(self, team_index: int) -> int:
+    async def await_ban(self, team_index: int) -> int | None:
         if self.mode == RefMode.ASSISTED:
             return await self._await_map_assisted(team_index, Step.BAN)
         if self.mode == RefMode.OFF:
             return await self._await_map_from_ref()
         return await self._await_map_choice(team_index)
 
-    async def await_protect(self, team_index: int) -> int:
+    async def await_protect(self, team_index: int) -> int | None:
         if self.mode == RefMode.ASSISTED:
             return await self._await_map_assisted(team_index, Step.PROTECT)
         if self.mode == RefMode.OFF:
@@ -580,6 +638,9 @@ class AutoRef(ABC):
                 elif step == Step.PICK:
                     await self._pre_pick(team_index)
                     beatmap_id = await self.await_pick(team_index)
+                    if beatmap_id is None:
+                        await self._push_state()
+                        continue
                     await self.handle_pick(team_index, beatmap_id)
                     await self._push_state()
                 elif step == Step.BAN:
@@ -587,6 +648,9 @@ class AutoRef(ABC):
                         await self.announce_next_ban(team_index)
                         await self.lobby.timer(self.timers.ban)
                     beatmap_id = await self.await_ban(team_index)
+                    if beatmap_id is None:
+                        await self._push_state()
+                        continue
                     await self.handle_ban(team_index, beatmap_id)
                     await self._push_state()
                 elif step == Step.PROTECT:
@@ -594,6 +658,9 @@ class AutoRef(ABC):
                         await self.announce_next_protect(team_index)
                         await self.lobby.timer(self.timers.protect)
                     beatmap_id = await self.await_protect(team_index)
+                    if beatmap_id is None:
+                        await self._push_state()
+                        continue
                     await self.handle_protect(team_index, beatmap_id)
                     await self._push_state()
                 elif step == Step.OTHER:
@@ -608,7 +675,11 @@ class AutoRef(ABC):
             await self.lobby.close()
 
     async def play_map(self, beatmap_id: int, team_index: int, step: Step) -> None:
-        """Set the map, wait for ready, start, wait for result, record it."""
+        """Set the map, wait for ready, start, wait for result, record it.
+
+        If >abort is issued while the map is in progress the ready/start cycle
+        repeats for the same map without recording a result or advancing logic.
+        """
         pm = _find_map(self.match, beatmap_id)
         gamemode = self.match.ruleset.gamemode.value
         mods = pm.effective_mods() if pm else None
@@ -616,20 +687,50 @@ class AutoRef(ABC):
         await self.lobby.set_map(beatmap_id, gamemode)
         enforced = self.match.ruleset.enforced_mods
         extra = str(mods) if mods else ""
-        base = str(enforced) if enforced else ""
-        combined = extra if "Freemod" in extra else (extra + base)
+        base_mods = str(enforced) if enforced else ""
+        combined = extra if "Freemod" in extra else (extra + base_mods)
         if combined:
             await self.lobby.set_mods(combined)
 
-        await self.lobby.timer(self.timers.between_maps)
-        ready_t = asyncio.create_task(self.lobby.wait_for_all_ready())
-        timer_t = asyncio.create_task(self.lobby.wait_for_timer())
-        await asyncio.wait([ready_t, timer_t], return_when=asyncio.FIRST_COMPLETED)
-        ready_t.cancel()
-        timer_t.cancel()
-        await asyncio.gather(ready_t, timer_t, return_exceptions=True)
-        await self.lobby.start(delay=self.timers.force_start)
-        result = await self.lobby.wait_for_match_end()
+        self._map_in_progress = True
+        try:
+            while True:
+                self._abort_event.clear()
+                await self.lobby.timer(self.timers.between_maps)
+
+                ready_t = asyncio.create_task(self.lobby.wait_for_all_ready())
+                timer_t = asyncio.create_task(self.lobby.wait_for_timer())
+                abort_t = asyncio.create_task(self._abort_event.wait())
+                done, pending = await asyncio.wait(
+                    {ready_t, timer_t, abort_t}, return_when=asyncio.FIRST_COMPLETED
+                )
+                for t in pending:
+                    t.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+
+                if abort_t in done:
+                    await self.lobby.say("Map aborted. Waiting for everyone to ready up again.")
+                    continue
+
+                await self.lobby.start(delay=self.timers.force_start)
+
+                result_t = asyncio.create_task(self.lobby.wait_for_match_end())
+                abort_t2 = asyncio.create_task(self._abort_event.wait())
+                done2, pending2 = await asyncio.wait(
+                    {result_t, abort_t2}, return_when=asyncio.FIRST_COMPLETED
+                )
+                for t in pending2:
+                    t.cancel()
+                await asyncio.gather(*pending2, return_exceptions=True)
+
+                if abort_t2 in done2:
+                    await self.lobby.say("Map aborted. Waiting for everyone to ready up again.")
+                    continue
+
+                result = result_t.result()
+                break
+        finally:
+            self._map_in_progress = False
 
         self.match.record_action(team_index, step, beatmap_id)
         return result
