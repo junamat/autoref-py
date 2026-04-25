@@ -197,6 +197,9 @@ class BracketAutoRef(AutoRef):
     async def handle_pick(self, team_index: int, beatmap_id: int) -> None:
         """Override to track map winners for the win/TB logic."""
         await self.announce_pick(team_index, beatmap_id)
+        pm = _find_map(self.match, beatmap_id)
+        if pm is not None:
+            pm.state = MapState.PLAYED
         result = await self.play_map(beatmap_id, team_index, Step.PICK)
         winner = self._map_winner(result) if result else None
         if winner is not None:
