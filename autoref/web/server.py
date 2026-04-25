@@ -307,13 +307,18 @@ class WebServer:
             finally:
                 server._landing_clients.discard(websocket)
 
+        @app.get("/match/{match_id}")
+        async def match_view(match_id: str):
+            return FileResponse(self.static_dir / "index.html")
+
         @app.websocket("/ws/{match_id}")
         async def ws_match(websocket: WebSocket, match_id: str):
+            await websocket.accept()
             iface = server._matches.get(match_id)
             if iface is None:
+                await websocket.send_text(json.dumps({"type": "error", "message": "match not found"}))
                 await websocket.close(code=4004)
                 return
-            await websocket.accept()
             iface._clients.add(websocket)
             if iface._last_state:
                 try:

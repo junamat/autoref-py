@@ -33,6 +33,7 @@ function showLanding() {
   $('landing-page').hidden = false;
   $('match-view').hidden   = true;
   if (ws) { ws.close(); ws = null; }
+  history.pushState(null, '', '/');
   connectLanding();
 }
 
@@ -41,6 +42,7 @@ function showMatch(matchId) {
   $('landing-page').hidden = true;
   $('match-view').hidden   = false;
   if (landingWs) { landingWs.close(); landingWs = null; }
+  history.pushState(null, '', `/match/${matchId}`);
   connectMatch(matchId);
 }
 
@@ -355,6 +357,7 @@ function connectMatch(matchId) {
       if      (msg.type === 'chat')  handleChat(msg);
       else if (msg.type === 'state') handleState(msg);
       else if (msg.type === 'reply') handleReply(msg);
+      else if (msg.type === 'error') { appendChatLine('autoref', msg.message, 'out'); showLanding(); }
     } catch (_) {}
   };
 }
@@ -662,4 +665,9 @@ $('assisted-input').addEventListener('keydown', e => {
 $('assisted-dismiss').addEventListener('click', () => sendWS('>dismiss'));
 
 /* ── boot ────────────────────────────────────────────────────── */
-showLanding();
+const _pathMatch = location.pathname.match(/^\/match\/([^/]+)/);
+if (_pathMatch) {
+  showMatch(_pathMatch[1]);
+} else {
+  showLanding();
+}
