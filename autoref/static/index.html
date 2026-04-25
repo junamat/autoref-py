@@ -2,18 +2,143 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>autoref</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div id="header">
-  <div id="status"></div>
-  <span id="status-text">connecting...</span>
-</div>
-<div id="chat"></div>
-<div id="form">
-  <input id="input" placeholder="send a message..." autocomplete="off" disabled>
-  <button id="send" disabled>send</button>
+<div id="app">
+
+  <!-- ── Top bar ─────────────────────────────────────────────── -->
+  <div id="topbar">
+    <div class="led" id="led"></div>
+    <span class="logo">autoref</span>
+    <span class="muted mono sm" id="match-info">connecting…</span>
+    <div id="topbar-right">
+      <button class="ghost-btn" id="panic-btn">⚠ !panic</button>
+    </div>
+  </div>
+
+  <!-- ── Score + mode strip ──────────────────────────────────── -->
+  <div id="strip">
+    <!-- bracket score (shown when qualifier=false) -->
+    <div id="score-panel">
+      <div class="score-side" id="score-left">
+        <span class="team-name blue" id="team0-name">—</span>
+        <span class="score-num blue" id="score-0">0</span>
+        <span class="muted mono xs">map wins</span>
+      </div>
+      <div id="score-mid">
+        <span class="mono sm bold" id="score-bo">BO1</span>
+        <span class="muted mono xs" id="score-need">first to 1</span>
+      </div>
+      <div class="score-side score-right" id="score-right">
+        <span class="team-name red" id="team1-name">—</span>
+        <span class="score-num red" id="score-1">0</span>
+        <span class="muted mono xs">map wins</span>
+      </div>
+    </div>
+
+    <!-- qualifiers progress (shown when qualifier=true) -->
+    <div id="quals-panel" hidden>
+      <div class="quals-stat">
+        <span class="quals-num" id="quals-remaining">—</span>
+        <span class="muted mono xs">maps left</span>
+      </div>
+      <div class="quals-divider"></div>
+      <div class="quals-stat">
+        <span class="quals-num green" id="quals-played">—</span>
+        <span class="muted mono xs">played</span>
+      </div>
+      <div class="quals-divider"></div>
+      <div class="quals-stat">
+        <span class="quals-num yellow" id="quals-eta">—</span>
+        <span class="muted mono xs">ETA</span>
+      </div>
+    </div>
+
+    <div class="vdiv"></div>
+
+    <div id="mode-panel">
+      <div id="mode-switcher">
+        <div class="mode-btn" data-mode="off">OFF</div>
+        <div class="mode-btn" data-mode="assisted">ASSISTED</div>
+        <div class="mode-btn" data-mode="auto">AUTO</div>
+      </div>
+      <div id="mode-status">
+        <div class="led led-sm" id="mode-led"></div>
+        <span class="mono xs" id="mode-label">off — not connected</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main area ───────────────────────────────────────────── -->
+  <div id="main">
+
+    <!-- Chat panel -->
+    <div id="chat-panel">
+      <div class="panel-head">
+        <span>lobby chat</span>
+        <div class="led led-sm" id="chat-led"></div>
+      </div>
+      <div id="chat-log"></div>
+      <div id="chat-form">
+        <input id="chat-input" placeholder="send a message or >command…" autocomplete="off" disabled>
+        <button id="chat-send" disabled>send</button>
+      </div>
+    </div>
+
+    <!-- Tabbed drawer -->
+    <div id="drawer">
+      <div id="drawer-tabs">
+        <div class="drawer-tab active" data-tab="players">players</div>
+        <div class="drawer-tab" data-tab="mappool">mappool</div>
+        <div class="drawer-tab" data-tab="timeline">timeline</div>
+        <div class="drawer-tab" data-tab="settings">settings</div>
+      </div>
+      <div id="drawer-body">
+
+        <div id="tab-players" class="tab-pane">
+          <div id="players-content">
+            <span class="muted mono xs pad">no team data</span>
+          </div>
+        </div>
+
+        <div id="tab-mappool" class="tab-pane" hidden>
+          <div id="mappool-grid"></div>
+        </div>
+
+        <div id="tab-timeline" class="tab-pane" hidden>
+          <div id="timeline-list"></div>
+        </div>
+
+        <div id="tab-settings" class="tab-pane" hidden>
+          <div id="settings-list">
+            <div class="setting-row">
+              <span class="setting-key">mode</span>
+              <span class="setting-val" id="cfg-mode">—</span>
+            </div>
+            <div class="setting-row">
+              <span class="setting-key">phase</span>
+              <span class="setting-val" id="cfg-phase">—</span>
+            </div>
+            <div class="setting-row">
+              <span class="setting-key">best of</span>
+              <span class="setting-val" id="cfg-bo">—</span>
+            </div>
+            <div class="setting-row">
+              <span class="setting-key">teams</span>
+              <span class="setting-val" id="cfg-teams">—</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
 </div>
 <script src="/static/app.js"></script>
 </body>

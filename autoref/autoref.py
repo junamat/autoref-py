@@ -86,7 +86,75 @@ class AutoRef(ABC):
             self._mode_event.set()
 
         self._next_future: asyncio.Future | None = None
+        self._state_hooks: list = []
         self.lobby.add_input_hook(self._handle_input)
+
+    # ------------------------------------------------------------ state hooks
+
+    def add_state_hook(self, fn) -> None:
+        """Register an async callback(state_dict) called after each state change."""
+        self._state_hooks.append(fn)
+
+    def _get_state(self) -> dict:
+        """Build a serialisable state snapshot. Subclasses should call super() and extend."""
+        played_ids: set[int] = set()
+        if not self.match.match_status.empty:
+            for bid in self.match.match_status.loc[
+                self.match.match_status["step"] == "PICK", "beatmap_id"
+            ]:
+                played_ids.add(int(bid))
+
+        maps = []
+        for pm in self.match.pool.flatten():
+            if int(pm.beatmap_id) in played_ids:
+                map_state = "played"
+            elif pm.state == MapState.BANNED:
+                map_state = "banned"
+            elif pm.state == MapState.PROTECTED:
+                map_state = "protected"
+            elif pm.state == MapState.DISALLOWED:
+                map_state = "disallowed"
+            else:
+                map_state = "pickable"
+            maps.append({
+                "code": pm.name or str(pm.beatmap_id),
+                "state": map_state,
+                "tb": getattr(pm, "is_tiebreaker", False),
+            })
+
+        events = []
+        for _, row in self.match.match_status.iterrows():
+            ti = int(row["team_index"])
+            team_name = (
+                self.match.teams[ti].name if ti < len(self.match.teams) else str(ti)
+            )
+            pm = _find_map(self.match, int(row["beatmap_id"]))
+            map_code = pm.name if pm and pm.name else str(row["beatmap_id"])
+            events.append({"step": str(row["step"]), "team": team_name, "map": map_code})
+
+        teams = [
+            {"name": t.name, "players": [{"username": p.username} for p in t.players]}
+            for t in self.match.teams
+        ]
+
+        return {
+            "mode": self.mode.value,
+            "team_names": [t.name for t in self.match.teams],
+            "teams": teams,
+            "best_of": self.match.ruleset.best_of,
+            "maps": maps,
+            "events": events,
+        }
+
+    async def _push_state(self) -> None:
+        if not self._state_hooks:
+            return
+        state = self._get_state()
+        for fn in self._state_hooks:
+            try:
+                await fn(state)
+            except Exception:
+                pass
 
     # ---------------------------------------------------------------- abstract
 
@@ -107,6 +175,7 @@ class AutoRef(ABC):
         else:
             self._mode_event.set()
         logger.info("mode → %s", mode.value)
+        await self._push_state()
 
     def _is_ref(self, username: str) -> bool:
         """True if username is allowed to use ref commands (or refs list is empty)."""
@@ -237,6 +306,12 @@ class AutoRef(ABC):
 
     # ---------------------------------------------------- overridable announces
 
+    async def _pre_pick(self, team_index: int) -> None:
+        """Called just before await_pick. Override to suppress or replace the pick timer."""
+        if self.mode != RefMode.OFF:
+            await self.announce_next_pick(team_index)
+            await self.lobby.timer(self.timers.pick)
+
     async def announce_pick(self, team_index: int, beatmap_id: int) -> None:
         team = self.match.teams[team_index]
         pm = _find_map(self.match, beatmap_id)
@@ -304,6 +379,7 @@ class AutoRef(ABC):
         cli_task = asyncio.create_task(self.lobby.run_cli_input())
         try:
             await self._pre_loop()
+            await self._push_state()
             while True:
                 # Pause here while OFF; resumes when ref switches to assisted/auto.
                 if self.mode == RefMode.OFF:
@@ -315,25 +391,27 @@ class AutoRef(ABC):
                     await self.announce_win(team_index)
                     break
                 elif step == Step.PICK:
-                    if self.mode != RefMode.OFF:
-                        await self.announce_next_pick(team_index)
-                        await self.lobby.timer(self.timers.pick)
+                    await self._pre_pick(team_index)
                     beatmap_id = await self.await_pick(team_index)
                     await self.handle_pick(team_index, beatmap_id)
+                    await self._push_state()
                 elif step == Step.BAN:
                     if self.mode != RefMode.OFF:
                         await self.announce_next_ban(team_index)
                         await self.lobby.timer(self.timers.ban)
                     beatmap_id = await self.await_ban(team_index)
                     await self.handle_ban(team_index, beatmap_id)
+                    await self._push_state()
                 elif step == Step.PROTECT:
                     if self.mode != RefMode.OFF:
                         await self.announce_next_protect(team_index)
                         await self.lobby.timer(self.timers.protect)
                     beatmap_id = await self.await_protect(team_index)
                     await self.handle_protect(team_index, beatmap_id)
+                    await self._push_state()
                 elif step == Step.OTHER:
                     await self.handle_other(team_index)
+                    await self._push_state()
             await self.announce_closing()
             await asyncio.sleep(self.timers.closing)
         finally:

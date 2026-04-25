@@ -349,6 +349,12 @@ class BracketAutoRef(AutoRef):
             await self._run_order_phase()
         self.commit_scheme(self.scheme)
 
+    def _get_state(self) -> dict:
+        state = super()._get_state()
+        state["phase"] = self.phase.name
+        state["wins"] = list(self._wins)
+        return state
+
     def _map_winner(self, result: MatchResult) -> int | None:
         """Team_index whose players' scores sum highest. None on tie/empty."""
         if result is None or not result.scores:

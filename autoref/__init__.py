@@ -6,3 +6,4 @@ from .autoref import AutoRef
 from .qualifiers import QualifiersAutoRef
 from .bracket import BracketAutoRef, Phase
 from .web import WebInterface
+from .beatmap_cache import BeatmapCache

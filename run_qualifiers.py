@@ -51,7 +51,7 @@ RULESET = Ruleset(
 )
 
 TIMERS = Timers(
-    between_maps=10,
+    between_maps=90,
     ready_up=60,
     force_start=10,
 )
@@ -86,6 +86,7 @@ async def main():
 
     web = WebInterface()
     web.attach(ar.lobby)
+    web.attach_autoref(ar)
 
     print(f"Mode: {mode.value}  prefix: {prefix}  refs: {refs or '(any)'}")
     print("Connecting to Bancho...")

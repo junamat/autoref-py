@@ -16,15 +16,36 @@ class WebInterface:
         self.static_dir = Path(static_dir) if static_dir else _STATIC_DIR
         self._clients: set = set()
         self._lobby = None
+        self._last_state: dict | None = None
 
     def attach(self, lobby) -> None:
         self._lobby = lobby
         lobby.add_message_hook(self._on_message)
 
+    def attach_autoref(self, ar) -> None:
+        """Register state-push hook so all AutoRef state changes reach the UI."""
+        ar.add_state_hook(self._on_state)
+
+    # ---------------------------------------------------------------- hooks
+
     async def _on_message(self, username: str, message: str, outgoing: bool) -> None:
         if not self._clients:
             return
-        payload = json.dumps({"username": username, "message": message, "outgoing": outgoing})
+        payload = json.dumps({
+            "type": "chat",
+            "username": username,
+            "message": message,
+            "outgoing": outgoing,
+        })
+        await self._broadcast(payload)
+
+    async def _on_state(self, state: dict) -> None:
+        self._last_state = state
+        if not self._clients:
+            return
+        await self._broadcast(json.dumps({"type": "state", **state}))
+
+    async def _broadcast(self, payload: str) -> None:
         dead = set()
         for client in self._clients:
             try:
@@ -32,6 +53,8 @@ class WebInterface:
             except Exception:
                 dead.add(client)
         self._clients -= dead
+
+    # ---------------------------------------------------------------- server
 
     async def start(self) -> None:
         from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -42,6 +65,7 @@ class WebInterface:
         app = FastAPI()
         clients = self._clients
         static_dir = self.static_dir
+        iface = self
 
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -53,11 +77,18 @@ class WebInterface:
         async def ws_endpoint(websocket: WebSocket):
             await websocket.accept()
             clients.add(websocket)
+            if iface._last_state:
+                try:
+                    await websocket.send_text(
+                        json.dumps({"type": "state", **iface._last_state})
+                    )
+                except Exception:
+                    pass
             try:
                 while True:
                     text = await websocket.receive_text()
-                    if self._lobby:
-                        await self._lobby.handle_input(text, "web")
+                    if iface._lobby:
+                        await iface._lobby.handle_input(text, "web")
             except WebSocketDisconnect:
                 pass
             finally:

@@ -119,6 +119,7 @@ async def main():
 
     web = WebInterface()
     web.attach(ar.lobby)
+    web.attach_autoref(ar)
 
     print(f"Mode: {mode.value}  prefix: {prefix}  refs: {refs or '(any)'}")
     print(f"Red: {red_player}  Blue: {blue_player}")
