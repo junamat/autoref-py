@@ -4,11 +4,11 @@
 
 
 left to implement
-- Classes/Data structures
+- ~Classes/Data structures~ 
 - safe handling of IRC creds and perhaps some others
-- Logic
-- IO text interface
-- IO web interface
+- ~Logic~
+- ~IO text interface~
+- ~IO web interface~
 - IO discord ? interface
 - ref utils
 - stat calculation/saving

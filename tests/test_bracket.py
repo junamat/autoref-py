@@ -137,17 +137,16 @@ def test_next_step_protect_then_ban_then_pick():
     assert ar.next_step(None) == (0, Step.PICK)  # pick_first=0 + no prior map
 
 
-def test_next_step_pick_alternates_on_loser():
-    ar = make_bracket(best_of=3)
+def test_next_step_pick_alternates_abab():
+    ar = make_bracket(best_of=5)
     ar.set_ranking([0, 1])
     ar.commit_scheme(OrderScheme("s", pick_first=0))
     t1, _ = ar.next_step(None)
-    assert t1 == 0
-    # simulate team 0 won
-    ar._wins[0] = 1
-    ar._last_map_winner = 0
+    assert t1 == 0   # first pick: rank-0 team
     t2, _ = ar.next_step(None)
-    assert t2 == 1   # loser picks next
+    assert t2 == 1   # second pick: rank-1 team
+    t3, _ = ar.next_step(None)
+    assert t3 == 0   # third pick: back to rank-0
 
 
 def test_next_step_wins_ends_match():

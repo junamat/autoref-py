@@ -183,16 +183,14 @@ class BracketAutoRef(AutoRef):
         return (t, Step.PICK)
 
     def next_picker(self, match_status) -> int:
-        """Default 2-team rule: first pick uses scheme.pick_first; later picks
-        go to the loser of the last played map."""
+        """Default 2-team rule: strict ABAB alternation starting from scheme.pick_first."""
         if len(self.match.teams) > 2:
             raise NotImplementedError(
                 "override next_picker for matches with more than 2 teams"
             )
-        if self._last_map_winner is None:
-            return self._rank_to_team(self.scheme.pick_first)
-        # loser-picks-next in a 2-team match
-        return 1 - self._last_map_winner
+        assert self.scheme is not None
+        n = len(self.match.teams)
+        return self._rank_to_team((self.scheme.pick_first + self._pick_count) % n)
 
     # -------------------------------------------------------------- handlers
 
