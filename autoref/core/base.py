@@ -488,6 +488,7 @@ class AutoRef(ABC):
             # Unblock any active wait so the loop reaches the close check.
             self._mode_event.set()
             self._timeout_event.set()
+            self._abort_event.set()
             self._cancel_step()
             return True
 
@@ -813,6 +814,10 @@ class AutoRef(ABC):
         try:
             while True:
                 self._abort_event.clear()
+
+                if self._close_event.is_set():
+                    return None
+
                 await self.lobby.timer(self.timers.between_maps)
 
                 ready_t = asyncio.create_task(self.lobby.wait_for_all_ready())
@@ -826,6 +831,8 @@ class AutoRef(ABC):
                 await asyncio.gather(*pending, return_exceptions=True)
 
                 if abort_t in done:
+                    if self._close_event.is_set():
+                        return None
                     await self.lobby.say("Map aborted. Waiting for everyone to ready up again.")
                     continue
 
@@ -841,6 +848,8 @@ class AutoRef(ABC):
                 await asyncio.gather(*pending2, return_exceptions=True)
 
                 if abort_t2 in done2:
+                    if self._close_event.is_set():
+                        return None
                     await self.lobby.say("Map aborted. Waiting for everyone to ready up again.")
                     continue
 

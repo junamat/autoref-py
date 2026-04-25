@@ -31,14 +31,24 @@ class QualifiersAutoRef(AutoRef):
         ids = [pm.beatmap_id for pm in self._maps]
         await self._beatmap_cache.prefetch(ids)
 
-    async def await_pick(self, team_index: int) -> int:
+    async def await_pick(self, team_index: int) -> int | None:
         if self.mode in (RefMode.ASSISTED, RefMode.OFF):
             # Ref confirms advance with >next (args ignored; pool order is fixed).
             self._next_future = asyncio.get_event_loop().create_future()
+            close_task = asyncio.ensure_future(self._close_event.wait())
             try:
-                await self._next_future
+                done, _ = await asyncio.wait(
+                    {self._next_future, close_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
             finally:
                 self._next_future = None
+                close_task.cancel()
+            if self._close_event.is_set():
+                return None
+
+        if self._close_event.is_set():
+            return None
 
         pm = self._maps[self._map_index]
         self._map_index += 1
