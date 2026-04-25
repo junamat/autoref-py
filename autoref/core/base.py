@@ -17,6 +17,74 @@ def _normalize(name: str) -> str:
     return name.replace(" ", "_").casefold()
 
 
+from dataclasses import dataclass, field as _field
+
+
+@dataclass
+class Command:
+    name: str                              # primary name without prefix, e.g. "undo"
+    aliases: list[str] = _field(default_factory=list)
+    desc: str = ""
+    usage: str = ""                        # argument hint, e.g. "<map>" or "[secs]"
+    section: str = "misc"                  # UI grouping
+    scope: str = "ref"                     # "ref" | "anyone"
+    noprefix: bool = False                 # True for !panic-style commands
+    bracket_only: bool = False             # hidden in qualifiers view
+
+    def to_dict(self) -> dict:
+        prefix = "" if self.noprefix else ">"
+        label = f"{prefix}{self.name}"
+        if self.aliases:
+            label += f" / {prefix}{self.aliases[0]}"
+        if self.usage:
+            label += f" {self.usage}"
+        return {
+            "name": self.name, "aliases": self.aliases,
+            "label": label, "desc": self.desc,
+            "section": self.section, "scope": self.scope,
+            "noprefix": self.noprefix, "bracket_only": self.bracket_only,
+        }
+
+
+COMMANDS: list[Command] = [
+    # flow
+    Command("undo",          ["u"],      "undo last pick/ban/protect",              section="flow"),
+    Command("abort",         ["ab"],     "abort map and replay it",                 section="flow"),
+    Command("dismiss",       [],         "discard pending proposal",                section="flow"),
+    Command("close",         [],         "end match + save",                        section="flow"),
+    Command("close force",   [],         "end match, skip save",                    section="flow"),
+    # mode
+    Command("mode auto",     [],         "",                                        section="mode"),
+    Command("mode assisted", [],         "",                                        section="mode"),
+    Command("mode off",      [],         "",                                        section="mode"),
+    Command("panic",         [],         "instant OFF, anyone",   noprefix=True,    section="mode",    scope="anyone"),
+    # timers & start
+    Command("timeout",       [],         "break timer",           usage="[secs]",   section="timers",  scope="anyone"),
+    Command("timer",         [],         "start a timer",         usage="<secs|pick|ban>", section="timers"),
+    Command("startmap",      [],         "force-start map",       usage="[delay]",  section="timers"),
+    # lobby
+    Command("setmap",        ["sm"],     "change the map",        usage="<id>",     section="lobby"),
+    Command("invite",        ["inv"],    "re-invite all players",                   section="lobby"),
+    Command("refresh",       ["rf"],     "fetch !mp settings",                      section="lobby"),
+    Command("next",          [],         "confirm step",          usage="<map>",    section="lobby"),
+    # info
+    Command("status",        ["st"],     "full match status",                       section="info",    scope="anyone"),
+    Command("scoreline",     ["sc"],     "score only",                              section="info",    scope="anyone"),
+    Command("picks",         ["pk"],     "pick history",                            section="info",    scope="anyone"),
+    Command("bans",          ["bn"],     "ban history",                             section="info",    scope="anyone"),
+    Command("protects",      ["prot"],   "protect history",                         section="info",    scope="anyone"),
+    Command("phase",         [],         "bracket phase info",                      section="info",    scope="anyone"),
+    # score override
+    Command("setscoreline",  ["ssl"],    "set wins directly",     usage="<s0> <s1>",section="override"),
+    # bracket only
+    Command("roll",          [],         "set roll ranking",      usage="<t1> <t2>",section="bracket", bracket_only=True),
+    Command("order",         [],         "choose scheme",         usage="<n>",      section="bracket", bracket_only=True),
+    Command("fp",            [],         "first pick",            usage="<team>",   section="bracket", bracket_only=True),
+    Command("fb",            [],         "first ban",             usage="<team>",   section="bracket", bracket_only=True),
+    Command("fpro",          [],         "first protect",         usage="<team>",   section="bracket", bracket_only=True),
+]
+
+
 def _find_map(match: Match, beatmap_id: int) -> PlayableMap | None:
     stack = list(match.pool.maps)
     while stack:
@@ -30,7 +98,21 @@ def _find_map(match: Match, beatmap_id: int) -> PlayableMap | None:
 
 def _find_map_by_input(match: Match, text: str) -> PlayableMap | None:
     """Match a chat message against map name or code (space/underscore-insensitive).
-    Only returns maps in PICKABLE or PROTECTED state."""
+    Only returns maps in PICKABLE state."""
+    needle = _normalize(text)
+    stack = list(match.pool.maps)
+    while stack:
+        item = stack.pop()
+        if isinstance(item, Pool):
+            stack.extend(item.maps)
+        elif item.name and _normalize(item.name) == needle:
+            if item.state == MapState.PICKABLE:
+                return item
+    return None
+
+
+def _find_map_by_input_pick(match: Match, text: str) -> PlayableMap | None:
+    """Like _find_map_by_input but also allows PROTECTED maps (picks can use them)."""
     needle = _normalize(text)
     stack = list(match.pool.maps)
     while stack:
@@ -172,6 +254,7 @@ class AutoRef(ABC):
             "pending_proposal": self._pending_proposal,
             "ref_name": getattr(self._client, "username", None),
             "room_id": self.lobby.room_id,
+            "commands": [c.to_dict() for c in self._commands()],
         }
 
     async def _push_state(self) -> None:
@@ -311,43 +394,23 @@ class AutoRef(ABC):
         """Sources that are not Bancho chat — reply sinks are registered for these."""
         return set(self.lobby._reply_sinks.keys())
 
-    # Commands shown to everyone in the lobby when >help is typed in chat.
-    _HELP_PUBLIC: list[str] = [
-        "!panic              — switch to OFF mode immediately",
-        ">timeout [secs]     — request a break (default 120s)",
-        ">scoreline / >sc    — show current score",
-        ">status  / >st      — show full match status",
-    ]
-
-    # Full ref command list, sent only to the originating trusted source.
-    _HELP_REF: list[str] = [
-        "── flow ──────────────────────────────────",
-        ">mode <off|assisted|auto>",
-        ">next <map>         — confirm pick/ban/protect (assisted/off)",
-        ">dismiss            — discard pending proposal",
-        ">abort / >ab        — abort map and replay it",
-        ">undo  / >u         — undo last pick/ban/protect",
-        ">close [force]      — end match (saves unless force)",
-        "── timers / lobby ────────────────────────",
-        ">timeout [secs]     — pause (default 120s)",
-        ">timer <secs|name>  — start a named or custom timer",
-        ">startmap [delay]   — force-start the map",
-        ">setmap <id> [mode] — change the map",
-        ">invite / >inv      — re-invite all players",
-        ">refresh / >rf      — fetch !mp settings and update player ready state",
-        "── info ──────────────────────────────────",
-        ">status / >st       — full match status",
-        ">scoreline / >sc    — score only",
-        ">picks / >pk        — pick history",
-        ">bans  / >bn        — ban history",
-        ">protects / >prot   — protect history",
-        "── score override ────────────────────────",
-        ">setscoreline <s0> <s1>  (alias >ssl)",
-    ]
+    def _commands(self) -> list[Command]:
+        """All commands for this instance. Subclasses can override to extend."""
+        return list(COMMANDS)
 
     def _help_ref_lines(self) -> list[str]:
-        """Subclasses can override or extend to add their own commands."""
-        return list(self._HELP_REF)
+        lines = []
+        current_section = None
+        for cmd in self._commands():
+            if cmd.section != current_section:
+                current_section = cmd.section
+                lines.append(f"── {cmd.section} ──")
+            prefix = "" if cmd.noprefix else ">"
+            aliases = "".join(f" / {prefix}{a}" for a in cmd.aliases)
+            usage = f" {cmd.usage}" if cmd.usage else ""
+            desc = f"  — {cmd.desc}" if cmd.desc else ""
+            lines.append(f"{prefix}{cmd.name}{aliases}{usage}{desc}")
+        return lines
 
     async def _dispatch_command(self, cmd: str, args: list[str], source: str) -> bool:
         """Execute a parsed ref command. Returns True if recognised."""
@@ -358,9 +421,12 @@ class AutoRef(ABC):
             if trusted:
                 for line in self._help_ref_lines():
                     await self.lobby.reply(line, source)
-            # Always show the short public list in the lobby.
-            for line in self._HELP_PUBLIC:
-                await self.lobby.say(line)
+            else:
+                prefix = self.ref_prefix
+                for c in self._commands():
+                    if c.scope == "anyone":
+                        p = "" if c.noprefix else prefix
+                        await self.lobby.say(f"{p}{c.name}  — {c.desc}")
             return True
 
         # ── mode / flow ──────────────────────────────────────────────────────
@@ -550,7 +616,7 @@ class AutoRef(ABC):
 
     # ------------------------------------------------- awaiting player input
 
-    async def _await_map_choice(self, team_index: int) -> int | None:
+    async def _await_map_choice(self, team_index: int, for_ban: bool = False) -> int | None:
         """Wait for a player on team_index to name a map in chat. Returns beatmap_id or None on undo."""
         team_usernames = {_normalize(p.username) for p in self.match.teams[team_index].players}
         loop = asyncio.get_event_loop()
@@ -562,9 +628,15 @@ class AutoRef(ABC):
                 return
             if _normalize(msg.user.username) not in team_usernames:
                 return
-            pm = _find_map_by_input(self.match, msg.message)
+            finder = _find_map_by_input if for_ban else _find_map_by_input_pick
+            pm = finder(self.match, msg.message)
             if pm:
                 map_future.set_result(pm.beatmap_id)
+            elif _find_map_by_input_pick(self.match, msg.message):
+                # map exists but is protected — can't ban it
+                asyncio.ensure_future(self.lobby.say(
+                    f"{msg.message} is protected and cannot be banned."
+                ))
 
         self.lobby.channel.on("message", on_message)
         try:
@@ -581,7 +653,7 @@ class AutoRef(ABC):
             self._step_cancel_future = None
             self.lobby.channel.remove_listener("message", on_message)
 
-    async def _await_map_from_ref(self) -> int | None:
+    async def _await_map_from_ref(self, for_ban: bool = False) -> int | None:
         """Wait for >next <map_code> from any source. Returns beatmap_id or None on undo."""
         while True:
             self._next_future = asyncio.get_event_loop().create_future()
@@ -592,19 +664,27 @@ class AutoRef(ABC):
             if args == ["__undo__"]:
                 return None
             if args:
-                pm = _find_map_by_input(self.match, " ".join(args))
+                text = " ".join(args)
+                finder = _find_map_by_input if for_ban else _find_map_by_input_pick
+                pm = finder(self.match, text)
                 if pm:
                     return pm.beatmap_id
-            await self.lobby.say(f"Unknown map. Usage: {self.ref_prefix}next <map_code>")
+                # give a specific reason if the map exists but is protected
+                if for_ban and _find_map_by_input_pick(self.match, text):
+                    await self.lobby.say(f"{text} is protected and cannot be banned.")
+                else:
+                    await self.lobby.say(f"Unknown or unavailable map: {text}. Usage: {self.ref_prefix}next <map_code>")
 
     async def _await_map_assisted(self, team_index: int, step: Step) -> int | None:
         """ASSISTED mode: watch for a player's map choice, surface as proposal, wait for ref confirm."""
         team_usernames = {_normalize(p.username) for p in self.match.teams[team_index].players}
+        for_ban = (step == Step.BAN)
 
         def on_message(msg) -> None:
             if _normalize(getattr(msg.user, "username", "")) not in team_usernames:
                 return
-            pm = _find_map_by_input(self.match, msg.message)
+            finder = _find_map_by_input if for_ban else _find_map_by_input_pick
+            pm = finder(self.match, msg.message)
             if pm is not None:
                 self._pending_proposal = {
                     "step": step.name,
@@ -613,6 +693,10 @@ class AutoRef(ABC):
                     "beatmap_id": pm.beatmap_id,
                 }
                 asyncio.ensure_future(self._push_state())
+            elif for_ban and _find_map_by_input_pick(self.match, msg.message):
+                asyncio.ensure_future(self.lobby.say(
+                    f"{msg.message} is protected and cannot be banned."
+                ))
 
         self.lobby.channel.on("message", on_message)
         try:
@@ -625,27 +709,30 @@ class AutoRef(ABC):
         if self.mode == RefMode.ASSISTED:
             return await self._await_map_assisted(team_index, Step.PICK)
         if self.mode == RefMode.OFF:
-            return await self._await_map_from_ref()
-        return await self._await_map_choice(team_index)
+            return await self._await_map_from_ref(for_ban=False)
+        return await self._await_map_choice(team_index, for_ban=False)
 
     async def await_ban(self, team_index: int) -> int | None:
         if self.mode == RefMode.ASSISTED:
             return await self._await_map_assisted(team_index, Step.BAN)
         if self.mode == RefMode.OFF:
-            return await self._await_map_from_ref()
-        return await self._await_map_choice(team_index)
+            return await self._await_map_from_ref(for_ban=True)
+        return await self._await_map_choice(team_index, for_ban=True)
 
     async def await_protect(self, team_index: int) -> int | None:
         if self.mode == RefMode.ASSISTED:
             return await self._await_map_assisted(team_index, Step.PROTECT)
         if self.mode == RefMode.OFF:
-            return await self._await_map_from_ref()
-        return await self._await_map_choice(team_index)
+            return await self._await_map_from_ref(for_ban=False)
+        return await self._await_map_choice(team_index, for_ban=False)
 
     # --------------------------------------------------------- default handlers
 
     async def handle_pick(self, team_index: int, beatmap_id: int) -> None:
         await self.announce_pick(team_index, beatmap_id)
+        pm = _find_map(self.match, beatmap_id)
+        if pm is not None:
+            pm.state = MapState.PLAYED
         await self.play_map(beatmap_id, team_index, Step.PICK)
 
     async def handle_ban(self, team_index: int, beatmap_id: int) -> None:
