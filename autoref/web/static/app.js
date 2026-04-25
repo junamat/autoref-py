@@ -183,6 +183,33 @@ $('qs-type').addEventListener('click', () => {
   $('qs-bans-field').hidden = isQuals;
 });
 
+/* ── Dynamic team list ───────────────────────────────────────── */
+let qsTeams = ['Blue', 'Red'];
+
+function renderQsTeams() {
+  const list = $('qs-team-list');
+  list.innerHTML = qsTeams.map((name, i) => `
+    <div class="pool-map-row mono" style="padding:2px 0">
+      <span style="flex:1;font-size:10px">${esc(name)}</span>
+      <button class="pool-del" data-i="${i}">✕</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('.pool-del').forEach(btn => {
+    btn.addEventListener('click', () => { qsTeams.splice(parseInt(btn.dataset.i), 1); renderQsTeams(); });
+  });
+}
+renderQsTeams();
+
+function addQsTeam() {
+  const val = $('qs-team-input').value.trim();
+  if (!val) return;
+  qsTeams.push(val);
+  $('qs-team-input').value = '';
+  renderQsTeams();
+}
+$('qs-team-add').addEventListener('click', addQsTeam);
+$('qs-team-input').addEventListener('keydown', e => { if (e.key === 'Enter') addQsTeam(); });
+
 /* ── Pool builder ────────────────────────────────────────────── */
 let poolMaps = [];  // [{beatmap_id, name, mod_group, mods}]
 
@@ -237,13 +264,11 @@ $('qs-submit').addEventListener('click', async () => {
   const name  = $('qs-name').value.trim() || 'autoref match';
   const bo    = parseInt($('qs-bo').value)  || 1;
   const bans  = parseInt($('qs-bans').value) || 0;
-  const t1    = $('qs-t1').value.trim() || 'Team 1';
-  const t2    = $('qs-t2').value.trim() || 'Team 2';
 
   const payload = {
     type, mode, room_name: name,
     best_of: bo, bans_per_team: bans,
-    teams: [{ name: t1, players: [] }, { name: t2, players: [] }],
+    teams: qsTeams.map(n => ({ name: n, players: [] })),
     maps: poolMaps,
   };
 
@@ -479,7 +504,8 @@ function renderTimeline() {
     return;
   }
   list.innerHTML = events.map(e => {
-    const teamClass = e.team === appState.team_names?.[0] ? 'blue' : 'red';
+    const teamIdx = (appState.team_names || []).indexOf(e.team);
+    const teamClass = teamIdx === 0 ? 'blue' : teamIdx === 1 ? 'red' : 'muted';
     return `<div class="event-row">
       <span class="event-step ${STEP_CLASS[e.step] || ''}">${esc(e.step)}</span>
       <span class="event-team ${teamClass}">${esc(e.team)}</span>
@@ -503,7 +529,7 @@ function renderPlayers() {
   updatePlayersAge();
 
   const cols = teams.map((team, i) => {
-    const headClass = i === 0 ? 'blue' : 'red';
+    const headClass = i === 0 ? 'blue' : i === 1 ? 'red' : 'muted';
     const name = team.name || appState.team_names?.[i] || `Team ${i}`;
   const rows = (team.players || []).map(p => {
       const absent   = p.present === false;
@@ -520,7 +546,7 @@ function renderPlayers() {
       ${rows}
     </div>`;
   }).join('');
-  content.innerHTML = `<div class="teams-grid">${cols}</div>`;
+  content.innerHTML = `<div class="teams-grid" style="grid-template-columns:repeat(${teams.length},1fr)">${cols}</div>`;
 }
 
 function updatePlayersAge() {

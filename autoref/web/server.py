@@ -181,8 +181,10 @@ class WebServer:
                          for p in td.get("players", [])]
             teams.append(t)
 
+        total_players = sum(len(t.players) for t in teams) or int(payload.get("vs", 1))
+
         ruleset = Ruleset(
-            vs=int(payload.get("vs", 1)),
+            vs=total_players if match_type == "qualifiers" else int(payload.get("vs", 1)),
             gamemode=aiosu.models.Gamemode.STANDARD,
             win_condition=WinCondition.SCORE_V2,
             enforced_mods="NF",
