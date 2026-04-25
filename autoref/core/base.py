@@ -479,6 +479,10 @@ class AutoRef(ABC):
             if not force:
                 self._save_match()
             self._close_event.set()
+            # Unblock any active wait so the loop reaches the close check.
+            self._mode_event.set()
+            self._timeout_event.set()
+            self._cancel_step()
             return True
 
         if cmd in ("invite", "inv"):
