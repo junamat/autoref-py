@@ -21,6 +21,7 @@ class MapState(Enum):
     PROTECTED  = 1
     BANNED     = 2
     DISALLOWED = 3
+    PLAYED     = 4
     OTHER      = 11
 
 

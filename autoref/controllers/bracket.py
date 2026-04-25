@@ -471,7 +471,7 @@ class BracketAutoRef(AutoRef):
         return state
 
     def _map_winner(self, result: MatchResult) -> int | None:
-        """Team_index whose players' scores sum highest. None on tie/empty."""
+        """Team_index whose players' scores sum highest. None on tie/no scores."""
         if result is None or not result.scores:
             return None
         totals = [0] * len(self.match.teams)
@@ -481,10 +481,8 @@ class BracketAutoRef(AutoRef):
                 u2t[_normalize(p.username)] = i
         for pr in result.scores:
             ti = u2t.get(_normalize(pr.username))
-            if ti is not None and pr.passed:
+            if ti is not None:
                 totals[ti] += pr.score
         top = max(totals)
-        if top == 0:
-            return None
         winners = [i for i, t in enumerate(totals) if t == top]
         return winners[0] if len(winners) == 1 else None
