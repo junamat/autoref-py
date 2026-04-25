@@ -48,6 +48,7 @@ class Lobby:
         self._input_hooks: list = []
         self._output_sinks: list = []
         self._reply_sinks: dict = {}
+        self._presence_hooks: list = []
 
     def add_message_hook(self, fn) -> None:
         self._message_hooks.append(fn)
@@ -55,6 +56,10 @@ class Lobby:
     def add_input_hook(self, fn) -> None:
         """Hook called for every CLI/web input line. Return True to consume, False to pass through to chat."""
         self._input_hooks.append(fn)
+
+    def add_presence_hook(self, fn) -> None:
+        """Register an async callable() called whenever a player joins or leaves."""
+        self._presence_hooks.append(fn)
 
     def add_output_sink(self, fn) -> None:
         """Register an async callable(text: str) called for every message the bot sends."""
@@ -124,8 +129,18 @@ class Lobby:
         else:
             self._lobby = await self._client.make_lobby(name)
 
-        self._lobby.on("playerJoined", lambda d: self.players.add(d["player"].user.username))
-        self._lobby.on("playerLeft", lambda p: self.players.discard(p.user.username))
+        def _on_joined(d):
+            self.players.add(d["player"].user.username)
+            for fn in self._presence_hooks:
+                asyncio.ensure_future(fn())
+
+        def _on_left(p):
+            self.players.discard(p.user.username)
+            for fn in self._presence_hooks:
+                asyncio.ensure_future(fn())
+
+        self._lobby.on("playerJoined", _on_joined)
+        self._lobby.on("playerLeft", _on_left)
         self._lobby.on("matchStarted", self._on_match_started)
         self._lobby.on("playerFinished", self._on_player_finished)
         self._lobby.on("matchFinished", self._on_match_finished)

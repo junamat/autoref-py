@@ -99,6 +99,7 @@ class AutoRef(ABC):
         self._state_hooks: list = []
         self._pending_proposal: dict | None = None
         self.lobby.add_input_hook(self._handle_input)
+        self.lobby.add_presence_hook(self._push_state)
 
     # ------------------------------------------------------------ state hooks
 
@@ -147,10 +148,15 @@ class AutoRef(ABC):
         ready_map: dict[str, bool] = {
             _normalize(s.username): s.ready for s in self.lobby.slot_info
         }
+        present: set[str] = {_normalize(u) for u in self.lobby.players}
 
         teams = [
             {"name": t.name, "players": [
-                {"username": p.username, "ready": ready_map.get(_normalize(p.username), False)}
+                {
+                    "username": p.username,
+                    "present": _normalize(p.username) in present,
+                    "ready": ready_map.get(_normalize(p.username), False),
+                }
                 for p in t.players
             ]}
             for t in self.match.teams

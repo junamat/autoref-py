@@ -375,13 +375,16 @@ function renderPlayers() {
   const cols = teams.map((team, i) => {
     const headClass = i === 0 ? 'blue' : 'red';
     const name = team.name || appState.team_names?.[i] || `Team ${i}`;
-    const rows = (team.players || []).map(p =>
-      `<div class="player-row">
-        <div class="led led-sm${p.ready ? ' on' : ''}"></div>
+  const rows = (team.players || []).map(p => {
+      const absent   = p.present === false;
+      const ledClass = absent ? 'led led-sm red' : (p.ready ? 'led led-sm on' : 'led led-sm');
+      const label    = absent ? 'not in lobby' : (!p.ready ? 'not ready' : '');
+      return `<div class="player-row">
+        <div class="${ledClass}"></div>
         <span class="mono xs">${esc(p.username || p.name || '?')}</span>
-        ${!p.ready ? '<span class="muted mono xs" style="margin-left:auto">not ready</span>' : ''}
-      </div>`
-    ).join('') || '<div class="player-row"><span class="muted mono xs">—</span></div>';
+        ${label ? `<span class="muted mono xs" style="margin-left:auto">${label}</span>` : ''}
+      </div>`;
+    }).join('') || '<div class="player-row"><span class="muted mono xs">—</span></div>';
     return `<div class="team-col">
       <div class="team-head ${headClass}">${esc(name)}</div>
       ${rows}

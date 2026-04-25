@@ -248,6 +248,10 @@ body {
   background: var(--green);
   box-shadow: 0 0 6px var(--green);
 }
+.led.red {
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
+}
 .led-sm { width: 6px; height: 6px; }
 
 /* ── Top bar ──────────────────────────────────────────────────── */
