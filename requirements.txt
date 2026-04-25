@@ -1,9 +1,10 @@
-aiosu
-numpy
-pandas
-python-dotenv
-pytest
-pytest-asyncio
-bancho.py
-fastapi
-uvicorn[standard]
+# Install the package with all extras for development:
+#   pip install -e .[all]
+#
+# Or pick only what you need:
+#   pip install -e .          # core only  (IRC bot, no web UI)
+#   pip install -e .[web]     # + FastAPI web interface
+#   pip install -e .[dev]     # + pytest, python-dotenv
+#
+# See pyproject.toml for the canonical dependency list.
+-e .[all]
