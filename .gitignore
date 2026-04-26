@@ -1,6 +1,9 @@
 # Claude Code
 .claude/
 
+# Local working notes (not for the public repo)
+notes/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
