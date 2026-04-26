@@ -5,6 +5,7 @@ import pytest
 import bancho
 
 from autoref.controllers.bracket import BracketAutoRef, Phase
+from autoref.core.base import _find_map_by_input, _find_map_by_input_pick
 from autoref.core.enums import MapState, Step, WinCondition
 from autoref.core.lobby import MatchResult, PlayerResult
 from autoref.core.models import (
@@ -260,6 +261,72 @@ def test_map_winner_none_on_empty():
     ar = make_bracket()
     assert ar._map_winner(MatchResult(scores=[])) is None
     assert ar._map_winner(None) is None
+
+
+def test_map_winner_both_zero_is_tie():
+    ar = make_bracket()
+    result = MatchResult(scores=[
+        PlayerResult("red1", 0, False),
+        PlayerResult("blue1", 0, False),
+    ])
+    assert ar._map_winner(result) is None
+
+
+def test_map_winner_one_team_zero_other_nonzero():
+    """A team whose only score failed loses to a team with a passed score."""
+    ar = make_bracket()
+    result = MatchResult(scores=[
+        PlayerResult("red1", 0, False),
+        PlayerResult("blue1", 1, True),
+    ])
+    assert ar._map_winner(result) == 1
+
+
+def test_map_winner_unknown_player_ignored():
+    ar = make_bracket()
+    result = MatchResult(scores=[
+        PlayerResult("spectator", 999_999, True),  # not on any team
+        PlayerResult("blue1", 100, True),
+    ])
+    assert ar._map_winner(result) == 1
+
+
+# ---------------------------------------------------------------- handle_pick map state
+
+def _bracket_with_lobby_for_play_map():
+    ar = make_bracket()
+    ar.lobby.set_map = AsyncMock()
+    ar.lobby.timer = AsyncMock()
+    ar.lobby.wait_for_all_ready = AsyncMock()
+    ar.lobby.wait_for_timer = AsyncMock()
+    ar.lobby.start = AsyncMock()
+    ar.lobby.wait_for_match_end = AsyncMock(return_value=MatchResult())
+    ar.lobby.say = AsyncMock()
+    return ar, ar.match.pool.maps
+
+
+@pytest.mark.asyncio
+async def test_handle_pick_marks_map_played():
+    ar, maps = _bracket_with_lobby_for_play_map()
+    await ar.handle_pick(0, maps[0].beatmap_id)
+    assert maps[0].state == MapState.PLAYED
+
+
+@pytest.mark.asyncio
+async def test_played_map_not_pickable_again():
+    ar, maps = _bracket_with_lobby_for_play_map()
+    await ar.handle_pick(0, maps[0].beatmap_id)
+    assert _find_map_by_input(ar.match, maps[0].name) is None
+    assert _find_map_by_input_pick(ar.match, maps[0].name) is None
+
+
+@pytest.mark.asyncio
+async def test_undo_resets_played_to_pickable():
+    ar, maps = _bracket_with_lobby_for_play_map()
+    await ar.handle_pick(0, maps[0].beatmap_id)
+    assert maps[0].state == MapState.PLAYED
+    await ar._undo_last_action()
+    assert maps[0].state == MapState.PICKABLE
 
 
 # ---------------------------------------------------------------- commands

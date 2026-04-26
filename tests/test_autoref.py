@@ -4,8 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from autoref.core.base import AutoRef, _find_map
-from autoref.core.enums import RefMode, Step, WinCondition
+from autoref.core.base import (
+    AutoRef, COMMANDS, Command, _find_map, _find_map_by_input, _find_map_by_input_pick,
+)
+from autoref.core.enums import MapState, RefMode, Step, WinCondition
 from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 
 
@@ -118,6 +120,47 @@ def test_find_map_by_input_no_match():
     from autoref.core.base import _find_map_by_input
     match = make_match(pool=Pool("p", PlayableMap(1, name="NM1")))
     assert _find_map_by_input(match, "DT3") is None
+
+
+# ban path: PICKABLE only
+
+def test_ban_finds_pickable():
+    pm = PlayableMap(1, name="NM1")
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input(match, "NM1") is pm
+
+
+@pytest.mark.parametrize("state", [
+    MapState.PROTECTED, MapState.BANNED, MapState.PLAYED, MapState.DISALLOWED,
+])
+def test_ban_rejects_non_pickable(state):
+    pm = PlayableMap(1, name="NM1")
+    pm.state = state
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input(match, "NM1") is None
+
+
+# pick path: PICKABLE + PROTECTED
+
+def test_pick_finds_pickable():
+    pm = PlayableMap(1, name="NM1")
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input_pick(match, "NM1") is pm
+
+
+def test_pick_finds_protected():
+    pm = PlayableMap(1, name="NM1")
+    pm.state = MapState.PROTECTED
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input_pick(match, "NM1") is pm
+
+
+@pytest.mark.parametrize("state", [MapState.BANNED, MapState.PLAYED])
+def test_pick_rejects_non_playable(state):
+    pm = PlayableMap(1, name="NM1")
+    pm.state = state
+    match = make_match(pool=Pool("p", pm))
+    assert _find_map_by_input_pick(match, "NM1") is None
 
 
 # ------------------------------------------------------------------ _await_map_choice
@@ -387,3 +430,58 @@ async def test_handle_protect_records_and_announces():
     assert len(ar.match.match_status) == 1
     assert ar.match.match_status.iloc[0]["step"] == "PROTECT"
     ar.lobby.say.assert_called_once()
+
+
+# ------------------------------------------------------------------ Command dataclass
+
+def test_command_to_dict_keys():
+    cmd = Command("undo", ["u"], desc="undo last action", section="flow")
+    d = cmd.to_dict()
+    assert d["name"] == "undo"
+    assert d["aliases"] == ["u"]
+    assert d["desc"] == "undo last action"
+    assert d["section"] == "flow"
+    assert d["scope"] == "ref"
+    assert d["noprefix"] is False
+    assert d["bracket_only"] is False
+    assert ">undo" in d["label"]
+    assert ">u" in d["label"]
+
+
+def test_command_noprefix_label():
+    cmd = Command("panic", noprefix=True, scope="anyone")
+    label = cmd.to_dict()["label"]
+    assert not label.startswith(">")
+    assert label.startswith("panic")
+
+
+def test_command_usage_in_label():
+    cmd = Command("next", usage="<map>")
+    assert "<map>" in cmd.to_dict()["label"]
+
+
+def test_command_bracket_only_flag():
+    cmd = Command("fp", bracket_only=True)
+    assert cmd.to_dict()["bracket_only"] is True
+
+
+# ------------------------------------------------------------------ COMMANDS registry
+
+def test_commands_registry_not_empty():
+    assert len(COMMANDS) > 0
+    for c in COMMANDS:
+        assert c.name
+        assert c.section
+        assert c.scope in ("ref", "anyone")
+
+
+def test_commands_registry_has_panic_noprefix():
+    panic = next(c for c in COMMANDS if c.name == "panic")
+    assert panic.noprefix is True
+    assert panic.scope == "anyone"
+
+
+def test_commands_registry_bracket_only_filtered():
+    bracket_cmds = [c for c in COMMANDS if c.bracket_only]
+    non_bracket = [c for c in COMMANDS if not c.bracket_only]
+    assert bracket_cmds and non_bracket
