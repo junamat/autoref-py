@@ -28,7 +28,7 @@ def _save_pools(pools: dict) -> None:
 
 
 def _flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
-    from .controllers.factory import flatten_pool_tree as _ft
+    from ..controllers.factory import flatten_pool_tree as _ft
     return _ft(nodes, parent_mods)
 
 
