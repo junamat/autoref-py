@@ -4,6 +4,9 @@
 # Local working notes (not for the public repo)
 notes/
 
+# Runtime data
+*.db
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
