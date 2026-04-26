@@ -45,6 +45,8 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
     import aiosu
     from ..core.models import Match, Pool, PlayableMap, ModdedPool, Ruleset, Team, OrderScheme
     from ..core.enums import WinCondition, RefMode, Step
+    from ..core.score_fetcher import ScoreFetcher
+    from ..client import make_client
     from .bracket import BracketAutoRef
     from .qualifiers import QualifiersAutoRef
 
@@ -109,9 +111,18 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
     match = Match(ruleset, pool, lambda _: (0, Step.WIN), *teams)
     client = bancho_lib.BanchoClient(username=bancho_username, password=bancho_password)
 
+    # API-side score enrichment. AutoRef.run() will aclose the fetcher when the match ends.
+    fetcher: ScoreFetcher | None = None
+    try:
+        fetcher = ScoreFetcher(make_client())
+    except Exception:
+        logger.exception("could not build ScoreFetcher; continuing without enrichment")
+
     if match_type == "qualifiers":
-        ar = QualifiersAutoRef(client=client, match=match, room_name=room_name, mode=mode)
+        ar = QualifiersAutoRef(client=client, match=match, room_name=room_name,
+                               mode=mode, score_fetcher=fetcher)
     else:
-        ar = BracketAutoRef(client=client, match=match, room_name=room_name, mode=mode)
+        ar = BracketAutoRef(client=client, match=match, room_name=room_name,
+                            mode=mode, score_fetcher=fetcher)
 
     return ar, client
