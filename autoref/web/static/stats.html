@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref · stats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { overflow: auto; }
+  #stats-page { display: flex; flex-direction: column; min-height: 100vh; }
+
+  #stats-topbar {
+    height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    background: var(--panel); border-bottom: 1.5px solid var(--border); flex-shrink: 0;
+    position: sticky; top: 0; z-index: 10;
+  }
+
+  #stats-body { padding: 16px; display: flex; flex-direction: column; gap: 20px; max-width: 960px; }
+
+  /* config bar */
+  #stats-config {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 8px 10px; background: var(--panel); border: 1.5px solid var(--border); border-radius: 3px;
+  }
+  .cfg-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .cfg-toggle { display: flex; gap: 3px; }
+  .cfg-opt {
+    padding: 3px 10px; font-size: 9px; font-weight: 700;
+    border: 1.5px solid var(--border); border-radius: 2px;
+    cursor: pointer; color: var(--muted);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .cfg-opt:hover { color: var(--text); border-color: var(--muted); }
+  .cfg-opt.active { background: var(--blue-dim); color: var(--blue); border-color: var(--blue); }
+  #stats-reload {
+    margin-left: auto; background: transparent; border: 1.5px solid var(--border);
+    border-radius: 2px; padding: 3px 10px; font-family: inherit; font-size: 9px;
+    font-weight: 700; color: var(--muted); cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  #stats-reload:hover { color: var(--text); border-color: var(--text); }
+
+  /* section */
+  .stats-section { display: flex; flex-direction: column; gap: 6px; }
+  .stats-section-head {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 5px;
+  }
+
+  /* tables */
+  .stats-table { width: 100%; border-collapse: collapse; }
+  .stats-table th {
+    text-align: left; font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); padding: 4px 8px;
+    border-bottom: 1.5px solid var(--border); white-space: nowrap;
+  }
+  .stats-table th.r, .stats-table td.r { text-align: right; }
+  .stats-table td {
+    padding: 4px 8px; font-size: 11px; border-bottom: 1px solid var(--border);
+  }
+  .stats-table tr:hover td { background: rgba(255,255,255,0.03); }
+  .stats-table tr:last-child td { border-bottom: none; }
+
+  .rank-cell { color: var(--muted); font-size: 10px; width: 28px; }
+  .rank-1 { color: var(--yellow); font-weight: 700; }
+  .rank-2 { color: var(--text);   font-weight: 700; }
+  .rank-3 { color: var(--orange); font-weight: 700; }
+
+  .z-bar-cell { width: 120px; }
+  .z-bar-wrap { display: flex; align-items: center; gap: 6px; }
+  .z-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .z-bar-fill { height: 100%; background: var(--blue); border-radius: 2px; transition: width 0.3s; }
+  .z-val { font-size: 10px; color: var(--blue); min-width: 44px; text-align: right; }
+
+  .pick-bar { display: inline-block; height: 6px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+
+  .empty-msg { padding: 16px 8px; color: var(--muted); font-size: 11px; font-style: italic; }
+</style>
+</head>
+<body>
+<div id="stats-page">
+  <div id="stats-topbar">
+    <span class="logo">autoref</span>
+    <span class="muted mono xs">·</span>
+    <span class="mono xs">stats</span>
+    <div style="flex:1"></div>
+    <a href="/" class="ghost-btn" style="text-decoration:none">← matches</a>
+    <button class="ghost-btn" id="theme-toggle" title="toggle light/dark">◑</button>
+  </div>
+
+  <div id="stats-body">
+
+    <!-- config -->
+    <div id="stats-config">
+      <span class="cfg-label">calculation</span>
+      <div class="cfg-toggle" id="cfg-calc">
+        <div class="cfg-opt active" data-val="zscore">Z-Sum</div>
+      </div>
+      <span class="cfg-label" style="margin-left:8px">failed scores</span>
+      <div class="cfg-toggle" id="cfg-failed">
+        <div class="cfg-opt active" data-val="true">include</div>
+        <div class="cfg-opt" data-val="false">exclude</div>
+      </div>
+      <button id="stats-reload">↻ reload</button>
+    </div>
+
+    <!-- leaderboard -->
+    <div class="stats-section">
+      <div class="stats-section-head">leaderboard</div>
+      <div id="leaderboard-wrap">
+        <div class="empty-msg">loading…</div>
+      </div>
+    </div>
+
+    <!-- mappool stats -->
+    <div class="stats-section">
+      <div class="stats-section-head">mappool statistics</div>
+      <div id="mappool-wrap">
+        <div class="empty-msg">loading…</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script src="/static/stats.js"></script>
+</body>
+</html>
