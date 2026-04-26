@@ -213,6 +213,12 @@ class Match:
         self.teams = teams
         self.match_status = pd.DataFrame(columns=self._STATUS_COLUMNS)
         self.match_id: int | None = None  # assigned by MatchDatabase after persisting
+        # API-enriched per-player score data, populated asynchronously by ScoreFetcher.
+        # List of (turn, beatmap_id, list[score_dict]).
+        self.game_scores: list[tuple[int, int, list[dict]]] = []
+
+    def add_game_scores(self, turn: int, beatmap_id: int, scores: list[dict]) -> None:
+        self.game_scores.append((turn, beatmap_id, scores))
 
     def record_action(self, team_index: int, step: Step, beatmap_id: int) -> None:
         row = {

@@ -34,6 +34,24 @@ CREATE TABLE IF NOT EXISTS match_actions (
     beatmap_id  INTEGER NOT NULL,
     timestamp   TIMESTAMP NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS game_scores (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id    INTEGER NOT NULL REFERENCES matches(match_id),
+    turn        INTEGER NOT NULL,
+    beatmap_id  INTEGER NOT NULL,
+    user_id     INTEGER NOT NULL,
+    username    TEXT,
+    team_index  INTEGER,
+    score       INTEGER NOT NULL,
+    accuracy    REAL NOT NULL,
+    max_combo   INTEGER NOT NULL,
+    mods        TEXT NOT NULL,                          -- JSON list[str]
+    passed      INTEGER NOT NULL,
+    perfect     INTEGER NOT NULL DEFAULT 0,
+    rank        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_game_scores_match ON game_scores (match_id);
 """
 
 
@@ -82,6 +100,25 @@ class MatchDatabase:
             actions["timestamp"] = actions["timestamp"].astype(str)
             actions.to_sql("match_actions", self._conn, if_exists="append", index=False)
 
+        # API-enriched per-player scores keyed by turn.
+        for turn, beatmap_id, scores in getattr(match, "game_scores", []):
+            for s in scores:
+                self._conn.execute(
+                    "INSERT INTO game_scores "
+                    "(match_id, turn, beatmap_id, user_id, username, team_index, "
+                    " score, accuracy, max_combo, mods, passed, perfect, rank) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        match_id, turn, beatmap_id,
+                        s["user_id"], s.get("username"), s.get("team_index"),
+                        s["score"], s["accuracy"], s["max_combo"],
+                        json.dumps(s.get("mods", [])),
+                        int(bool(s["passed"])),
+                        int(bool(s.get("perfect", False))),
+                        s.get("rank"),
+                    ),
+                )
+
         self._conn.commit()
         match.match_id = match_id
         return match_id
@@ -101,6 +138,13 @@ class MatchDatabase:
             ORDER BY beatmap_id, step
             """,
             self._conn,
+        )
+
+    def get_game_scores(self, match_id: int) -> pd.DataFrame:
+        return pd.read_sql(
+            "SELECT * FROM game_scores WHERE match_id = ? ORDER BY turn, score DESC",
+            self._conn,
+            params=(match_id,),
         )
 
     def get_team_stats(self) -> pd.DataFrame:

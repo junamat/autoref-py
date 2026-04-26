@@ -95,6 +95,32 @@ def test_get_team_stats_tracks_matches_played(db):
     assert red["matches_played"] == 2
 
 
+def test_game_scores_roundtrip(db):
+    match = make_match_with_actions()
+    match.add_game_scores(2, 103, [
+        {"user_id": 100, "username": "redA", "team_index": 0, "score": 800_000,
+         "accuracy": 0.96, "max_combo": 500, "mods": ["HD"], "passed": True,
+         "perfect": False, "rank": "S"},
+        {"user_id": 200, "username": "blueA", "team_index": 1, "score": 600_000,
+         "accuracy": 0.93, "max_combo": 400, "mods": [], "passed": True,
+         "perfect": False, "rank": "A"},
+    ])
+    match_id = db.save_match(match)
+    rows = db.get_game_scores(match_id)
+    assert len(rows) == 2
+    top = rows.iloc[0]
+    assert top["user_id"] == 100
+    assert top["score"] == 800_000
+    assert top["mods"] == '["HD"]'
+    assert top["team_index"] == 0
+
+
+def test_game_scores_empty_when_none_recorded(db):
+    match = make_match_with_actions()
+    match_id = db.save_match(match)
+    assert db.get_game_scores(match_id).empty
+
+
 def test_save_match_without_actions(db):
     match = Match(
         make_ruleset(),
