@@ -212,14 +212,15 @@ class WebServer:
             return FileResponse(self.static_dir / "stats.html")
 
         @app.get("/api/stats")
-        async def api_stats(count_failed: bool = True):
-            from ..core.stats import include_all, exclude_failed
+        async def api_stats(method: str = "zscore", count_failed: bool = True):
+            from ..core.stats import include_all, exclude_failed, METHODS
+            if method not in METHODS:
+                return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
             predicate = include_all if count_failed else exclude_failed
-            leaderboard = server.db.get_z_sum_leaderboard(include=predicate)
+            leaderboard = server.db.get_leaderboard(method=method, include=predicate)
             map_stats   = server.db.get_map_stats()
             all_scores  = server.db.get_all_scores()
 
-            # avg score per map (across all players, respecting predicate)
             avg_by_map: dict = {}
             if not all_scores.empty:
                 filtered = all_scores.loc[all_scores.apply(predicate, axis=1)]
@@ -229,7 +230,6 @@ class WebServer:
                         .round(0).astype(int).to_dict()
                     )
 
-            # pivot map_stats: {beatmap_id: {PICK: n, BAN: n, PROTECT: n}}
             pool_rows: dict = {}
             for _, row in map_stats.iterrows():
                 bid = int(row["beatmap_id"])
@@ -247,7 +247,14 @@ class WebServer:
                 for bid, counts in pool_rows.items()
             ]
 
+            _, ascending = METHODS[method]
+            metric_col = leaderboard.columns[-1]  # last col is always the metric
+
             return JSONResponse({
+                "methods":    [{"key": k, "label": v[0]} for k, v in METHODS.items()],
+                "method":     method,
+                "ascending":  ascending,
+                "metric_col": metric_col,
                 "leaderboard": leaderboard.to_dict(orient="records"),
                 "mappool":     mappool,
             })
