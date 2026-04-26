@@ -5,6 +5,7 @@ from .core.storage import MatchDatabase
 from .core.lobby import Lobby, MatchResult, PlayerResult, SlotInfo
 from .core.output import OutputSink
 from .core.score_fetcher import ScoreFetcher
+from .core.stats import z_sum_leaderboard, include_all, exclude_failed
 from .core.base import AutoRef
 
 # controllers — always available (depend only on core)
