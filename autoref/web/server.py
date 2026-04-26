@@ -207,6 +207,51 @@ class WebServer:
         async def pool_builder():
             return FileResponse(self.static_dir / "pool_builder.html")
 
+        @app.get("/stats")
+        async def stats_page():
+            return FileResponse(self.static_dir / "stats.html")
+
+        @app.get("/api/stats")
+        async def api_stats(count_failed: bool = True):
+            from ..core.stats import include_all, exclude_failed
+            predicate = include_all if count_failed else exclude_failed
+            leaderboard = server.db.get_z_sum_leaderboard(include=predicate)
+            map_stats   = server.db.get_map_stats()
+            all_scores  = server.db.get_all_scores()
+
+            # avg score per map (across all players, respecting predicate)
+            avg_by_map: dict = {}
+            if not all_scores.empty:
+                filtered = all_scores.loc[all_scores.apply(predicate, axis=1)]
+                if not filtered.empty:
+                    avg_by_map = (
+                        filtered.groupby("beatmap_id")["score"].mean()
+                        .round(0).astype(int).to_dict()
+                    )
+
+            # pivot map_stats: {beatmap_id: {PICK: n, BAN: n, PROTECT: n}}
+            pool_rows: dict = {}
+            for _, row in map_stats.iterrows():
+                bid = int(row["beatmap_id"])
+                pool_rows.setdefault(bid, {})
+                pool_rows[bid][row["step"]] = int(row["count"])
+
+            mappool = [
+                {
+                    "beatmap_id": bid,
+                    "picks":    counts.get("PICK", 0),
+                    "bans":     counts.get("BAN", 0),
+                    "protects": counts.get("PROTECT", 0),
+                    "avg_score": avg_by_map.get(bid),
+                }
+                for bid, counts in pool_rows.items()
+            ]
+
+            return JSONResponse({
+                "leaderboard": leaderboard.to_dict(orient="records"),
+                "mappool":     mappool,
+            })
+
         @app.get("/api/pools")
         async def list_pools():
             return JSONResponse(list(_load_pools().values()))
