@@ -99,10 +99,7 @@ async def main():
     print("Connecting to Bancho...")
     await client.connect()
     print("Connected. Starting qualifiers on http://localhost:8080 ...")
-    try:
-        await asyncio.gather(server.start(), ar.run())
-    finally:
-        await api.aclose()
+    await asyncio.gather(server.start(), ar.run())
     print("Done.")
     await client.disconnect()
 

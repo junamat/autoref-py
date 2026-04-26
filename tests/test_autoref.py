@@ -476,7 +476,7 @@ def test_commands_registry_not_empty():
 
 
 def test_commands_registry_has_panic_noprefix():
-    panic = next(c for c in COMMANDS if c.name == "panic")
+    panic = next(c for c in COMMANDS if c.name == "!panic")
     assert panic.noprefix is True
     assert panic.scope == "anyone"
 
