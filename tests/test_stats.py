@@ -137,6 +137,38 @@ def test_custom_predicate():
 
 # --------------------------------------------------------- integration with MatchDatabase
 
+# --------------------------------------------------------- real-data regression
+
+def test_matches_4wc_qualifiers_spreadsheet():
+    """Sanity check against a published qualifiers sheet (376 scores, 15 players).
+
+    Fixture sourced from:
+      https://docs.google.com/spreadsheets/d/1_rBb5XkPcgrqPer083qlTJiDyNUwf3-KC0CL2DrIo78
+      tab `_filtered_scores` (raw input) + `Qualifiers Results` (expected z-sum).
+
+    Sheet config: calculation=Z-Sum, score_aggregate=Max, count_failed=True
+    → matches our defaults (include_all + best score per (player, map)).
+    Uses `modded_score` because the sheet feeds that into Z-Sum, not raw `score`
+    (mod multipliers applied upstream; for this stage they're all 1.0 except 1.06).
+    """
+    from pathlib import Path
+    fixtures = Path(__file__).parent / "fixtures"
+    scores = pd.read_csv(fixtures / "qualifiers_4wc_scores.csv")
+    expected = pd.read_csv(fixtures / "qualifiers_4wc_expected.csv")
+
+    df = scores.rename(columns={"score": "raw_score", "modded_score": "score"})
+    out = z_sum_leaderboard(df).head(15)
+
+    cmp = out.merge(expected, on="username", how="left")
+    # Every row must agree with the sheet to ≤1e-9.
+    assert cmp["z_sum_sheet"].notna().all(), "missing expected row(s)"
+    delta = (cmp["z_sum"] - cmp["z_sum_sheet"]).abs().max()
+    assert delta < 1e-9, f"max |delta| was {delta}"
+
+    # And the leaderboard order must match.
+    assert list(out["username"])[:15] == list(expected["username"])[:15]
+
+
 def test_get_z_sum_leaderboard_via_db():
     from autoref.core.storage import MatchDatabase
     db = MatchDatabase(":memory:")
