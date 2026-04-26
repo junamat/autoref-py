@@ -14,8 +14,9 @@ import bancho
 
 from autoref import Match, ModdedPool, PlayableMap, Pool, Ruleset, Team, Timers
 from autoref import WinCondition, RefMode, Step
-from autoref import QualifiersAutoRef
+from autoref import QualifiersAutoRef, ScoreFetcher
 from autoref import WebInterface, WebServer
+from autoref.client import make_client
 
 load_dotenv()
 
@@ -73,6 +74,9 @@ async def main():
     refs_env = getenv("AUTOREF_REFS", "")
     refs = {r.strip() for r in refs_env.split(",") if r.strip()} or None
 
+    api = make_client()
+    fetcher = ScoreFetcher(api)
+
     ar = QualifiersAutoRef(
         client=client,
         match=match,
@@ -82,6 +86,7 @@ async def main():
         mode=mode,
         ref_prefix=prefix,
         refs=refs,
+        score_fetcher=fetcher,
     )
 
     web = WebInterface()
@@ -94,7 +99,10 @@ async def main():
     print("Connecting to Bancho...")
     await client.connect()
     print("Connected. Starting qualifiers on http://localhost:8080 ...")
-    await asyncio.gather(server.start(), ar.run())
+    try:
+        await asyncio.gather(server.start(), ar.run())
+    finally:
+        await api.aclose()
     print("Done.")
     await client.disconnect()
 

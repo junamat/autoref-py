@@ -49,22 +49,24 @@ CLIENT_SECRET=...
 - ~~Classes / data structures~~ — `Pool`, `Match`, `Ruleset`, `Team`, `Timers`, `OrderScheme`
 - ~~Core match logic~~ — pick / ban / protect / tiebreaker state machine
 - ~~Bracket controller~~ — `BracketAutoRef`: roll → order → protect → ban → pick → TB
-- ~~Qualifiers controller~~ — `QualifiersAutoRef`: sequential pool, multi-run, ETA
+- ~~Qualifiers controller~~ — `QualifiersAutoRef`: sequential pool, multi-run, ETA, N teams
 - ~~Ref modes~~ — `AUTO` / `ASSISTED` / `OFF`, `!panic`, `>mode` / `>next` / `>dismiss`
 - ~~IO — text / CLI interface~~
-- ~~IO — web interface~~ — chat, score strip, mappool, timeline, players, settings tabs
+- ~~IO — web interface~~ — chat, score strip, mappool, timeline, players, settings, commands tabs
 - ~~Web: qualifiers view~~ — maps left, played, ETA, per-map durations from osu! API
 - ~~Web: assisted-mode banner~~ — confirm / change / dismiss proposal flow
 - ~~Web: landing page~~ — active match list, join button, ref pill
+- ~~Web: start a match from the browser~~ — quick-start form with per-team player input
+- ~~Web: mappool builder~~ — standalone `/pool-builder`, save/load, selectable in match form
 - ~~Beatmap cache~~ — disk-backed JSON at `~/.cache/autoref/beatmaps.json`
 - ~~Match persistence~~ — `MatchDatabase` (SQLite) - not set in stone
+- ~~Score enrichment~~ — background `ScoreFetcher` polls the osu! match endpoint for mods/acc/combo/rank per game
 - ~~Project structure~~ — `core/` / `controllers/` / `web/` split; modular `pyproject.toml` extras
 
 ### Planned
-- Web: start a match from the browser (no CLI required) + mappool builder
+- Stat calculation and serving — endpoints + a `/stats` page over `MatchDatabase`
 - Safe multi-ref support — credential handling, sign-in flow
 - IO — Discord interface
-- Stat calculation and serving
 - CI stat badge
 - will to live (impossible)
 
