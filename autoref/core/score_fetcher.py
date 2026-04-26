@@ -25,7 +25,7 @@ def _score_to_dict(s: Any, users: dict[int, str]) -> dict:
         "passed":       bool(s.passed),
         "perfect":      bool(getattr(s, "perfect", False)),
         "mods":         mods,
-        "rank":         s.rank.value if getattr(s, "rank", None) else None,
+        "rank":         s.rank.value if hasattr(s.rank, "value") else (s.rank or None),
     }
 
 
