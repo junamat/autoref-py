@@ -6,6 +6,9 @@ import pytest
 
 from autoref.core.stats import (
     exclude_failed, include_all, z_sum_leaderboard,
+    leaderboard, avg_score_leaderboard, avg_placements_leaderboard,
+    percentile_leaderboard, zipf_leaderboard, pct_diff_leaderboard,
+    METHODS,
 )
 
 
@@ -192,3 +195,140 @@ def test_get_z_sum_leaderboard_via_db():
     out = db.get_z_sum_leaderboard()
     assert len(out) == 2
     assert out.iloc[0]["user_id"] == 100  # higher score → higher z_sum → first
+
+
+# --------------------------------------------------------- new calculation methods
+
+def test_methods_registry_has_all_keys():
+    assert set(METHODS) == {"zscore", "avg_score", "placements", "percentile", "zipf", "pct_diff"}
+
+
+def test_leaderboard_dispatcher_unknown_method():
+    df = _scores([{"user_id": 1, "score": 100, "beatmap_id": 1}])
+    with pytest.raises(ValueError, match="unknown method"):
+        leaderboard(df, method="nope")
+
+
+def test_leaderboard_dispatcher_routes_to_zscore():
+    df = _scores([
+        {"user_id": 1, "score": 200, "beatmap_id": 1},
+        {"user_id": 2, "score": 100, "beatmap_id": 1},
+    ])
+    assert leaderboard(df, method="zscore").equals(z_sum_leaderboard(df))
+
+
+# avg_score
+
+def test_avg_score_two_players():
+    df = _scores([
+        {"user_id": 1, "score": 300, "beatmap_id": 1},
+        {"user_id": 1, "score": 100, "beatmap_id": 2},
+        {"user_id": 2, "score": 200, "beatmap_id": 1},
+        {"user_id": 2, "score": 200, "beatmap_id": 2},
+    ])
+    out = avg_score_leaderboard(df).set_index("user_id")
+    assert out.loc[1, "avg_score"] == pytest.approx(200.0)
+    assert out.loc[2, "avg_score"] == pytest.approx(200.0)
+
+
+def test_avg_score_sorted_desc():
+    df = _scores([
+        {"user_id": 1, "score": 100, "beatmap_id": 1},
+        {"user_id": 2, "score": 500, "beatmap_id": 1},
+    ])
+    out = avg_score_leaderboard(df)
+    assert out.iloc[0]["user_id"] == 2
+
+
+# placements
+
+def test_placements_rank_order():
+    df = _scores([
+        {"user_id": 1, "score": 300, "beatmap_id": 1},
+        {"user_id": 2, "score": 200, "beatmap_id": 1},
+        {"user_id": 3, "score": 100, "beatmap_id": 1},
+    ])
+    out = avg_placements_leaderboard(df).set_index("user_id")
+    # user 1 = rank 1, user 2 = rank 2, user 3 = rank 3
+    assert out.loc[1, "placement_sum"] == pytest.approx(1.0)
+    assert out.loc[3, "placement_sum"] == pytest.approx(3.0)
+
+
+def test_placements_sorted_ascending():
+    df = _scores([
+        {"user_id": 1, "score": 100, "beatmap_id": 1},
+        {"user_id": 2, "score": 500, "beatmap_id": 1},
+    ])
+    out = avg_placements_leaderboard(df)
+    # lower placement_sum = better → user 2 (rank 1) first
+    assert out.iloc[0]["user_id"] == 2
+
+
+# percentile
+
+def test_percentile_top_player_near_100():
+    df = _scores([
+        {"user_id": 1, "score": 300, "beatmap_id": 1},
+        {"user_id": 2, "score": 200, "beatmap_id": 1},
+        {"user_id": 3, "score": 100, "beatmap_id": 1},
+    ])
+    out = percentile_leaderboard(df).set_index("user_id")
+    assert out.loc[1, "percentile_sum"] > out.loc[2, "percentile_sum"]
+    assert out.loc[2, "percentile_sum"] > out.loc[3, "percentile_sum"]
+
+
+# zipf
+
+def test_zipf_rank1_gets_weight_1():
+    df = _scores([
+        {"user_id": 1, "score": 300, "beatmap_id": 1},
+        {"user_id": 2, "score": 100, "beatmap_id": 1},
+    ])
+    out = zipf_leaderboard(df).set_index("user_id")
+    assert out.loc[1, "zipf_sum"] == pytest.approx(1.0)
+    assert out.loc[2, "zipf_sum"] == pytest.approx(0.5)
+
+
+# pct_diff
+
+def test_pct_diff_above_mean_is_positive():
+    df = _scores([
+        {"user_id": 1, "score": 200, "beatmap_id": 1},
+        {"user_id": 2, "score": 100, "beatmap_id": 1},
+    ])
+    out = pct_diff_leaderboard(df).set_index("user_id")
+    # mean=150; user1: (200-150)/150*100 = 33.33; user2: (100-150)/150*100 = -33.33
+    assert out.loc[1, "pct_diff_sum"] == pytest.approx(100 / 3)
+    assert out.loc[2, "pct_diff_sum"] == pytest.approx(-100 / 3)
+
+
+def test_pct_diff_single_player_zero():
+    df = _scores([{"user_id": 1, "score": 500, "beatmap_id": 1}])
+    out = pct_diff_leaderboard(df)
+    assert out.iloc[0]["pct_diff_sum"] == pytest.approx(0.0)
+
+
+# get_leaderboard via MatchDatabase
+
+def test_get_leaderboard_method_param():
+    from autoref.core.storage import MatchDatabase
+    db = MatchDatabase(":memory:")
+    db._conn.execute(
+        "INSERT INTO matches (ruleset_vs, gamemode, win_condition) VALUES (1, 'osu', 'SCORE_V2')"
+    )
+    rows = [
+        (1, 0, 10, 100, "alpha", 0, 200, 0.95, 400, "[]", 1, 0, "S"),
+        (1, 0, 10, 200, "beta",  1, 100, 0.90, 350, "[]", 1, 0, "A"),
+    ]
+    for r in rows:
+        db._conn.execute(
+            "INSERT INTO game_scores "
+            "(match_id, turn, beatmap_id, user_id, username, team_index, "
+            " score, accuracy, max_combo, mods, passed, perfect, rank) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", r,
+        )
+    db._conn.commit()
+    for method in METHODS:
+        out = db.get_leaderboard(method=method)
+        assert not out.empty, f"method={method} returned empty"
+        assert "user_id" in out.columns
