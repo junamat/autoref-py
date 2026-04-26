@@ -979,15 +979,31 @@ class AutoRef(ABC):
             return
         if not scores:
             return
-        # Annotate user_id -> (username, team_index) using team rosters.
-        u2t: dict[int, tuple[str, int]] = {}
+        # Annotate user_id -> team_index via roster .id; fall back to normalized username.
+        id_to_team: dict[int, tuple[str, int]] = {}
+        name_to_team: dict[str, tuple[str, int]] = {}
         for ti, team in enumerate(self.match.teams):
             for p in team.players:
                 pid = getattr(p, "id", None)
+                pname = getattr(p, "username", None) or ""
                 if pid is not None:
-                    u2t[int(pid)] = (getattr(p, "username", None) or "", ti)
+                    id_to_team[int(pid)] = (pname, ti)
+                if pname:
+                    name_to_team[_normalize(pname)] = (pname, ti)
+        unmatched = []
         for s in scores:
-            username, team_index = u2t.get(int(s["user_id"]), (None, None))
-            s["username"] = username
+            username, team_index = id_to_team.get(int(s["user_id"]), (None, None))
+            if team_index is None and s.get("api_username"):
+                username, team_index = name_to_team.get(
+                    _normalize(s["api_username"]), (None, None)
+                )
+            s["username"] = username or s.get("api_username")
             s["team_index"] = team_index
+            if team_index is None:
+                unmatched.append((s["user_id"], s.get("api_username")))
+        if unmatched:
+            logger.warning("score fetch: unmatched players for turn=%d map=%d: %s",
+                           turn, beatmap_id, unmatched)
+        logger.info("score fetch: turn=%d map=%d enriched %d scores",
+                    turn, beatmap_id, len(scores))
         self.match.add_game_scores(turn, beatmap_id, scores)

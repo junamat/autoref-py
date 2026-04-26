@@ -11,20 +11,21 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def _score_to_dict(s: Any) -> dict:
+def _score_to_dict(s: Any, users: dict[int, str]) -> dict:
     mods: list[str] = []
     if s.mods:
         for m in s.mods:
             mods.append(m.acronym if hasattr(m, "acronym") else str(m))
     return {
-        "user_id":   int(s.user_id),
-        "score":     int(s.score),
-        "accuracy":  float(s.accuracy),
-        "max_combo": int(s.max_combo),
-        "passed":    bool(s.passed),
-        "perfect":   bool(getattr(s, "perfect", False)),
-        "mods":      mods,
-        "rank":      s.rank.value if getattr(s, "rank", None) else None,
+        "user_id":      int(s.user_id),
+        "api_username": users.get(int(s.user_id)),
+        "score":        int(s.score),
+        "accuracy":     float(s.accuracy),
+        "max_combo":    int(s.max_combo),
+        "passed":       bool(s.passed),
+        "perfect":      bool(getattr(s, "perfect", False)),
+        "mods":         mods,
+        "rank":         s.rank.value if getattr(s, "rank", None) else None,
     }
 
 
@@ -67,6 +68,13 @@ class ScoreFetcher:
                 delay = min(delay * 2, self._max_delay)
                 continue
 
+            users: dict[int, str] = {}
+            for u in getattr(resp, "users", None) or []:
+                uid = getattr(u, "id", None)
+                uname = getattr(u, "username", None)
+                if uid is not None and uname is not None:
+                    users[int(uid)] = str(uname)
+
             for ev in reversed(resp.events):
                 game = getattr(ev, "game", None)
                 if (game is None
@@ -76,7 +84,7 @@ class ScoreFetcher:
                         or int(game.id) <= self._last_game_id):
                     continue
                 self._last_game_id = int(game.id)
-                return [_score_to_dict(s) for s in game.scores]
+                return [_score_to_dict(s, users) for s in game.scores]
 
             delay = min(delay * 2, self._max_delay)
 
