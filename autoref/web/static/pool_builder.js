@@ -9,6 +9,13 @@ function fmtTime(s) {
   if (!s) return '0:00';
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/* ── theme ───────────────────────────────────────────────────── */
+if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
+$('theme-toggle').addEventListener('click', () => {
+  document.body.classList.toggle('light');
+  localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+});
 function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
