@@ -28,21 +28,8 @@ def _save_pools(pools: dict) -> None:
 
 
 def _flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
-    """Flatten a pool builder tree into the flat map-entry format _create_match expects."""
-    entries = []
-    for node in nodes:
-        if node.get("type") == "map":
-            entries.append({
-                "beatmap_id": node.get("bid", ""),
-                "name":       node.get("code") or node.get("name", ""),
-                "mod_group":  node.get("code", "MAP").rstrip("0123456789") or "NM",
-                "mods":       node.get("mods") or parent_mods,
-                "is_tiebreaker": node.get("tb", False),
-            })
-        elif node.get("children"):
-            mods = node.get("mods") or parent_mods
-            entries.extend(_flatten_pool_tree(node["children"], mods))
-    return entries
+    from .controllers.factory import flatten_pool_tree as _ft
+    return _ft(nodes, parent_mods)
 
 
 class WebInterface:
@@ -166,92 +153,20 @@ class WebServer:
 
     async def _create_match(self, payload: dict, match_id: str | None = None) -> WebInterface:
         """Spin up an AutoRef from a web payload and register it."""
-        import bancho
-        import aiosu
-        from ..core.models import Match, Pool, PlayableMap, ModdedPool, Ruleset, Team, Timers, OrderScheme
-        from ..core.enums import WinCondition, RefMode
-        from ..controllers.bracket import BracketAutoRef
-        from ..controllers.qualifiers import QualifiersAutoRef
+        from ..controllers.factory import build_autoref
 
-        match_type = payload.get("type", "bracket")
-        room_name  = payload.get("room_name", "autoref match")
-        mode       = RefMode(payload.get("mode", "off"))
-        best_of    = int(payload.get("best_of", 1))
-        bans       = int(payload.get("bans_per_team", 0))
-        protects   = int(payload.get("protects_per_team", 0))
+        def _pool_loader(pool_id):
+            return _load_pools().get(pool_id)
 
-        # Build pool from flat map list grouped by mod_group, or from saved pool
-        map_entries = payload.get("maps", [])
-        pool_id = payload.get("pool_id")
-        if pool_id:
-            saved = _load_pools().get(pool_id)
-            if saved:
-                map_entries = _flatten_pool_tree(saved.get("tree", []))
-
-        groups: dict[str, list] = {}
-        for e in map_entries:
-            g = e.get("mod_group", "NM")
-            groups.setdefault(g, []).append(e)
-
-        pool_children = []
-        for group_name, entries in groups.items():
-            mods_str = entries[0].get("mods", "") if entries else ""
-            maps = [PlayableMap(
-                int(e["beatmap_id"]),
-                name=e.get("name") or f"{group_name}{i+1}",
-                is_tiebreaker=e.get("is_tiebreaker", False),
-            ) for i, e in enumerate(entries)]
-            if mods_str and mods_str.lower() not in ("", "nm", "nomod"):
-                if mods_str.lower() == "freemod":
-                    pool_children.append(ModdedPool(group_name, "Freemod", *maps))
-                else:
-                    pool_children.append(ModdedPool(group_name, aiosu.models.mods.Mods(mods_str), *maps))
-            else:
-                pool_children.append(Pool(group_name, *maps))
-
-        pool = Pool(room_name, *pool_children)
-
-        # Teams
-        team_defs = payload.get("teams", [{"name": "Team 1"}, {"name": "Team 2"}])
-        teams = []
-        for td in team_defs:
-            t = Team(td["name"])
-            t.players = [type("Player", (), {"username": p})()
-                         for p in td.get("players", [])]
-            teams.append(t)
-
-        total_players = sum(len(t.players) for t in teams) or int(payload.get("vs", 1))
-
-        ruleset = Ruleset(
-            vs=total_players if match_type == "qualifiers" else int(payload.get("vs", 1)),
-            gamemode=aiosu.models.Gamemode.STANDARD,
-            win_condition=WinCondition.SCORE_V2,
-            enforced_mods="NF",
-            team_mode=0 if match_type == "qualifiers" else 2,
-            best_of=best_of,
-            bans_per_team=bans,
-            protects_per_team=protects,
-            schemes=[OrderScheme("standard", ban_pattern="ABBA")] if match_type == "bracket" else None,
-        )
-
-        from ..core.enums import Step
-        match = Match(ruleset, pool, lambda _: (0, Step.WIN), *teams)
-
-        client = bancho.BanchoClient(
-            username=self._bancho_username,
-            password=self._bancho_password,
+        ar, client = await build_autoref(
+            payload,
+            bancho_username=self._bancho_username,
+            bancho_password=self._bancho_password,
+            pool_loader=_pool_loader,
         )
 
         iface = WebInterface(match_id=match_id)
         self.register(iface)
-
-        if match_type == "qualifiers":
-            ar = QualifiersAutoRef(client=client, match=match,
-                                   room_name=room_name, mode=mode)
-        else:
-            ar = BracketAutoRef(client=client, match=match,
-                                room_name=room_name, mode=mode)
-
         iface.attach(ar.lobby)
         iface.attach_autoref(ar)
 
@@ -265,8 +180,7 @@ class WebServer:
                 await client.disconnect()
                 self.unregister(iface)
 
-        task = asyncio.create_task(_run())
-        self._tasks[iface.match_id] = task
+        self._tasks[iface.match_id] = asyncio.create_task(_run())
         return iface
 
     async def start(self) -> None:
