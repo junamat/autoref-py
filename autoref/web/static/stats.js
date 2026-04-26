@@ -5,34 +5,51 @@ function esc(s) {
 }
 
 /* ── theme ───────────────────────────────────────────────────── */
-const savedTheme = localStorage.getItem('theme');
-if (savedTheme === 'light') document.body.classList.add('light');
+if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
 document.getElementById('theme-toggle').addEventListener('click', () => {
   document.body.classList.toggle('light');
   localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
 });
+
+/* ── state ───────────────────────────────────────────────────── */
+let currentMethod = 'zscore';
+let methodsReady  = false;
 
 /* ── config toggles ──────────────────────────────────────────── */
 function activeVal(groupId) {
   return document.querySelector(`#${groupId} .cfg-opt.active`)?.dataset.val;
 }
 
-document.querySelectorAll('.cfg-toggle').forEach(toggle => {
+document.getElementById('cfg-failed').addEventListener('click', e => {
+  const opt = e.target.closest('.cfg-opt');
+  if (!opt) return;
+  document.querySelectorAll('#cfg-failed .cfg-opt').forEach(o => o.classList.remove('active'));
+  opt.classList.add('active');
+  load();
+});
+
+document.getElementById('stats-reload').addEventListener('click', load);
+
+/* ── method toggle (populated from API) ─────────────────────── */
+function buildMethodToggle(methods) {
+  const toggle = document.getElementById('cfg-calc');
+  toggle.innerHTML = methods.map(m =>
+    `<div class="cfg-opt${m.key === currentMethod ? ' active' : ''}" data-val="${esc(m.key)}">${esc(m.label)}</div>`
+  ).join('');
   toggle.addEventListener('click', e => {
     const opt = e.target.closest('.cfg-opt');
     if (!opt) return;
     toggle.querySelectorAll('.cfg-opt').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
+    currentMethod = opt.dataset.val;
     load();
   });
-});
-
-document.getElementById('stats-reload').addEventListener('click', load);
+}
 
 /* ── fetch + render ──────────────────────────────────────────── */
 async function load() {
   const countFailed = activeVal('cfg-failed') !== 'false';
-  const url = `/api/stats?count_failed=${countFailed}`;
+  const url = `/api/stats?method=${currentMethod}&count_failed=${countFailed}`;
 
   document.getElementById('leaderboard-wrap').innerHTML = '<div class="empty-msg">loading…</div>';
   document.getElementById('mappool-wrap').innerHTML     = '<div class="empty-msg">loading…</div>';
@@ -49,26 +66,38 @@ async function load() {
     return;
   }
 
-  renderLeaderboard(data.leaderboard || []);
+  if (!methodsReady && data.methods) {
+    buildMethodToggle(data.methods);
+    methodsReady = true;
+  }
+
+  renderLeaderboard(data.leaderboard || [], data.metric_col, data.ascending, data.method);
   renderMappool(data.mappool || []);
 }
 
 /* ── leaderboard ─────────────────────────────────────────────── */
-function renderLeaderboard(rows) {
+function renderLeaderboard(rows, metricCol, ascending, method) {
   const wrap = document.getElementById('leaderboard-wrap');
   if (!rows.length) {
     wrap.innerHTML = '<div class="empty-msg">no data — play some matches first</div>';
     return;
   }
 
-  const maxZ = Math.max(...rows.map(r => Math.abs(r.z_sum)), 1);
+  const label = document.querySelector(`#cfg-calc .cfg-opt.active`)?.textContent || metricCol;
+  const isPlacement = method === 'placements';
+
+  // for bar: placements lower=better so invert; others higher=better
+  const values = rows.map(r => r[metricCol] ?? 0);
+  const maxVal = Math.max(...values.map(Math.abs), 1);
 
   const tbody = rows.map((r, i) => {
     const rank = i + 1;
     const rankClass = rank <= 3 ? `rank-${rank}` : '';
-    const pct = Math.min(100, (Math.abs(r.z_sum) / maxZ) * 100).toFixed(1);
-    const zFmt = r.z_sum.toFixed(4);
-    const avgFmt = r.avg_score != null ? Math.round(r.avg_score).toLocaleString() : '—';
+    const val = r[metricCol] ?? 0;
+    const pct = isPlacement
+      ? Math.min(100, (1 - (val - 1) / (maxVal - 1 || 1)) * 100).toFixed(1)
+      : Math.min(100, (Math.abs(val) / maxVal) * 100).toFixed(1);
+    const fmt = Number.isInteger(val) ? val.toLocaleString() : val.toFixed(4);
     return `<tr>
       <td class="rank-cell ${rankClass}">${rank}</td>
       <td>${esc(r.username || r.user_id)}</td>
@@ -76,7 +105,7 @@ function renderLeaderboard(rows) {
       <td class="z-bar-cell">
         <div class="z-bar-wrap">
           <div class="z-bar-bg"><div class="z-bar-fill" style="width:${pct}%"></div></div>
-          <span class="z-val">${zFmt}</span>
+          <span class="z-val">${fmt}</span>
         </div>
       </td>
     </tr>`;
@@ -87,7 +116,7 @@ function renderLeaderboard(rows) {
       <th>#</th>
       <th>player</th>
       <th class="r">maps</th>
-      <th>z-sum ▼</th>
+      <th>${esc(label)} ▼</th>
     </tr></thead>
     <tbody>${tbody}</tbody>
   </table>`;
@@ -101,14 +130,10 @@ function renderMappool(rows) {
     return;
   }
 
-  // sort by total actions desc
   rows = [...rows].sort((a, b) => (b.picks + b.bans + b.protects) - (a.picks + a.bans + a.protects));
-
   const maxPicks = Math.max(...rows.map(r => r.picks), 1);
 
   const tbody = rows.map(r => {
-    const total = r.picks + r.bans + r.protects;
-    const pickPct = total ? ((r.picks / total) * 100).toFixed(0) : 0;
     const barW = Math.round((r.picks / maxPicks) * 60);
     const avgFmt = r.avg_score != null ? Math.round(r.avg_score).toLocaleString() : '—';
     return `<tr>
