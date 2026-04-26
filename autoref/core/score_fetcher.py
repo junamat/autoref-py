@@ -93,3 +93,13 @@ class ScoreFetcher:
             beatmap_id, lobby_id,
         )
         return None
+
+    async def aclose(self) -> None:
+        """Close the underlying api client if it supports it. Idempotent."""
+        aclose = getattr(self._client, "aclose", None)
+        if aclose is None:
+            return
+        try:
+            await aclose()
+        except Exception:
+            logger.exception("ScoreFetcher.aclose failed")

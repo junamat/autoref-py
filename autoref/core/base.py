@@ -776,6 +776,8 @@ class AutoRef(ABC):
             # Drain pending API enrichment tasks so save_match() catches their results.
             if self._score_fetch_tasks:
                 await asyncio.gather(*self._score_fetch_tasks, return_exceptions=True)
+            if self.score_fetcher is not None:
+                await self.score_fetcher.aclose()
             await self.lobby.close()
 
     async def play_map(self, beatmap_id: int, team_index: int, step: Step) -> None:

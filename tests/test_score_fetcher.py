@@ -96,6 +96,22 @@ async def test_fetch_timeout_returns_none(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_aclose_calls_client_aclose():
+    aclose = AsyncMock()
+    client = SimpleNamespace(aclose=aclose)
+    f = ScoreFetcher(client)
+    await f.aclose()
+    aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_aclose_noop_when_client_has_no_aclose():
+    client = SimpleNamespace()  # no aclose
+    f = ScoreFetcher(client)
+    await f.aclose()  # must not raise
+
+
+@pytest.mark.asyncio
 async def test_fetch_swallows_api_errors_and_retries(monkeypatch):
     monkeypatch.setattr(asyncio, "sleep", AsyncMock())
     # First call raises, second succeeds.
