@@ -4,6 +4,7 @@ from .core.models import PlayableMap, Pool, ModdedPool, Team, Ruleset, Match, Ti
 from .core.storage import MatchDatabase
 from .core.lobby import Lobby, MatchResult, PlayerResult, SlotInfo
 from .core.output import OutputSink
+from .core.score_fetcher import ScoreFetcher
 from .core.base import AutoRef
 
 # controllers — always available (depend only on core)

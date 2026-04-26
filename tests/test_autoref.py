@@ -485,3 +485,54 @@ def test_commands_registry_bracket_only_filtered():
     bracket_cmds = [c for c in COMMANDS if c.bracket_only]
     non_bracket = [c for c in COMMANDS if not c.bracket_only]
     assert bracket_cmds and non_bracket
+
+
+# ------------------------------------------------------------------ score fetcher wiring
+
+@pytest.mark.asyncio
+async def test_play_map_spawns_score_fetch_and_stores_results():
+    fetcher = MagicMock()
+    fetcher.fetch_for_game = AsyncMock(return_value=[
+        {"user_id": 11, "score": 900_000, "accuracy": 0.95, "max_combo": 400,
+         "mods": ["HD"], "passed": True, "perfect": False, "rank": "S"},
+    ])
+
+    match = make_match()
+    p = MagicMock(); p.id = 11; p.username = "redA"
+    match.teams[0].players = [p]
+
+    ar = make_autoref(match=match)
+    ar.score_fetcher = fetcher
+    ar.lobby.room_id = 9999
+    await ar.play_map(1, 0, Step.PICK)
+    # Drain the spawned background task.
+    await asyncio.gather(*ar._score_fetch_tasks, return_exceptions=True)
+
+    fetcher.fetch_for_game.assert_awaited_once_with(9999, 1)
+    assert match.game_scores
+    turn, beatmap_id, scores = match.game_scores[0]
+    assert beatmap_id == 1
+    # roster annotation applied
+    assert scores[0]["username"] == "redA"
+    assert scores[0]["team_index"] == 0
+
+
+@pytest.mark.asyncio
+async def test_play_map_no_fetch_without_fetcher():
+    ar = make_autoref()
+    ar.lobby.room_id = 9999
+    assert ar.score_fetcher is None
+    await ar.play_map(1, 0, Step.PICK)
+    assert ar._score_fetch_tasks == []
+    assert ar.match.game_scores == []
+
+
+@pytest.mark.asyncio
+async def test_play_map_no_fetch_when_room_id_none():
+    fetcher = MagicMock()
+    fetcher.fetch_for_game = AsyncMock(return_value=[])
+    ar = make_autoref()
+    ar.score_fetcher = fetcher
+    ar.lobby.room_id = None
+    await ar.play_map(1, 0, Step.PICK)
+    fetcher.fetch_for_game.assert_not_called()

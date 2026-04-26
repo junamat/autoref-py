@@ -153,6 +153,7 @@ class AutoRef(ABC):
         ref_prefix: str = ">",
         refs: set[str] | None = None,
         db: MatchDatabase | None = None,
+        score_fetcher=None,
     ):
         self._client = client
         self.match = match
@@ -160,6 +161,8 @@ class AutoRef(ABC):
         self.timers = timers or Timers()
         self.lobby = Lobby(client)
         self.db = db
+        self.score_fetcher = score_fetcher
+        self._score_fetch_tasks: list[asyncio.Task] = []
 
         self.mode = mode
         self.ref_prefix = ref_prefix
@@ -877,6 +880,9 @@ class AutoRef(ABC):
             broker_task.cancel()
             cli_task.cancel()
             await asyncio.gather(broker_task, cli_task, return_exceptions=True)
+            # Drain pending API enrichment tasks so save_match() catches their results.
+            if self._score_fetch_tasks:
+                await asyncio.gather(*self._score_fetch_tasks, return_exceptions=True)
             await self.lobby.close()
 
     async def play_map(self, beatmap_id: int, team_index: int, step: Step) -> None:
@@ -946,4 +952,42 @@ class AutoRef(ABC):
             self._map_in_progress = False
 
         self.match.record_action(team_index, step, beatmap_id)
+        turn = len(self.match.match_status) - 1
+        self._spawn_score_fetch(turn, beatmap_id)
         return result
+
+    def _spawn_score_fetch(self, turn: int, beatmap_id: int) -> None:
+        """Fire-and-forget API enrichment for the just-finished game."""
+        if self.score_fetcher is None:
+            return
+        lobby_id = self.lobby.room_id
+        if lobby_id is None:
+            return
+        task = asyncio.create_task(self._do_score_fetch(turn, beatmap_id, lobby_id))
+        self._score_fetch_tasks.append(task)
+        task.add_done_callback(lambda t: self._score_fetch_tasks.remove(t)
+                               if t in self._score_fetch_tasks else None)
+
+    async def _do_score_fetch(self, turn: int, beatmap_id: int, lobby_id: int) -> None:
+        fetcher = self.score_fetcher
+        if fetcher is None:
+            return
+        try:
+            scores = await fetcher.fetch_for_game(lobby_id, beatmap_id)
+        except Exception:
+            logger.exception("score fetch failed for turn=%d map=%d", turn, beatmap_id)
+            return
+        if not scores:
+            return
+        # Annotate user_id -> (username, team_index) using team rosters.
+        u2t: dict[int, tuple[str, int]] = {}
+        for ti, team in enumerate(self.match.teams):
+            for p in team.players:
+                pid = getattr(p, "id", None)
+                if pid is not None:
+                    u2t[int(pid)] = (getattr(p, "username", None) or "", ti)
+        for s in scores:
+            username, team_index = u2t.get(int(s["user_id"]), (None, None))
+            s["username"] = username
+            s["team_index"] = team_index
+        self.match.add_game_scores(turn, beatmap_id, scores)
