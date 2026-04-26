@@ -14,7 +14,7 @@ import bancho
 
 from autoref import Match, ModdedPool, PlayableMap, Pool, Ruleset, Team, Timers
 from autoref import WinCondition, RefMode, Step
-from autoref import QualifiersAutoRef, ScoreFetcher
+from autoref import MatchDatabase, QualifiersAutoRef, ScoreFetcher
 from autoref import WebInterface, WebServer
 from autoref.client import make_client
 
@@ -76,6 +76,7 @@ async def main():
 
     api = make_client()
     fetcher = ScoreFetcher(api)
+    db = MatchDatabase(getenv("AUTOREF_DB", "matches.db"))
 
     ar = QualifiersAutoRef(
         client=client,
@@ -87,6 +88,7 @@ async def main():
         ref_prefix=prefix,
         refs=refs,
         score_fetcher=fetcher,
+        db=db,
     )
 
     web = WebInterface()

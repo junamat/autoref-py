@@ -25,7 +25,7 @@ def flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
 
 
 async def build_autoref(payload: dict, bancho_username: str = "", bancho_password: str = "",
-                        pool_loader=None):
+                        pool_loader=None, db=None):
     """Build and return an (AutoRef, BanchoClient) pair from a web/CLI payload dict.
 
     payload keys:
@@ -120,9 +120,9 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
 
     if match_type == "qualifiers":
         ar = QualifiersAutoRef(client=client, match=match, room_name=room_name,
-                               mode=mode, score_fetcher=fetcher)
+                               mode=mode, score_fetcher=fetcher, db=db)
     else:
         ar = BracketAutoRef(client=client, match=match, room_name=room_name,
-                            mode=mode, score_fetcher=fetcher)
+                            mode=mode, score_fetcher=fetcher, db=db)
 
     return ar, client

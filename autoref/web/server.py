@@ -102,7 +102,9 @@ class WebServer:
     def __init__(self, host: str = "0.0.0.0", port: int = 8080,
                  static_dir: str | Path | None = None,
                  bancho_username: str | None = None,
-                 bancho_password: str | None = None):
+                 bancho_password: str | None = None,
+                 db_path: str | Path | None = None):
+        from ..core.storage import MatchDatabase
         self.host = host
         self.port = port
         self.static_dir = Path(static_dir) if static_dir else _STATIC_DIR
@@ -112,6 +114,8 @@ class WebServer:
         self._bancho_username = bancho_username or os.getenv("BANCHO_USERNAME", "")
         self._bancho_password = bancho_password or os.getenv("BANCHO_PASSWORD", "")
         self._tasks: dict[str, asyncio.Task] = {}
+        # Single shared sqlite file for cross-match stats. Override path with $AUTOREF_DB.
+        self.db = MatchDatabase(db_path or os.getenv("AUTOREF_DB", "matches.db"))
 
     def register(self, iface: WebInterface) -> WebInterface:
         """Add a WebInterface to the registry. Returns the interface for chaining."""
@@ -163,6 +167,7 @@ class WebServer:
             bancho_username=self._bancho_username,
             bancho_password=self._bancho_password,
             pool_loader=_pool_loader,
+            db=self.db,
         )
 
         iface = WebInterface(match_id=match_id)
