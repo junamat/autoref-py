@@ -1113,13 +1113,13 @@ async function hydrateTreeFromCache(nodes) {
       try {
         const data = await fetch(`/api/beatmap/${node.bid}`).then(r => r.json());
         node.title = data.title || node.title;
-        node.diff = data.version || node.diff;
-        node.len = data.total_length || node.len;
-        node.stars = data.difficulty_rating || node.stars;
-        node.ar = data.ar || 0;
-        node.od = data.accuracy || 0;
-        node.cs = data.cs || 0;
-        node.hp = data.drain || 0;
+        node.diff = data.diff || node.diff;
+        node.len = data.len || node.len;
+        node.stars = data.stars || node.stars;
+        node.ar = data.ar ?? 0;
+        node.od = data.od ?? 0;
+        node.cs = data.cs ?? 0;
+        node.hp = data.hp ?? 0;
       } catch (_) {}
     }
     if (node.children) await hydrateTreeFromCache(node.children);
