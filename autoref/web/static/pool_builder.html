@@ -240,6 +240,35 @@
   box-sizing: border-box;
 }
 #pb-import-textarea:focus { border-color: var(--blue); }
+
+#pb-load-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+#pb-load-overlay.hidden { display: none; }
+#pb-load-box {
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#pb-load-body { padding: 12px; overflow-y: auto; flex: 1; }
+#pb-load-list { display: flex; flex-direction: column; gap: 6px; }
+.pb-load-item {
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.pb-load-item:hover { border-color: var(--blue); }
 </style>
 </head>
 <body>
@@ -259,6 +288,7 @@
     <div id="pb-actions">
       <button class="ghost-btn" id="pb-import-btn">⬆ import</button>
       <button class="ghost-btn" id="pb-export-btn">⬇ export</button>
+      <button class="ghost-btn" id="pb-load-btn">📂 load</button>
       <button class="join-btn" id="pb-save-btn">save pool</button>
       <button class="ghost-btn" id="theme-toggle" title="toggle light/dark">◑</button>
     </div>
@@ -312,6 +342,19 @@
         </div>
         <button class="join-btn" id="pb-import-submit" style="width:100%">lookup &amp; import</button>
         <div class="mono xs muted" style="font-style:italic">Fetches titles, diffs &amp; lengths from osu! API</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pb-load-overlay" class="hidden">
+    <div id="pb-load-box">
+      <div class="panel-head">
+        load saved pool
+        <button class="ghost-btn xs" id="pb-load-close">✕</button>
+      </div>
+      <div id="pb-load-body">
+        <div class="mono xs muted" style="margin-bottom:10px">Select a pool to load and modify</div>
+        <div id="pb-load-list"></div>
       </div>
     </div>
   </div>

@@ -592,6 +592,49 @@ $('pb-export-btn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+/* ── load ────────────────────────────────────────────────────── */
+$('pb-load-btn').addEventListener('click', async () => {
+  $('pb-load-overlay').classList.remove('hidden');
+  const list = $('pb-load-list');
+  list.innerHTML = '<div class="mono xs muted">loading…</div>';
+  
+  try {
+    const pools = await fetch('/api/pools').then(r => r.json());
+    if (!pools.length) {
+      list.innerHTML = '<div class="mono xs muted">No saved pools found</div>';
+      return;
+    }
+    
+    list.innerHTML = '';
+    for (const pool of pools) {
+      const item = document.createElement('div');
+      item.className = 'pb-load-item';
+      item.innerHTML = `<div style="font-weight:500">${esc(pool.name || 'Untitled')}</div>
+                        <div class="mono xs muted">${pool.tree?.length || 0} pools</div>`;
+      item.addEventListener('click', () => {
+        currentPoolId = pool.id;
+        $('pb-pool-name').value = pool.name || '';
+        tree = pool.tree || [];
+        renderTree();
+        renderDetail();
+        history.replaceState(null, '', `?id=${encodeURIComponent(pool.id)}`);
+        $('pb-load-overlay').classList.add('hidden');
+      });
+      list.appendChild(item);
+    }
+  } catch (e) {
+    list.innerHTML = `<div class="mono xs muted">Error: ${esc(e.message)}</div>`;
+  }
+});
+
+$('pb-load-close').addEventListener('click', () => {
+  $('pb-load-overlay').classList.add('hidden');
+});
+$('pb-load-overlay').addEventListener('click', e => {
+  if (e.target === $('pb-load-overlay')) $('pb-load-overlay').classList.add('hidden');
+});
+
+
 /* ── save ────────────────────────────────────────────────────── */
 let currentPoolId = null;
 
