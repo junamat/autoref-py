@@ -194,13 +194,14 @@ function renderMapDetail(body, node) {
   // beatmap card
   const card = document.createElement('div');
   card.className = 'pb-beatmap-card';
+  const modsText = node.mods && node.mods !== 'inherit' ? ` +${node.mods}` : '';
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <div>
         <div class="pb-beatmap-title">${esc(node.title || '—')}</div>
         <div class="pb-beatmap-sub">${esc(node.diff || '—')} · ${fmtTime(node.len)}</div>
       </div>
-      <span class="pb-stars">★${node.stars || '?'}</span>
+      <span class="pb-stars" id="det-stars">★${node.stars || '?'}${modsText}</span>
     </div>
     <div class="pb-beatmap-bid">beatmap #${esc(node.bid || '—')}</div>
   `;
@@ -256,6 +257,7 @@ function renderMapDetail(body, node) {
     btn.textContent = '⏳';
     btn.disabled = true;
     try {
+      // Fetch base beatmap data
       const res = await fetch(`/api/beatmap/${node.bid}`);
       if (!res.ok) throw new Error('Failed to fetch beatmap data');
       const data = await res.json();
@@ -263,6 +265,16 @@ function renderMapDetail(body, node) {
       node.diff = data.diff;
       node.len = data.len;
       node.stars = data.stars;
+      
+      // Fetch modded attributes if mods are set
+      if (node.mods && node.mods !== 'inherit' && node.mods !== '') {
+        const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(node.mods)}`);
+        if (attrsRes.ok) {
+          const attrs = await attrsRes.json();
+          node.stars = attrs.star_rating;
+        }
+      }
+      
       renderTree();
       renderDetail();
     } catch (e) {
@@ -362,7 +374,23 @@ function makeModsSection(node, title, noneLabel) {
   input.placeholder = noneLabel ? 'inherit (leave blank)' : 'e.g. HD, HDHR, DT';
   input.value = node.mods || '';
   input.style.marginBottom = '5px';
-  input.addEventListener('change', () => { node.mods = input.value.trim().toUpperCase(); renderTree(); });
+  input.addEventListener('change', async () => {
+    node.mods = input.value.trim().toUpperCase();
+    renderTree();
+    // Auto-refresh stars for maps when mods change
+    if (node.type === 'map' && node.bid && node.mods && node.mods !== 'inherit') {
+      try {
+        const res = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(node.mods)}`);
+        if (res.ok) {
+          const attrs = await res.json();
+          node.stars = attrs.star_rating;
+          renderDetail();
+        }
+      } catch (e) {
+        console.error('Failed to fetch modded attributes:', e);
+      }
+    }
+  });
   wrap.appendChild(input);
 
   // quick-pick chips
@@ -373,10 +401,23 @@ function makeModsSection(node, title, noneLabel) {
     const btn = document.createElement('div');
     btn.className = 'pb-toggle-opt';
     btn.textContent = m || 'NM';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       node.mods = m;
       input.value = m;
       renderTree();
+      // Auto-refresh stars for maps when mods change
+      if (node.type === 'map' && node.bid && m && m !== 'inherit') {
+        try {
+          const res = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(m)}`);
+          if (res.ok) {
+            const attrs = await res.json();
+            node.stars = attrs.star_rating;
+            renderDetail();
+          }
+        } catch (e) {
+          console.error('Failed to fetch modded attributes:', e);
+        }
+      }
     });
     chips.appendChild(btn);
   }

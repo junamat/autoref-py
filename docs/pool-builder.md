@@ -157,6 +157,7 @@ Pools are stored as a tree structure:
 - `POST /api/pools` - Save a pool (create or update)
 - `DELETE /api/pools/{pool_id}` - Delete a pool
 - `GET /api/beatmap/{beatmap_id}` - Fetch beatmap metadata from osu! API
+- `GET /api/beatmap/{beatmap_id}/attributes?mods={mods}` - Fetch difficulty attributes with mods
 
 ### Beatmap Data
 
@@ -165,6 +166,8 @@ When importing maps or clicking the refresh button, the system fetches:
 - **Difficulty**: Difficulty version name
 - **Length**: Total length in seconds
 - **Stars**: Difficulty rating (rounded to 2 decimals)
+
+When mods are set on a map, the star rating automatically updates to reflect the modded difficulty using the osu! API's `/beatmaps/{id}/attributes` endpoint.
 
 Data is fetched from the osu! API v2 and cached in the pool structure.
 

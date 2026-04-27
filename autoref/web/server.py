@@ -311,6 +311,28 @@ class WebServer:
             finally:
                 await client.aclose()
 
+        @app.get("/api/beatmap/{beatmap_id}/attributes")
+        async def get_beatmap_attributes(beatmap_id: str, mods: str = ""):
+            """Fetch beatmap difficulty attributes with mods from osu! API."""
+            from ..client import make_client
+            from aiosu.models import Mods
+            client = make_client()
+            try:
+                # Parse mods string to Mods enum
+                mods_enum = Mods.from_str(mods) if mods else None
+                attrs = await client.get_beatmap_attributes(int(beatmap_id), mods=mods_enum)
+                return JSONResponse({
+                    "star_rating": round(attrs.star_rating, 2),
+                    "max_combo": attrs.max_combo,
+                    "ar": round(attrs.approach_rate, 1) if attrs.approach_rate else None,
+                    "od": round(attrs.overall_difficulty, 1) if attrs.overall_difficulty else None,
+                })
+            except Exception as e:
+                logger.exception(f"failed to fetch beatmap attributes {beatmap_id} with mods {mods}")
+                return JSONResponse({"error": str(e)}, status_code=500)
+            finally:
+                await client.aclose()
+
         @app.get("/api/matches")
         async def api_matches():
             all_matches = (
