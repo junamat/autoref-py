@@ -18,6 +18,32 @@ def get_adjusted_cs(base_cs: float, mods: str) -> float:
     return round(max(0.0, min(10.0, cs)), 1)
 
 
+def get_adjusted_ar(base_ar: float, mods: str) -> float:
+    """Calculate AR with mod adjustments."""
+    if not mods:
+        return base_ar
+    
+    mods_upper = mods.upper()
+    ar = base_ar
+    
+    if 'HR' in mods_upper:
+        ar = min(10.0, ar * 1.4)
+    if 'EZ' in mods_upper:
+        ar *= 0.5
+    
+    if 'DT' in mods_upper or 'NC' in mods_upper:
+        ms = 1800 - ar * 120 if ar <= 5 else 1200 - (ar - 5) * 150
+        adjusted_ms = ms * (2/3)
+        ar = (1800 - adjusted_ms) / 120 if adjusted_ms > 1200 else 5 + (1200 - adjusted_ms) / 150
+    
+    if 'HT' in mods_upper:
+        ms = 1800 - ar * 120 if ar <= 5 else 1200 - (ar - 5) * 150
+        adjusted_ms = ms * (4/3)
+        ar = (1800 - adjusted_ms) / 120 if adjusted_ms > 1200 else 5 + (1200 - adjusted_ms) / 150
+    
+    return round(max(0.0, min(10.0, ar)), 1)
+
+
 class TestCSModAdjustments:
     """Test CS (Circle Size) mod adjustments."""
     
@@ -89,3 +115,70 @@ class TestCSModAdjustments:
         """HT should not affect CS."""
         assert get_adjusted_cs(5.0, 'HT') == 5.0
         assert get_adjusted_cs(7.0, 'EZHT') == 3.5  # Only EZ affects it
+
+
+class TestARModAdjustments:
+    """Test AR (Approach Rate) mod adjustments."""
+    
+    def test_ar_no_mods(self):
+        """AR without mods should remain unchanged."""
+        assert get_adjusted_ar(5.0, '') == 5.0
+        assert get_adjusted_ar(8.0, '') == 8.0
+        assert get_adjusted_ar(10.0, '') == 10.0
+    
+    def test_ar_ez(self):
+        """EZ halves AR."""
+        assert get_adjusted_ar(2.0, 'EZ') == 1.0
+        assert get_adjusted_ar(5.0, 'EZ') == 2.5
+        assert get_adjusted_ar(8.0, 'EZ') == 4.0
+        assert get_adjusted_ar(10.0, 'EZ') == 5.0
+    
+    def test_ar_hr(self):
+        """HR multiplies AR by 1.4 and caps at 10."""
+        assert get_adjusted_ar(2.0, 'HR') == 2.8
+        assert get_adjusted_ar(5.0, 'HR') == 7.0
+        assert get_adjusted_ar(7.0, 'HR') == 9.8
+        assert get_adjusted_ar(7.2, 'HR') == 10.0  # Capped
+        assert get_adjusted_ar(8.0, 'HR') == 10.0  # Capped
+        assert get_adjusted_ar(10.0, 'HR') == 10.0  # Capped
+    
+    def test_ar_sample_values(self):
+        """Test sample values from the table."""
+        # EZ column
+        assert get_adjusted_ar(1.0, 'EZ') == 0.5
+        assert get_adjusted_ar(3.0, 'EZ') == 1.5
+        assert get_adjusted_ar(5.0, 'EZ') == 2.5
+        assert get_adjusted_ar(7.0, 'EZ') == 3.5
+        assert get_adjusted_ar(10.0, 'EZ') == 5.0
+        
+        # NM column
+        assert get_adjusted_ar(2.0, '') == 2.0
+        assert get_adjusted_ar(5.0, '') == 5.0
+        assert get_adjusted_ar(8.0, '') == 8.0
+        assert get_adjusted_ar(10.0, '') == 10.0
+        
+        # HR column
+        assert get_adjusted_ar(1.0, 'HR') == 1.4
+        assert get_adjusted_ar(2.0, 'HR') == 2.8
+        assert get_adjusted_ar(3.0, 'HR') == 4.2
+        assert get_adjusted_ar(5.0, 'HR') == 7.0
+        assert get_adjusted_ar(6.0, 'HR') == 8.4
+        assert get_adjusted_ar(7.0, 'HR') == 9.8
+        assert get_adjusted_ar(7.2, 'HR') == 10.0  # Capped
+        assert get_adjusted_ar(10.0, 'HR') == 10.0  # Capped
+    
+    def test_ar_dt(self):
+        """DT increases AR by speeding up timing windows."""
+        # DT makes AR higher (faster approach)
+        assert get_adjusted_ar(5.0, 'DT') > 5.0
+        assert get_adjusted_ar(8.0, 'DT') > 8.0
+        # Should cap at 10
+        assert get_adjusted_ar(10.0, 'DT') == 10.0
+    
+    def test_ar_ht(self):
+        """HT decreases AR by slowing down timing windows."""
+        # HT makes AR lower (slower approach)
+        assert get_adjusted_ar(5.0, 'HT') < 5.0
+        assert get_adjusted_ar(8.0, 'HT') < 8.0
+        # Should not go below 0
+        assert get_adjusted_ar(0.0, 'HT') == 0.0
