@@ -1109,7 +1109,7 @@ let currentPoolId = null;
 
 async function hydrateTreeFromCache(nodes) {
   for (const node of nodes) {
-    if (node.type === 'map' && node.bid && (!node.ar && !node.od && !node.cs && !node.hp)) {
+    if (node.type === 'map' && node.bid && node.ar === undefined) {
       try {
         const data = await fetch(`/api/beatmap/${node.bid}`).then(r => r.json());
         node.title = data.title || node.title;
