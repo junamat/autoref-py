@@ -321,6 +321,10 @@ class WebServer:
                     "diff": beatmap.version,
                     "len": beatmap.total_length,
                     "stars": round(beatmap.difficulty_rating, 2),
+                    "ar": round(beatmap.ar, 1),
+                    "od": round(beatmap.accuracy, 1),
+                    "cs": round(beatmap.cs, 1),
+                    "hp": round(beatmap.drain, 1),
                 }
                 # Cache the result
                 cache[beatmap_id] = data

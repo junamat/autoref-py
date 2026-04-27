@@ -166,12 +166,15 @@ When importing maps or clicking the refresh button, the system fetches:
 - **Difficulty**: Difficulty version name
 - **Length**: Total length in seconds (adjusted for DT/HT mods)
 - **Stars**: Difficulty rating (rounded to 2 decimals)
+- **CS, AR, OD, HP**: Circle Size, Approach Rate, Overall Difficulty, HP Drain
 
-When mods are set on a map, the star rating automatically updates to reflect the modded difficulty using the osu! API's `/beatmaps/{id}/attributes` endpoint.
+When mods are set on a map, all attributes automatically update to reflect the modded values using the osu! API's `/beatmaps/{id}/attributes` endpoint.
 
 **Mod Adjustments:**
-- **DT/NC**: Length divided by 1.5 (1.5x speed)
-- **HT**: Length divided by 0.75 (0.75x speed)
+- **DT/NC**: Length ÷ 1.5, timing windows × 2/3
+- **HT**: Length ÷ 0.75, timing windows × 4/3
+- **HR**: CS × 1.3, AR/OD/HP × 1.4 (capped at 10)
+- **EZ**: All difficulty settings × 0.5
 
 Data is fetched from the osu! API v2 and cached locally in `~/.cache/autoref/beatmaps.json` to reduce API calls.
 

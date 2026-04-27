@@ -22,6 +22,72 @@ function getAdjustedLength(baseLength, mods) {
   return baseLength;
 }
 
+function getAdjustedAR(baseAR, mods) {
+  if (!mods) return baseAR;
+  const modsUpper = mods.toUpperCase();
+  let ar = baseAR;
+  
+  if (modsUpper.includes('HR')) ar = Math.min(10, ar * 1.4);
+  if (modsUpper.includes('EZ')) ar *= 0.5;
+  
+  if (modsUpper.includes('DT') || modsUpper.includes('NC')) {
+    const ms = ar <= 5 ? 1800 - ar * 120 : 1200 - (ar - 5) * 150;
+    const adjustedMs = ms * (2/3);
+    ar = adjustedMs > 1200 ? (1800 - adjustedMs) / 120 : 5 + (1200 - adjustedMs) / 150;
+  }
+  if (modsUpper.includes('HT')) {
+    const ms = ar <= 5 ? 1800 - ar * 120 : 1200 - (ar - 5) * 150;
+    const adjustedMs = ms * (4/3);
+    ar = adjustedMs > 1200 ? (1800 - adjustedMs) / 120 : 5 + (1200 - adjustedMs) / 150;
+  }
+  
+  return Math.floor(Math.max(0, Math.min(10, ar)) * 10) / 10;
+}
+
+function getAdjustedOD(baseOD, mods) {
+  if (!mods) return baseOD;
+  const modsUpper = mods.toUpperCase();
+  let od = baseOD;
+  
+  if (modsUpper.includes('HR')) od = Math.min(10, od * 1.4);
+  if (modsUpper.includes('EZ')) od *= 0.5;
+  
+  if (modsUpper.includes('DT') || modsUpper.includes('NC')) {
+    const ms = 79 - od * 6 + 0.5;
+    const adjustedMs = ms * (2/3) + 0.33;
+    od = (79 - adjustedMs + 0.5) / 6;
+  }
+  if (modsUpper.includes('HT')) {
+    const ms = 79 - od * 6 + 0.5;
+    const adjustedMs = ms * (4/3) + 0.66;
+    od = (79 - adjustedMs + 0.5) / 6;
+  }
+  
+  return Math.floor(Math.max(0, Math.min(10, od)) * 10) / 10;
+}
+
+function getAdjustedCS(baseCS, mods) {
+  if (!mods) return baseCS;
+  const modsUpper = mods.toUpperCase();
+  let cs = baseCS;
+  
+  if (modsUpper.includes('HR')) cs = Math.min(10, cs * 1.3);
+  if (modsUpper.includes('EZ')) cs *= 0.5;
+  
+  return Math.floor(Math.max(0, Math.min(10, cs)) * 10) / 10;
+}
+
+function getAdjustedHP(baseHP, mods) {
+  if (!mods) return baseHP;
+  const modsUpper = mods.toUpperCase();
+  let hp = baseHP;
+  
+  if (modsUpper.includes('HR')) hp = Math.min(10, hp * 1.4);
+  if (modsUpper.includes('EZ')) hp *= 0.5;
+  
+  return Math.floor(Math.max(0, Math.min(10, hp)) * 10) / 10;
+}
+
 /* ── theme ───────────────────────────────────────────────────── */
 if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
 $('theme-toggle').addEventListener('click', () => {
@@ -216,6 +282,11 @@ function renderMapDetail(body, node) {
   const effectiveMods = getEffectiveMods(node);
   const modsText = effectiveMods ? ` +${effectiveMods}` : '';
   const adjustedLen = getAdjustedLength(node.len, effectiveMods);
+  const adjustedAR = getAdjustedAR(node.ar || 0, effectiveMods);
+  const adjustedOD = getAdjustedOD(node.od || 0, effectiveMods);
+  const adjustedCS = getAdjustedCS(node.cs || 0, effectiveMods);
+  const adjustedHP = getAdjustedHP(node.hp || 0, effectiveMods);
+  
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <div>
@@ -225,6 +296,12 @@ function renderMapDetail(body, node) {
       <span class="pb-stars" id="det-stars">★${node.stars || '?'}${modsText}</span>
     </div>
     <div class="pb-beatmap-bid">beatmap #${esc(node.bid || '—')}</div>
+    <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--muted)">
+      <span>CS ${adjustedCS.toFixed(1)}</span>
+      <span>AR ${adjustedAR.toFixed(1)}</span>
+      <span>OD ${adjustedOD.toFixed(1)}</span>
+      <span>HP ${adjustedHP.toFixed(1)}</span>
+    </div>
   `;
   body.appendChild(card);
 
@@ -286,6 +363,10 @@ function renderMapDetail(body, node) {
       node.diff = data.diff;
       node.len = data.len;
       node.stars = data.stars;
+      node.ar = data.ar;
+      node.od = data.od;
+      node.cs = data.cs;
+      node.hp = data.hp;
       
       // Fetch modded attributes if mods are set (including inherited)
       const effectiveMods = getEffectiveMods(node);
@@ -658,6 +739,10 @@ $('pb-import-submit').addEventListener('click', async () => {
       diff: data?.diff || '',
       len: data?.len || 0,
       stars: data?.stars || 0,
+      ar: data?.ar || 0,
+      od: data?.od || 0,
+      cs: data?.cs || 0,
+      hp: data?.hp || 0,
       tb: false, disallowed: false, mods: '', winCon: 'inherit',
     };
     poolNode.children = poolNode.children || [];
