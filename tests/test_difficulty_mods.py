@@ -26,33 +26,35 @@ def get_adjusted_ar(base_ar: float, mods: str) -> float:
     mods_upper = mods.upper()
     ar = base_ar
     
-    # Apply EZ/HR first
-    if 'HR' in mods_upper:
-        ar = min(10.0, ar * 1.4)
+    # Apply EZ/HR as simple multipliers
     if 'EZ' in mods_upper:
         ar *= 0.5
+    if 'HR' in mods_upper:
+        ar = min(10.0, ar * 1.4)
     
-    # Calculate preempt time in ms
-    if ar > 5:
-        ms = 200 + (11 - ar) * 100
-    else:
-        ms = 800 + (5 - ar) * 80
+    # For DT/HT, calculate "perceived AR" through ms conversion
+    if 'DT' in mods_upper or 'NC' in mods_upper or 'HT' in mods_upper:
+        # Calculate preempt time in ms
+        if ar > 5:
+            ms = 1200 - (ar - 5) * 150
+        else:
+            ms = 1200 + (5 - ar) * 120
+        
+        # Apply speed mods to timing
+        if 'DT' in mods_upper or 'NC' in mods_upper:
+            ms *= (2/3)
+        elif 'HT' in mods_upper:
+            ms *= (4/3)
+        
+        # Convert back to "perceived AR"
+        if ms < 300:
+            ar = 11
+        elif ms < 1200:
+            ar = 5 + (1200 - ms) / 150
+        else:
+            ar = 5 - (ms - 1200) / 120
     
-    # Apply speed mods
-    if 'DT' in mods_upper or 'NC' in mods_upper:
-        ms *= (2/3)
-    if 'HT' in mods_upper:
-        ms *= (4/3)
-    
-    # Convert back to AR
-    if ms < 300:
-        ar = 11
-    elif ms < 1200:
-        ar = 11 - (ms - 300) / 150
-    else:
-        ar = 5 - (ms - 1200) / 120
-    
-    return round(max(0.0, min(10.0, ar)), 1)
+    return round(ar, 1)
 
 
 class TestCSModAdjustments:
@@ -183,13 +185,13 @@ class TestARModAdjustments:
         # DT makes AR higher (faster approach)
         assert get_adjusted_ar(5.0, 'DT') > 5.0
         assert get_adjusted_ar(8.0, 'DT') > 8.0
-        # Should cap at 10
-        assert get_adjusted_ar(10.0, 'DT') == 10.0
+        # Can go above 10
+        assert get_adjusted_ar(10.0, 'DT') == 11.0
     
     def test_ar_ht(self):
-        """HT decreases AR by slowing down timing windows."""
-        # HT makes AR lower (slower approach)
+        """HT decreases perceived AR by slowing down timing windows."""
+        # HT makes perceived AR lower (easier to read)
         assert get_adjusted_ar(5.0, 'HT') < 5.0
         assert get_adjusted_ar(8.0, 'HT') < 8.0
-        # Should not go below 0
-        assert get_adjusted_ar(0.0, 'HT') == 0.0
+        # Can go negative for very low AR
+        assert get_adjusted_ar(0.0, 'HT') == -5.0

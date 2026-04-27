@@ -27,36 +27,38 @@ function getAdjustedAR(baseAR, mods) {
   const modsUpper = mods.toUpperCase();
   let ar = baseAR;
   
-  if (modsUpper.includes('HR')) ar = Math.min(10, ar * 1.4);
+  // Apply EZ/HR as simple multipliers
   if (modsUpper.includes('EZ')) ar *= 0.5;
+  if (modsUpper.includes('HR')) ar = Math.min(10, ar * 1.4);
   
-  // Calculate preempt time in ms
-  let ms;
-  if (ar > 5) {
-    ms = 200 + (11 - ar) * 100;
-  } else {
-    ms = 800 + (5 - ar) * 80;
+  // For DT/HT, calculate "perceived AR" through ms conversion
+  if (modsUpper.includes('DT') || modsUpper.includes('NC') || modsUpper.includes('HT')) {
+    // Calculate preempt time in ms
+    let ms;
+    if (ar > 5) {
+      ms = 1200 - (ar - 5) * 150;
+    } else {
+      ms = 1200 + (5 - ar) * 120;
+    }
+    
+    // Apply speed mods to timing
+    if (modsUpper.includes('DT') || modsUpper.includes('NC')) {
+      ms *= (2/3);
+    } else if (modsUpper.includes('HT')) {
+      ms *= (4/3);
+    }
+    
+    // Convert back to "perceived AR"
+    if (ms < 300) {
+      ar = 11;
+    } else if (ms < 1200) {
+      ar = 5 + (1200 - ms) / 150;
+    } else {
+      ar = 5 - (ms - 1200) / 120;
+    }
   }
   
-  // Apply speed mods
-  if (modsUpper.includes('DT') || modsUpper.includes('NC')) {
-    ms *= (2/3);
-  }
-  if (modsUpper.includes('HT')) {
-    ms *= (4/3);
-  }
-  
-  // Convert back to AR
-  let newAR;
-  if (ms < 300) {
-    newAR = 11;
-  } else if (ms < 1200) {
-    newAR = 11 - (ms - 300) / 150;
-  } else {
-    newAR = 5 - (ms - 1200) / 120;
-  }
-  
-  return Math.round(Math.max(0, Math.min(10, newAR)) * 100) / 100;
+  return Math.round(ar * 100) / 100;
 }
 
 function getAdjustedOD(baseOD, mods) {
