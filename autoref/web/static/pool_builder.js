@@ -1108,51 +1108,54 @@ let currentPoolId = null;
 })();
 
 async function hydrateTreeFromCache(nodes, parentMods = '') {
+  const promises = [];
+  
   for (const node of nodes) {
     const isPool = node.type === 'pool' || node.type === 'modpool';
-    if (isPool) {
-      console.log(`Pool ${node.name}: mods=${node.mods}, parentMods=${parentMods}`);
-    }
+    
     if (node.type === 'map' && node.bid) {
       const needsHydration = node.ar === undefined;
       const mods = node.mods || parentMods;
-      console.log(`Map ${node.bid}: needsHydration=${needsHydration}, node.mods=${node.mods}, parentMods=${parentMods}, effectiveMods=${mods}`);
+      const needsModdedSR = mods && mods !== 'NM';
       
-      try {
-        // Fetch base data if needed
-        if (needsHydration) {
-          const data = await fetch(`/api/beatmap/${node.bid}`).then(r => r.json());
-          node.title = data.title || node.title;
-          node.diff = data.diff || node.diff;
-          node.len = data.len || node.len;
-          node.ar = data.ar ?? 0;
-          node.od = data.od ?? 0;
-          node.cs = data.cs ?? 0;
-          node.hp = data.hp ?? 0;
-          if (!mods) node.stars = data.stars || node.stars;
-        }
-        
-        // Always fetch modded SR if mods are set
-        if (mods) {
-          console.log(`Fetching modded SR for ${node.bid} with mods ${mods}`);
-          const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(mods)}`);
-          if (attrsRes.ok) {
-            const attrs = await attrsRes.json();
-            console.log(`Got modded SR: ${attrs.star_rating}`);
-            node.stars = attrs.star_rating;
-          } else {
-            console.log(`Failed to fetch modded SR: ${attrsRes.status}`);
+      if (needsHydration || needsModdedSR) {
+        promises.push((async () => {
+          try {
+            // Fetch base data if needed
+            if (needsHydration) {
+              const data = await fetch(`/api/beatmap/${node.bid}`).then(r => r.json());
+              node.title = data.title || node.title;
+              node.diff = data.diff || node.diff;
+              node.len = data.len || node.len;
+              node.ar = data.ar ?? 0;
+              node.od = data.od ?? 0;
+              node.cs = data.cs ?? 0;
+              node.hp = data.hp ?? 0;
+              if (!needsModdedSR) node.stars = data.stars || node.stars;
+            }
+            
+            // Fetch modded SR if mods are set (excluding NM)
+            if (needsModdedSR) {
+              const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(mods)}`);
+              if (attrsRes.ok) {
+                const attrs = await attrsRes.json();
+                node.stars = attrs.star_rating;
+              }
+            }
+          } catch (e) {
+            console.error(`Hydration error for ${node.bid}:`, e);
           }
-        }
-      } catch (e) {
-        console.error(`Hydration error for ${node.bid}:`, e);
+        })());
       }
     }
+    
     if (node.children) {
       const mods = isPool ? (node.mods || parentMods) : parentMods;
-      await hydrateTreeFromCache(node.children, mods);
+      promises.push(hydrateTreeFromCache(node.children, mods));
     }
   }
+  
+  await Promise.all(promises);
 }
 
 $('pb-save-btn').addEventListener('click', async () => {
