@@ -168,13 +168,17 @@ When importing maps or clicking the refresh button, the system fetches:
 - **Stars**: Difficulty rating (rounded to 2 decimals)
 - **CS, AR, OD, HP**: Circle Size, Approach Rate, Overall Difficulty, HP Drain
 
-When mods are set on a map, all attributes automatically update to reflect the modded values using the osu! API's `/beatmaps/{id}/attributes` endpoint.
+The beatmap card displays all difficulty attributes with mod adjustments applied in real-time.
+
+When mods are set on a map (including inherited mods from parent pool), all attributes automatically update to reflect the modded values.
 
 **Mod Adjustments:**
-- **DT/NC**: Length ÷ 1.5, timing windows × 2/3
-- **HT**: Length ÷ 0.75, timing windows × 4/3
-- **HR**: CS × 1.3, AR/OD/HP × 1.4 (capped at 10)
 - **EZ**: All difficulty settings × 0.5
+- **HR**: CS × 1.3 (capped at 10), AR/OD/HP × 1.4 (capped at 10)
+- **DT/NC**: Length ÷ 1.5, perceived AR/OD calculated through timing window conversion
+- **HT**: Length ÷ 0.75, perceived AR/OD calculated through timing window conversion
+
+**Note**: AR values can go beyond the normal 0-10 range with extreme mod combinations (e.g., AR10+DT = 11.0, AR0+HT = -5.0).
 
 Data is fetched from the osu! API v2 and cached locally in `~/.cache/autoref/beatmaps.json` to reduce API calls.
 
