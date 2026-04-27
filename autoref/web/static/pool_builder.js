@@ -304,13 +304,17 @@ function renderMapDetail(body, node) {
   const adjustedCS = getAdjustedCS(node.cs || 0, effectiveMods);
   const adjustedHP = getAdjustedHP(node.hp || 0, effectiveMods);
   
+  // Get SR from cache based on effective mods
+  const modsKey = effectiveMods || 'NM';
+  const displayStars = (node.srCache && node.srCache[modsKey]) || node.stars || '?';
+  
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <div>
         <div class="pb-beatmap-title">${esc(node.title || '—')}</div>
         <div class="pb-beatmap-sub">${esc(node.diff || '—')} · ${fmtTime(adjustedLen)}</div>
       </div>
-      <span class="pb-stars" id="det-stars">★${node.stars || '?'}${modsText}</span>
+      <span class="pb-stars" id="det-stars">★${displayStars}${modsText}</span>
     </div>
     <div class="pb-beatmap-bid">beatmap #${esc(node.bid || '—')}</div>
     <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--muted)">
@@ -372,6 +376,9 @@ function renderMapDetail(body, node) {
     btn.textContent = '⏳';
     btn.disabled = true;
     try {
+      // Initialize SR cache if needed
+      if (!node.srCache) node.srCache = {};
+      
       // Fetch base beatmap data
       const res = await fetch(`/api/beatmap/${node.bid}`);
       if (!res.ok) throw new Error('Failed to fetch beatmap data');
@@ -379,21 +386,24 @@ function renderMapDetail(body, node) {
       node.title = `${data.artist} - ${data.title}`;
       node.diff = data.diff;
       node.len = data.len;
-      node.stars = data.stars;
       node.ar = data.ar;
       node.od = data.od;
       node.cs = data.cs;
       node.hp = data.hp;
+      node.srCache['NM'] = data.stars;
       
       // Fetch modded attributes if mods are set (including inherited)
       const effectiveMods = getEffectiveMods(node);
+      const modsKey = effectiveMods || 'NM';
       if (effectiveMods) {
         const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(effectiveMods)}`);
         if (attrsRes.ok) {
           const attrs = await attrsRes.json();
-          node.stars = attrs.star_rating;
+          node.srCache[modsKey] = attrs.star_rating;
         }
       }
+      
+      node.stars = node.srCache[modsKey];
       
       renderTree();
       renderDetail();
@@ -1116,7 +1126,12 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
     if (node.type === 'map' && node.bid) {
       const needsHydration = node.ar === undefined;
       const mods = node.mods || parentMods;
-      const needsModdedSR = mods && mods !== 'NM' && !node.stars;
+      const modsKey = mods || 'NM';
+      
+      // Initialize SR cache if needed
+      if (!node.srCache) node.srCache = {};
+      
+      const needsModdedSR = mods && mods !== 'NM' && !node.srCache[modsKey];
       
       if (needsHydration || needsModdedSR) {
         promises.push((async () => {
@@ -1131,7 +1146,7 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
               node.od = data.od ?? 0;
               node.cs = data.cs ?? 0;
               node.hp = data.hp ?? 0;
-              if (!needsModdedSR) node.stars = data.stars || node.stars;
+              node.srCache['NM'] = data.stars;
             }
             
             // Fetch modded SR if not cached
@@ -1139,13 +1154,19 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
               const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(mods)}`);
               if (attrsRes.ok) {
                 const attrs = await attrsRes.json();
-                node.stars = attrs.star_rating;
+                node.srCache[modsKey] = attrs.star_rating;
               }
             }
+            
+            // Set current stars from cache
+            node.stars = node.srCache[modsKey] || node.srCache['NM'] || node.stars;
           } catch (e) {
             console.error(`Hydration error for ${node.bid}:`, e);
           }
         })());
+      } else {
+        // Use cached SR
+        node.stars = node.srCache[modsKey] || node.srCache['NM'] || node.stars;
       }
     }
     
