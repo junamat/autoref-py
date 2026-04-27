@@ -318,9 +318,9 @@ class WebServer:
             from aiosu.models import Mods
             client = make_client()
             try:
-                # Parse mods string to Mods enum
-                mods_enum = Mods.from_str(mods) if mods else None
-                attrs = await client.get_beatmap_attributes(int(beatmap_id), mods=mods_enum)
+                # Parse mods string to Mods object
+                mods_obj = Mods(mods) if mods else None
+                attrs = await client.get_beatmap_attributes(int(beatmap_id), mods=mods_obj)
                 return JSONResponse({
                     "star_rating": round(attrs.star_rating, 2),
                     "max_combo": attrs.max_combo,

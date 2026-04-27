@@ -54,6 +54,13 @@ function findParent(nodes, id, parent = null) {
   return undefined;
 }
 
+function getEffectiveMods(node) {
+  if (node.type !== 'map') return node.mods || '';
+  if (node.mods && node.mods !== 'inherit' && node.mods !== '') return node.mods;
+  const parent = findParent(tree, node.id);
+  return parent?.mods || '';
+}
+
 function removeNode(nodes, id) {
   for (let i = 0; i < nodes.length; i++) {
     if (nodes[i].id === id) { nodes.splice(i, 1); return true; }
@@ -194,7 +201,8 @@ function renderMapDetail(body, node) {
   // beatmap card
   const card = document.createElement('div');
   card.className = 'pb-beatmap-card';
-  const modsText = node.mods && node.mods !== 'inherit' ? ` +${node.mods}` : '';
+  const effectiveMods = getEffectiveMods(node);
+  const modsText = effectiveMods ? ` +${effectiveMods}` : '';
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <div>
@@ -266,9 +274,10 @@ function renderMapDetail(body, node) {
       node.len = data.len;
       node.stars = data.stars;
       
-      // Fetch modded attributes if mods are set
-      if (node.mods && node.mods !== 'inherit' && node.mods !== '') {
-        const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(node.mods)}`);
+      // Fetch modded attributes if mods are set (including inherited)
+      const effectiveMods = getEffectiveMods(node);
+      if (effectiveMods) {
+        const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(effectiveMods)}`);
         if (attrsRes.ok) {
           const attrs = await attrsRes.json();
           node.stars = attrs.star_rating;
@@ -378,16 +387,19 @@ function makeModsSection(node, title, noneLabel) {
     node.mods = input.value.trim().toUpperCase();
     renderTree();
     // Auto-refresh stars for maps when mods change
-    if (node.type === 'map' && node.bid && node.mods && node.mods !== 'inherit') {
-      try {
-        const res = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(node.mods)}`);
-        if (res.ok) {
-          const attrs = await res.json();
-          node.stars = attrs.star_rating;
-          renderDetail();
+    if (node.type === 'map' && node.bid) {
+      const effectiveMods = getEffectiveMods(node);
+      if (effectiveMods) {
+        try {
+          const res = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(effectiveMods)}`);
+          if (res.ok) {
+            const attrs = await res.json();
+            node.stars = attrs.star_rating;
+            renderDetail();
+          }
+        } catch (e) {
+          console.error('Failed to fetch modded attributes:', e);
         }
-      } catch (e) {
-        console.error('Failed to fetch modded attributes:', e);
       }
     }
   });
@@ -406,16 +418,19 @@ function makeModsSection(node, title, noneLabel) {
       input.value = m;
       renderTree();
       // Auto-refresh stars for maps when mods change
-      if (node.type === 'map' && node.bid && m && m !== 'inherit') {
-        try {
-          const res = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(m)}`);
-          if (res.ok) {
-            const attrs = await res.json();
-            node.stars = attrs.star_rating;
-            renderDetail();
+      if (node.type === 'map' && node.bid) {
+        const effectiveMods = getEffectiveMods(node);
+        if (effectiveMods) {
+          try {
+            const res = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(effectiveMods)}`);
+            if (res.ok) {
+              const attrs = await res.json();
+              node.stars = attrs.star_rating;
+              renderDetail();
+            }
+          } catch (e) {
+            console.error('Failed to fetch modded attributes:', e);
           }
-        } catch (e) {
-          console.error('Failed to fetch modded attributes:', e);
         }
       }
     });
