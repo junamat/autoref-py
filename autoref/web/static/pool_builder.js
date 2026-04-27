@@ -302,7 +302,6 @@ function renderMapDetail(body, node) {
   const adjustedAR = getAdjustedAR(node.ar || 0, effectiveMods);
   const adjustedOD = getAdjustedOD(node.od || 0, effectiveMods);
   const adjustedCS = getAdjustedCS(node.cs || 0, effectiveMods);
-  const adjustedHP = getAdjustedHP(node.hp || 0, effectiveMods);
   
   // Get SR from cache based on effective mods
   const modsKey = effectiveMods || 'NM';
@@ -321,7 +320,6 @@ function renderMapDetail(body, node) {
       <span>CS ${adjustedCS.toFixed(1)}</span>
       <span>AR ${adjustedAR.toFixed(1)}</span>
       <span>OD ${adjustedOD.toFixed(1)}</span>
-      <span>HP ${adjustedHP.toFixed(1)}</span>
     </div>
   `;
   body.appendChild(card);
@@ -389,7 +387,6 @@ function renderMapDetail(body, node) {
       node.ar = data.ar;
       node.od = data.od;
       node.cs = data.cs;
-      node.hp = data.hp;
       node.srCache['NM'] = data.stars;
       
       // Fetch modded attributes if mods are set (including inherited)
@@ -652,7 +649,7 @@ function addMapToPool(poolId) {
     id: uid(), type: 'map',
     code: `MAP${totalMaps() + 1}`,
     bid: '', title: 'New Map', diff: '', len: 0, stars: 0,
-    ar: 0, od: 0, cs: 0, hp: 0,
+    ar: 0, od: 0, cs: 0,
     tb: false, disallowed: false, mods: '', winCon: 'inherit',
   };
   pool.children = pool.children || [];
@@ -1145,7 +1142,6 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
               node.ar = data.ar ?? 0;
               node.od = data.od ?? 0;
               node.cs = data.cs ?? 0;
-              node.hp = data.hp ?? 0;
               node.srCache['NM'] = data.stars;
             }
             
