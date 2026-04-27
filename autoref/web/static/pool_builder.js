@@ -572,12 +572,12 @@ function findNodeByName(nodes, name) {
 $('pb-export-btn').addEventListener('click', () => {
   const name = $('pb-pool-name').value.trim() || 'pool';
   const lines = [];
-  function collectMaps(nodes) {
+  function collectMaps(nodes, poolName = '') {
     for (const n of nodes) {
       if (n.type === 'map') {
-        if (n.bid) lines.push(`${n.bid} ${n.code || ''}`);
+        if (n.bid) lines.push(`${n.bid} ${poolName}`);
       } else if (n.children) {
-        collectMaps(n.children);
+        collectMaps(n.children, n.name || poolName);
       }
     }
   }
