@@ -668,6 +668,104 @@ $('pb-load-overlay').addEventListener('click', e => {
   if (e.target === $('pb-load-overlay')) $('pb-load-overlay').classList.add('hidden');
 });
 
+/* ── compose ──────────────────────────────────────────────────── */
+let selectedPools = new Set();
+
+$('pb-compose-btn').addEventListener('click', async () => {
+  $('pb-compose-overlay').classList.remove('hidden');
+  selectedPools.clear();
+  await loadComposeList();
+});
+
+async function loadComposeList() {
+  const list = $('pb-compose-list');
+  list.innerHTML = '<div class="mono xs muted">loading…</div>';
+  
+  try {
+    const pools = await fetch('/api/pools').then(r => r.json());
+    if (!pools.length) {
+      list.innerHTML = '<div class="mono xs muted">No saved pools found</div>';
+      return;
+    }
+    
+    list.innerHTML = '';
+    for (const pool of pools) {
+      const item = document.createElement('div');
+      item.className = 'pb-compose-item';
+      item.dataset.id = pool.id;
+      item.innerHTML = `
+        <div class="pb-compose-checkbox"></div>
+        <div style="flex:1">
+          <div style="font-weight:500">${esc(pool.name || 'Untitled')}</div>
+          <div class="mono xs muted">${pool.tree?.length || 0} pools</div>
+        </div>
+      `;
+      
+      item.addEventListener('click', () => {
+        if (selectedPools.has(pool.id)) {
+          selectedPools.delete(pool.id);
+          item.classList.remove('selected');
+        } else {
+          selectedPools.add(pool.id);
+          item.classList.add('selected');
+        }
+      });
+      
+      list.appendChild(item);
+    }
+  } catch (e) {
+    list.innerHTML = `<div class="mono xs muted">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+$('pb-compose-merge').addEventListener('click', async () => {
+  if (selectedPools.size === 0) {
+    alert('Select at least one pool to merge');
+    return;
+  }
+  
+  const btn = $('pb-compose-merge');
+  btn.textContent = 'merging…';
+  btn.disabled = true;
+  
+  try {
+    const pools = await fetch('/api/pools').then(r => r.json());
+    
+    for (const poolId of selectedPools) {
+      const pool = pools.find(p => p.id === poolId);
+      if (!pool || !pool.tree) continue;
+      
+      // Deep clone and merge the tree
+      for (const node of pool.tree) {
+        const cloned = JSON.parse(JSON.stringify(node));
+        // Regenerate IDs to avoid conflicts
+        cloned.id = uid();
+        if (cloned.children) {
+          cloned.children = cloned.children.map(c => ({ ...c, id: uid() }));
+        }
+        tree.push(cloned);
+      }
+    }
+    
+    renderTree();
+    renderDetail();
+    $('pb-compose-overlay').classList.add('hidden');
+    selectedPools.clear();
+  } catch (e) {
+    alert('Merge failed: ' + e.message);
+  } finally {
+    btn.textContent = 'merge selected';
+    btn.disabled = false;
+  }
+});
+
+$('pb-compose-close').addEventListener('click', () => {
+  $('pb-compose-overlay').classList.add('hidden');
+});
+$('pb-compose-overlay').addEventListener('click', e => {
+  if (e.target === $('pb-compose-overlay')) $('pb-compose-overlay').classList.add('hidden');
+});
+
 
 /* ── save ────────────────────────────────────────────────────── */
 let currentPoolId = null;
