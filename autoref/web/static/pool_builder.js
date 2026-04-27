@@ -1109,27 +1109,31 @@ let currentPoolId = null;
 
 async function hydrateTreeFromCache(nodes, parentMods = '') {
   for (const node of nodes) {
-    if (node.type === 'map' && node.bid && node.ar === undefined) {
+    if (node.type === 'map' && node.bid) {
+      const needsHydration = node.ar === undefined;
+      const mods = node.mods || parentMods;
+      
       try {
-        const data = await fetch(`/api/beatmap/${node.bid}`).then(r => r.json());
-        node.title = data.title || node.title;
-        node.diff = data.diff || node.diff;
-        node.len = data.len || node.len;
-        node.ar = data.ar ?? 0;
-        node.od = data.od ?? 0;
-        node.cs = data.cs ?? 0;
-        node.hp = data.hp ?? 0;
+        // Fetch base data if needed
+        if (needsHydration) {
+          const data = await fetch(`/api/beatmap/${node.bid}`).then(r => r.json());
+          node.title = data.title || node.title;
+          node.diff = data.diff || node.diff;
+          node.len = data.len || node.len;
+          node.ar = data.ar ?? 0;
+          node.od = data.od ?? 0;
+          node.cs = data.cs ?? 0;
+          node.hp = data.hp ?? 0;
+          if (!mods) node.stars = data.stars || node.stars;
+        }
         
-        // Fetch modded SR if mods are set
-        const mods = node.mods || parentMods;
+        // Always fetch modded SR if mods are set
         if (mods) {
           const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(mods)}`);
           if (attrsRes.ok) {
             const attrs = await attrsRes.json();
-            node.stars = attrs.star_rating || data.stars;
+            node.stars = attrs.star_rating;
           }
-        } else {
-          node.stars = data.stars || node.stars;
         }
       } catch (_) {}
     }
