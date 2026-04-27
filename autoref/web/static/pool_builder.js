@@ -1101,10 +1101,30 @@ let currentPoolId = null;
     currentPoolId = pool.id;
     $('pb-pool-name').value = pool.name || '';
     tree = pool.tree || [];
+    await hydrateTreeFromCache(tree);
     renderTree();
     renderDetail();
   } catch (_) {}
 })();
+
+async function hydrateTreeFromCache(nodes) {
+  for (const node of nodes) {
+    if (node.type === 'map' && node.bid && (!node.ar && !node.od && !node.cs && !node.hp)) {
+      try {
+        const data = await fetch(`/api/beatmap/${node.bid}`).then(r => r.json());
+        node.title = data.title || node.title;
+        node.diff = data.version || node.diff;
+        node.len = data.total_length || node.len;
+        node.stars = data.difficulty_rating || node.stars;
+        node.ar = data.ar || 0;
+        node.od = data.accuracy || 0;
+        node.cs = data.cs || 0;
+        node.hp = data.drain || 0;
+      } catch (_) {}
+    }
+    if (node.children) await hydrateTreeFromCache(node.children);
+  }
+}
 
 $('pb-save-btn').addEventListener('click', async () => {
   const name = $('pb-pool-name').value.trim() || 'Untitled Pool';
