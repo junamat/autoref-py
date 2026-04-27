@@ -1109,9 +1109,14 @@ let currentPoolId = null;
 
 async function hydrateTreeFromCache(nodes, parentMods = '') {
   for (const node of nodes) {
+    const isPool = node.type === 'pool' || node.type === 'modpool';
+    if (isPool) {
+      console.log(`Pool ${node.name}: mods=${node.mods}, parentMods=${parentMods}`);
+    }
     if (node.type === 'map' && node.bid) {
       const needsHydration = node.ar === undefined;
       const mods = node.mods || parentMods;
+      console.log(`Map ${node.bid}: needsHydration=${needsHydration}, node.mods=${node.mods}, parentMods=${parentMods}, effectiveMods=${mods}`);
       
       try {
         // Fetch base data if needed
@@ -1129,16 +1134,22 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
         
         // Always fetch modded SR if mods are set
         if (mods) {
+          console.log(`Fetching modded SR for ${node.bid} with mods ${mods}`);
           const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(mods)}`);
           if (attrsRes.ok) {
             const attrs = await attrsRes.json();
+            console.log(`Got modded SR: ${attrs.star_rating}`);
             node.stars = attrs.star_rating;
+          } else {
+            console.log(`Failed to fetch modded SR: ${attrsRes.status}`);
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        console.error(`Hydration error for ${node.bid}:`, e);
+      }
     }
     if (node.children) {
-      const mods = node.type === 'pool' ? (node.mods || parentMods) : parentMods;
+      const mods = isPool ? (node.mods || parentMods) : parentMods;
       await hydrateTreeFromCache(node.children, mods);
     }
   }
