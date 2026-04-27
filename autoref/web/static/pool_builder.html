@@ -324,6 +324,61 @@
   color: white;
   font-size: 11px;
 }
+
+#pb-separate-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+#pb-separate-overlay.hidden { display: none; }
+#pb-separate-box {
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#pb-separate-body { padding: 12px; overflow-y: auto; flex: 1; }
+#pb-separate-list { display: flex; flex-direction: column; gap: 6px; }
+.pb-separate-item {
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pb-separate-item:hover { border-color: var(--blue); }
+.pb-separate-item.selected { 
+  border-color: var(--blue); 
+  background: rgba(59, 130, 246, 0.1);
+}
+.pb-separate-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pb-separate-item.selected .pb-separate-checkbox {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+.pb-separate-item.selected .pb-separate-checkbox::after {
+  content: '✓';
+  color: white;
+  font-size: 11px;
+}
 </style>
 </head>
 <body>
@@ -345,6 +400,7 @@
       <button class="ghost-btn" id="pb-export-btn">⬇ export</button>
       <button class="ghost-btn" id="pb-load-btn">📂 load</button>
       <button class="ghost-btn" id="pb-compose-btn">🔗 compose</button>
+      <button class="ghost-btn" id="pb-separate-btn">✂ separate</button>
       <button class="join-btn" id="pb-save-btn">save pool</button>
       <button class="ghost-btn" id="theme-toggle" title="toggle light/dark">◑</button>
     </div>
@@ -425,6 +481,20 @@
         <div class="mono xs muted" style="margin-bottom:10px">Select pools to merge into current pool</div>
         <div id="pb-compose-list"></div>
         <button class="join-btn" id="pb-compose-merge" style="width:100%;margin-top:10px">merge selected</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pb-separate-overlay" class="hidden">
+    <div id="pb-separate-box">
+      <div class="panel-head">
+        separate pools
+        <button class="ghost-btn xs" id="pb-separate-close">✕</button>
+      </div>
+      <div id="pb-separate-body">
+        <div class="mono xs muted" style="margin-bottom:10px">Select pools to extract and save separately</div>
+        <div id="pb-separate-list"></div>
+        <button class="join-btn" id="pb-separate-extract" style="width:100%;margin-top:10px">extract selected</button>
       </div>
     </div>
   </div>

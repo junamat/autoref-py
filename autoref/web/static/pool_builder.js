@@ -766,6 +766,107 @@ $('pb-compose-overlay').addEventListener('click', e => {
   if (e.target === $('pb-compose-overlay')) $('pb-compose-overlay').classList.add('hidden');
 });
 
+/* ── separate ─────────────────────────────────────────────────── */
+let selectedNodes = new Set();
+
+$('pb-separate-btn').addEventListener('click', () => {
+  if (tree.length === 0) {
+    alert('No pools to separate');
+    return;
+  }
+  $('pb-separate-overlay').classList.remove('hidden');
+  selectedNodes.clear();
+  loadSeparateList();
+});
+
+function loadSeparateList() {
+  const list = $('pb-separate-list');
+  list.innerHTML = '';
+  
+  for (const node of tree) {
+    const item = document.createElement('div');
+    item.className = 'pb-separate-item';
+    item.dataset.id = node.id;
+    
+    const mapCount = node.children?.length || 0;
+    item.innerHTML = `
+      <div class="pb-separate-checkbox"></div>
+      <div style="flex:1">
+        <div style="font-weight:500">${esc(node.name || 'Unnamed')}</div>
+        <div class="mono xs muted">${mapCount} maps</div>
+      </div>
+    `;
+    
+    item.addEventListener('click', () => {
+      if (selectedNodes.has(node.id)) {
+        selectedNodes.delete(node.id);
+        item.classList.remove('selected');
+      } else {
+        selectedNodes.add(node.id);
+        item.classList.add('selected');
+      }
+    });
+    
+    list.appendChild(item);
+  }
+}
+
+$('pb-separate-extract').addEventListener('click', async () => {
+  if (selectedNodes.size === 0) {
+    alert('Select at least one pool to extract');
+    return;
+  }
+  
+  const btn = $('pb-separate-extract');
+  btn.textContent = 'extracting…';
+  btn.disabled = true;
+  
+  try {
+    const poolName = $('pb-pool-name').value.trim() || 'Untitled Pool';
+    
+    for (const nodeId of selectedNodes) {
+      const node = findNode(tree, nodeId);
+      if (!node) continue;
+      
+      // Create a new saved pool with just this node
+      const newPool = {
+        name: `${poolName} - ${node.name || 'Unnamed'}`,
+        tree: [JSON.parse(JSON.stringify(node))]
+      };
+      
+      const res = await fetch('/api/pools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPool)
+      });
+      
+      if (!res.ok) throw new Error('Failed to save extracted pool');
+    }
+    
+    // Remove extracted nodes from current tree
+    tree = tree.filter(n => !selectedNodes.has(n.id));
+    
+    renderTree();
+    renderDetail();
+    $('pb-separate-overlay').classList.add('hidden');
+    selectedNodes.clear();
+    
+    alert(`Extracted ${selectedNodes.size} pool(s) and saved separately`);
+  } catch (e) {
+    alert('Extract failed: ' + e.message);
+  } finally {
+    btn.textContent = 'extract selected';
+    btn.disabled = false;
+  }
+});
+
+$('pb-separate-close').addEventListener('click', () => {
+  $('pb-separate-overlay').classList.add('hidden');
+});
+$('pb-separate-overlay').addEventListener('click', e => {
+  if (e.target === $('pb-separate-overlay')) $('pb-separate-overlay').classList.add('hidden');
+});
+
 
 /* ── save ────────────────────────────────────────────────────── */
 let currentPoolId = null;
