@@ -212,12 +212,14 @@ class WebServer:
             return FileResponse(self.static_dir / "stats.html")
 
         @app.get("/api/stats")
-        async def api_stats(method: str = "zscore", count_failed: bool = True):
+        async def api_stats(method: str = "zscore", count_failed: bool = True, aggregate: str = "sum"):
             from ..core.stats import include_all, exclude_failed, METHODS
             if method not in METHODS:
                 return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
+            if aggregate not in ("sum", "mean"):
+                return JSONResponse({"error": f"aggregate must be 'sum' or 'mean'"}, status_code=400)
             predicate = include_all if count_failed else exclude_failed
-            leaderboard = server.db.get_leaderboard(method=method, include=predicate)
+            leaderboard = server.db.get_leaderboard(method=method, include=predicate, aggregate=aggregate)
             map_stats   = server.db.get_map_stats()
             all_scores  = server.db.get_all_scores()
 

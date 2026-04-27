@@ -28,6 +28,14 @@ document.getElementById('cfg-failed').addEventListener('click', e => {
   load();
 });
 
+document.getElementById('cfg-aggregate').addEventListener('click', e => {
+  const opt = e.target.closest('.cfg-opt');
+  if (!opt) return;
+  document.querySelectorAll('#cfg-aggregate .cfg-opt').forEach(o => o.classList.remove('active'));
+  opt.classList.add('active');
+  load();
+});
+
 document.getElementById('stats-reload').addEventListener('click', load);
 
 /* ── method toggle (populated from API) ─────────────────────── */
@@ -49,7 +57,8 @@ function buildMethodToggle(methods) {
 /* ── fetch + render ──────────────────────────────────────────── */
 async function load() {
   const countFailed = activeVal('cfg-failed') !== 'false';
-  const url = `/api/stats?method=${currentMethod}&count_failed=${countFailed}`;
+  const aggregate = activeVal('cfg-aggregate') || 'sum';
+  const url = `/api/stats?method=${currentMethod}&count_failed=${countFailed}&aggregate=${aggregate}`;
 
   document.getElementById('leaderboard-wrap').innerHTML = '<div class="empty-msg">loading…</div>';
   document.getElementById('mappool-wrap').innerHTML     = '<div class="empty-msg">loading…</div>';
