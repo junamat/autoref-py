@@ -1107,7 +1107,7 @@ let currentPoolId = null;
   } catch (_) {}
 })();
 
-async function hydrateTreeFromCache(nodes) {
+async function hydrateTreeFromCache(nodes, parentMods = '') {
   for (const node of nodes) {
     if (node.type === 'map' && node.bid && node.ar === undefined) {
       try {
@@ -1115,14 +1115,28 @@ async function hydrateTreeFromCache(nodes) {
         node.title = data.title || node.title;
         node.diff = data.diff || node.diff;
         node.len = data.len || node.len;
-        node.stars = data.stars || node.stars;
         node.ar = data.ar ?? 0;
         node.od = data.od ?? 0;
         node.cs = data.cs ?? 0;
         node.hp = data.hp ?? 0;
+        
+        // Fetch modded SR if mods are set
+        const mods = node.mods || parentMods;
+        if (mods) {
+          const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(mods)}`);
+          if (attrsRes.ok) {
+            const attrs = await attrsRes.json();
+            node.stars = attrs.star_rating || data.stars;
+          }
+        } else {
+          node.stars = data.stars || node.stars;
+        }
       } catch (_) {}
     }
-    if (node.children) await hydrateTreeFromCache(node.children);
+    if (node.children) {
+      const mods = node.type === 'pool' ? (node.mods || parentMods) : parentMods;
+      await hydrateTreeFromCache(node.children, mods);
+    }
   }
 }
 
