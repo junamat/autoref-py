@@ -595,6 +595,10 @@ $('pb-export-btn').addEventListener('click', () => {
 /* ── load ────────────────────────────────────────────────────── */
 $('pb-load-btn').addEventListener('click', async () => {
   $('pb-load-overlay').classList.remove('hidden');
+  await loadPoolList();
+});
+
+async function loadPoolList() {
   const list = $('pb-load-list');
   list.innerHTML = '<div class="mono xs muted">loading…</div>';
   
@@ -609,9 +613,19 @@ $('pb-load-btn').addEventListener('click', async () => {
     for (const pool of pools) {
       const item = document.createElement('div');
       item.className = 'pb-load-item';
-      item.innerHTML = `<div style="font-weight:500">${esc(pool.name || 'Untitled')}</div>
-                        <div class="mono xs muted">${pool.tree?.length || 0} pools</div>`;
-      item.addEventListener('click', () => {
+      item.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1">
+            <div style="font-weight:500">${esc(pool.name || 'Untitled')}</div>
+            <div class="mono xs muted">${pool.tree?.length || 0} pools</div>
+          </div>
+          <button class="ghost-btn xs pb-delete-pool" data-id="${esc(pool.id)}" title="delete">🗑</button>
+        </div>
+      `;
+      
+      // Load pool on click (but not on delete button)
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('pb-delete-pool')) return;
         currentPoolId = pool.id;
         $('pb-pool-name').value = pool.name || '';
         tree = pool.tree || [];
@@ -620,12 +634,32 @@ $('pb-load-btn').addEventListener('click', async () => {
         history.replaceState(null, '', `?id=${encodeURIComponent(pool.id)}`);
         $('pb-load-overlay').classList.add('hidden');
       });
+      
+      // Delete button
+      const deleteBtn = item.querySelector('.pb-delete-pool');
+      deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Delete pool "${pool.name || 'Untitled'}"?`)) return;
+        
+        deleteBtn.textContent = '⏳';
+        deleteBtn.disabled = true;
+        try {
+          const res = await fetch(`/api/pools/${pool.id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Delete failed');
+          await loadPoolList(); // Refresh list
+        } catch (err) {
+          alert('Delete failed: ' + err.message);
+          deleteBtn.textContent = '🗑';
+          deleteBtn.disabled = false;
+        }
+      });
+      
       list.appendChild(item);
     }
   } catch (e) {
     list.innerHTML = `<div class="mono xs muted">Error: ${esc(e.message)}</div>`;
   }
-});
+}
 
 $('pb-load-close').addEventListener('click', () => {
   $('pb-load-overlay').classList.add('hidden');
