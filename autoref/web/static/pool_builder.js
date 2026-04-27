@@ -254,7 +254,7 @@ function renderNodes(nodes, container, depth) {
       hint.className = 'pb-add-hint';
       hint.style.paddingLeft = `${8 + indent + 16}px`;
       hint.style.padding = `2px 8px 2px ${8 + indent + 16}px`;
-      hint.innerHTML = `<span>+ add map or sub-pool</span>`;
+      hint.innerHTML = `<span>+ add map</span>`;
       hint.addEventListener('click', () => addMapToPool(node.id));
       container.appendChild(hint);
     }
