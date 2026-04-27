@@ -12,6 +12,7 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 
 _POOLS_FILE = Path.home() / ".cache" / "autoref" / "pools.json"
+_BEATMAP_CACHE_FILE = Path.home() / ".cache" / "autoref" / "beatmaps.json"
 
 
 def _load_pools() -> dict:
@@ -25,6 +26,17 @@ def _save_pools(pools: dict) -> None:
     _POOLS_FILE.parent.mkdir(parents=True, exist_ok=True)
     _POOLS_FILE.write_text(json.dumps(pools, indent=2))
 
+
+def _load_beatmap_cache() -> dict:
+    try:
+        return json.loads(_BEATMAP_CACHE_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_beatmap_cache(cache: dict) -> None:
+    _BEATMAP_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _BEATMAP_CACHE_FILE.write_text(json.dumps(cache, indent=2))
 
 
 def _flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
@@ -293,18 +305,27 @@ class WebServer:
         @app.get("/api/beatmap/{beatmap_id}")
         async def get_beatmap(beatmap_id: str):
             """Fetch beatmap metadata from osu! API."""
+            # Check cache first
+            cache = _load_beatmap_cache()
+            if beatmap_id in cache:
+                return JSONResponse(cache[beatmap_id])
+            
             from ..client import make_client
             client = make_client()
             try:
                 beatmap = await client.get_beatmap(int(beatmap_id))
-                return JSONResponse({
+                data = {
                     "id": beatmap.id,
                     "title": beatmap.beatmapset.title,
                     "artist": beatmap.beatmapset.artist,
                     "diff": beatmap.version,
                     "len": beatmap.total_length,
                     "stars": round(beatmap.difficulty_rating, 2),
-                })
+                }
+                # Cache the result
+                cache[beatmap_id] = data
+                _save_beatmap_cache(cache)
+                return JSONResponse(data)
             except Exception as e:
                 logger.exception(f"failed to fetch beatmap {beatmap_id}")
                 return JSONResponse({"error": str(e)}, status_code=500)

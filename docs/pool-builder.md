@@ -164,16 +164,22 @@ Pools are stored as a tree structure:
 When importing maps or clicking the refresh button, the system fetches:
 - **Title & Artist**: Full song name
 - **Difficulty**: Difficulty version name
-- **Length**: Total length in seconds
+- **Length**: Total length in seconds (adjusted for DT/HT mods)
 - **Stars**: Difficulty rating (rounded to 2 decimals)
 
 When mods are set on a map, the star rating automatically updates to reflect the modded difficulty using the osu! API's `/beatmaps/{id}/attributes` endpoint.
 
-Data is fetched from the osu! API v2 and cached in the pool structure.
+**Mod Adjustments:**
+- **DT/NC**: Length divided by 1.5 (1.5x speed)
+- **HT**: Length divided by 0.75 (0.75x speed)
+
+Data is fetched from the osu! API v2 and cached locally in `~/.cache/autoref/beatmaps.json` to reduce API calls.
 
 ### Storage
 
-Pools are stored in `~/.local/share/autoref/pools.json` as a JSON object mapping pool IDs to pool data.
+Pools are stored in `~/.cache/autoref/pools.json` as a JSON object mapping pool IDs to pool data.
+
+Beatmap metadata is cached in `~/.cache/autoref/beatmaps.json` to reduce API calls and improve performance.
 
 ### Win Conditions
 

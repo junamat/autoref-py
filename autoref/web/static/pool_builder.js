@@ -10,6 +10,18 @@ function fmtTime(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+function getAdjustedLength(baseLength, mods) {
+  if (!mods) return baseLength;
+  const modsUpper = mods.toUpperCase();
+  if (modsUpper.includes('DT') || modsUpper.includes('NC')) {
+    return Math.round(baseLength / 1.5);
+  }
+  if (modsUpper.includes('HT')) {
+    return Math.round(baseLength / 0.75);
+  }
+  return baseLength;
+}
+
 /* ── theme ───────────────────────────────────────────────────── */
 if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
 $('theme-toggle').addEventListener('click', () => {
@@ -203,11 +215,12 @@ function renderMapDetail(body, node) {
   card.className = 'pb-beatmap-card';
   const effectiveMods = getEffectiveMods(node);
   const modsText = effectiveMods ? ` +${effectiveMods}` : '';
+  const adjustedLen = getAdjustedLength(node.len, effectiveMods);
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <div>
         <div class="pb-beatmap-title">${esc(node.title || '—')}</div>
-        <div class="pb-beatmap-sub">${esc(node.diff || '—')} · ${fmtTime(node.len)}</div>
+        <div class="pb-beatmap-sub">${esc(node.diff || '—')} · ${fmtTime(adjustedLen)}</div>
       </div>
       <span class="pb-stars" id="det-stars">★${node.stars || '?'}${modsText}</span>
     </div>
