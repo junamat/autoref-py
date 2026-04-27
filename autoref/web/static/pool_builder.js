@@ -124,7 +124,7 @@ let tree = [];
 let selectedId = null;
 
 const WIN_CONDITIONS = ['score_v2', 'score', 'accuracy', 'combo'];
-const MOD_OPTIONS    = ['NM', 'HD', 'HR', 'DT', 'FL', 'EZ', 'FM', 'HDHR', 'HDDT'];
+const MOD_OPTIONS    = ['None', 'HD', 'HR', 'DT', 'FL', 'EZ', 'FM', 'HDHR', 'HDDT'];
 
 /* ── tree helpers ────────────────────────────────────────────── */
 function findNode(nodes, id) {
@@ -530,7 +530,7 @@ function makeModsSection(node, title, noneLabel) {
   for (const m of quickOpts) {
     const btn = document.createElement('div');
     btn.className = 'pb-toggle-opt';
-    btn.textContent = m || 'NM';
+    btn.textContent = m || (noneLabel ? 'Clear' : 'NM');
     btn.addEventListener('click', async () => {
       node.mods = m;
       input.value = m;
