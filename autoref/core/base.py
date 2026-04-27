@@ -716,6 +716,19 @@ class AutoRef(ABC):
             for player in team.players:
                 await self.lobby.invite(player.username)
 
+        # Auto-assign teams when players join
+        async def auto_assign_teams():
+            for team_idx, team in enumerate(self.match.teams):
+                team_color = "Blue" if team_idx == 0 else "Red"
+                for player in team.players:
+                    if _normalize(player.username) in {_normalize(p) for p in self.lobby.players}:
+                        try:
+                            await self.lobby.set_team(player.username, team_color)
+                        except Exception:
+                            pass  # Player might not be in lobby yet
+        
+        self.lobby.add_presence_hook(auto_assign_teams)
+
         broker_task = asyncio.create_task(self._run_command_broker())
         cli_task = asyncio.create_task(self.lobby.run_cli_input())
         try:
