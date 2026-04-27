@@ -124,7 +124,7 @@ let tree = [];
 let selectedId = null;
 
 const WIN_CONDITIONS = ['score_v2', 'score', 'accuracy', 'combo'];
-const MOD_OPTIONS    = ['None', 'HD', 'HR', 'DT', 'FL', 'EZ', 'FM', 'HDHR', 'HDDT'];
+const MOD_OPTIONS    = ['NM', 'HD', 'HR', 'DT', 'FL', 'EZ', 'FM', 'HDHR', 'HDDT'];
 
 /* ── tree helpers ────────────────────────────────────────────── */
 function findNode(nodes, id) {
@@ -307,6 +307,13 @@ function renderMapDetail(body, node) {
   const modsKey = effectiveMods || 'NM';
   const displayStars = (node.srCache && node.srCache[modsKey]) || node.stars || '?';
   
+  // Add background image if beatmapset_id exists
+  if (node.setId) {
+    card.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.85)), url(https://assets.ppy.sh/beatmaps/${node.setId}/covers/cover.jpg)`;
+    card.style.backgroundSize = 'cover';
+    card.style.backgroundPosition = 'center';
+  }
+  
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <div>
@@ -387,6 +394,7 @@ function renderMapDetail(body, node) {
       node.ar = data.ar;
       node.od = data.od;
       node.cs = data.cs;
+      node.setId = data.beatmapset_id;
       node.srCache['NM'] = data.stars;
       
       // Fetch modded attributes if mods are set (including inherited)
@@ -1158,6 +1166,7 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
               node.ar = data.ar ?? 0;
               node.od = data.od ?? 0;
               node.cs = data.cs ?? 0;
+              node.setId = data.beatmapset_id;
               node.srCache['NM'] = data.stars;
             }
             

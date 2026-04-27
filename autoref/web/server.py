@@ -316,6 +316,7 @@ class WebServer:
                 beatmap = await client.get_beatmap(int(beatmap_id))
                 data = {
                     "id": beatmap.id,
+                    "beatmapset_id": beatmap.beatmapset_id,
                     "title": beatmap.beatmapset.title,
                     "artist": beatmap.beatmapset.artist,
                     "diff": beatmap.version,
