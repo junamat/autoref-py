@@ -47,15 +47,16 @@ function getAdjustedAR(baseAR, mods) {
   }
   
   // Convert back to AR
+  let newAR;
   if (ms < 300) {
-    ar = 11;
+    newAR = 11;
   } else if (ms < 1200) {
-    ar = (11 - (ms - 300) / 150);
+    newAR = 11 - (ms - 300) / 150;
   } else {
-    ar = (5 - (ms - 1200) / 120);
+    newAR = 5 - (ms - 1200) / 120;
   }
   
-  return Math.floor(Math.max(0, Math.min(11, ar)) * 10) / 10;
+  return Math.round(Math.max(0, Math.min(10, newAR)) * 100) / 100;
 }
 
 function getAdjustedOD(baseOD, mods) {
