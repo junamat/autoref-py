@@ -1116,7 +1116,7 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
     if (node.type === 'map' && node.bid) {
       const needsHydration = node.ar === undefined;
       const mods = node.mods || parentMods;
-      const needsModdedSR = mods && mods !== 'NM';
+      const needsModdedSR = mods && mods !== 'NM' && !node.stars;
       
       if (needsHydration || needsModdedSR) {
         promises.push((async () => {
@@ -1134,7 +1134,7 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
               if (!needsModdedSR) node.stars = data.stars || node.stars;
             }
             
-            // Fetch modded SR if mods are set (excluding NM)
+            // Fetch modded SR if not cached
             if (needsModdedSR) {
               const attrsRes = await fetch(`/api/beatmap/${node.bid}/attributes?mods=${encodeURIComponent(mods)}`);
               if (attrsRes.ok) {
