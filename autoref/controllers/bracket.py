@@ -12,7 +12,7 @@ import re
 from enum import Enum
 
 from ..core.base import AutoRef, _normalize, _find_map
-from ..core.enums import MapState, Step
+from ..core.enums import MapState, RefMode, Step
 from ..core.lobby import MatchResult, PlayerResult
 from ..core.models import OrderScheme
 
@@ -205,6 +205,8 @@ class BracketAutoRef(AutoRef):
         if winner is not None:
             self._wins[winner] += 1
             self._last_map_winner = winner
+        # Show scoreline after map finishes
+        await self.lobby.say(self._format_scoreline())
 
     async def handle_other(self, team_index: int) -> None:
         """Tiebreaker: flip the TB map to PICKABLE and play it as a pick by the
@@ -221,6 +223,29 @@ class BracketAutoRef(AutoRef):
         await self.handle_pick(picker, tb.beatmap_id)
 
     # ------------------------------------------------------------ overrides
+
+    async def await_pick(self, team_index: int) -> int | None:
+        """Override to handle pick timer expiration by passing to other team."""
+        if self.mode == RefMode.ASSISTED:
+            return await self._await_map_assisted(team_index, Step.PICK)
+        if self.mode == RefMode.OFF:
+            return await self._await_map_from_ref(for_ban=False)
+        
+        # AUTO mode with timeout
+        try:
+            return await asyncio.wait_for(
+                self._await_map_choice(team_index, for_ban=False),
+                timeout=self.timers.pick
+            )
+        except asyncio.TimeoutError:
+            other_team = 1 - team_index
+            await self.lobby.say(
+                f"{self.match.teams[team_index].name} ran out of time. "
+                f"{self.match.teams[other_team].name} picks instead."
+            )
+            # Decrement pick count so original team still picks next
+            self._pick_count -= 1
+            return await self._await_map_choice(other_team, for_ban=False)
 
     def _win_counts(self) -> list[int]:
         return list(self._wins)
@@ -398,18 +423,45 @@ class BracketAutoRef(AutoRef):
     async def _run_roll_phase(self) -> None:
         self.phase = Phase.ROLL
         self._rolls = {}
+        self._invalid_rolls = set()  # Track users who used !roll <number>
+        
+        # Wait for all expected players to join AND mode to be auto/assisted
+        expected_players = sum(len(team.players) for team in self.match.teams)
+        while True:
+            if len(self.lobby.players) >= expected_players and self.mode != RefMode.OFF:
+                break
+            await asyncio.sleep(0.5)
+        
         await self.lobby.say(
             f"All teams, please !roll. You have {self.roll_timeout}s — "
             "ref can override with >roll <team> <team> [...]."
         )
 
         def on_msg(msg) -> None:
-            if getattr(msg.user, "username", None) != "BanchoBot":
+            username = getattr(msg.user, "username", None)
+            
+            # Track user commands to detect !roll <number>
+            if username and username != "BanchoBot":
+                # Check if user typed !roll followed by a number
+                if msg.message.startswith("!roll "):
+                    args = msg.message[6:].strip()
+                    if args and args.split()[0].isdigit():
+                        # User typed !roll <number>, mark as invalid
+                        self._invalid_rolls.add(_normalize(username))
+                return
+            
+            # Process BanchoBot's roll response
+            if username != "BanchoBot":
                 return
             m = _ROLL_RE.match(msg.message)
             if not m:
                 return
             user = _normalize(m.group("user"))
+            
+            # Ignore rolls from users who used !roll <number>
+            if user in self._invalid_rolls:
+                return
+                
             value = int(m.group("n"))
             for ti, team in enumerate(self.match.teams):
                 if any(_normalize(p.username) == user for p in team.players):
