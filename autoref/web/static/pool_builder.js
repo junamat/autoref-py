@@ -30,18 +30,32 @@ function getAdjustedAR(baseAR, mods) {
   if (modsUpper.includes('HR')) ar = Math.min(10, ar * 1.4);
   if (modsUpper.includes('EZ')) ar *= 0.5;
   
-  if (modsUpper.includes('DT') || modsUpper.includes('NC')) {
-    const ms = ar <= 5 ? 1800 - ar * 120 : 1200 - (ar - 5) * 150;
-    const adjustedMs = ms * (2/3);
-    ar = adjustedMs > 1200 ? (1800 - adjustedMs) / 120 : 5 + (1200 - adjustedMs) / 150;
-  }
-  if (modsUpper.includes('HT')) {
-    const ms = ar <= 5 ? 1800 - ar * 120 : 1200 - (ar - 5) * 150;
-    const adjustedMs = ms * (4/3);
-    ar = adjustedMs > 1200 ? (1800 - adjustedMs) / 120 : 5 + (1200 - adjustedMs) / 150;
+  // Calculate preempt time in ms
+  let ms;
+  if (ar > 5) {
+    ms = 200 + (11 - ar) * 100;
+  } else {
+    ms = 800 + (5 - ar) * 80;
   }
   
-  return Math.floor(Math.max(0, Math.min(10, ar)) * 10) / 10;
+  // Apply speed mods
+  if (modsUpper.includes('DT') || modsUpper.includes('NC')) {
+    ms *= (2/3);
+  }
+  if (modsUpper.includes('HT')) {
+    ms *= (4/3);
+  }
+  
+  // Convert back to AR
+  if (ms < 300) {
+    ar = 11;
+  } else if (ms < 1200) {
+    ar = (11 - (ms - 300) / 150);
+  } else {
+    ar = (5 - (ms - 1200) / 120);
+  }
+  
+  return Math.floor(Math.max(0, Math.min(11, ar)) * 10) / 10;
 }
 
 function getAdjustedOD(baseOD, mods) {

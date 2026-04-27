@@ -26,20 +26,31 @@ def get_adjusted_ar(base_ar: float, mods: str) -> float:
     mods_upper = mods.upper()
     ar = base_ar
     
+    # Apply EZ/HR first
     if 'HR' in mods_upper:
         ar = min(10.0, ar * 1.4)
     if 'EZ' in mods_upper:
         ar *= 0.5
     
-    if 'DT' in mods_upper or 'NC' in mods_upper:
-        ms = 1800 - ar * 120 if ar <= 5 else 1200 - (ar - 5) * 150
-        adjusted_ms = ms * (2/3)
-        ar = (1800 - adjusted_ms) / 120 if adjusted_ms > 1200 else 5 + (1200 - adjusted_ms) / 150
+    # Calculate preempt time in ms
+    if ar > 5:
+        ms = 200 + (11 - ar) * 100
+    else:
+        ms = 800 + (5 - ar) * 80
     
+    # Apply speed mods
+    if 'DT' in mods_upper or 'NC' in mods_upper:
+        ms *= (2/3)
     if 'HT' in mods_upper:
-        ms = 1800 - ar * 120 if ar <= 5 else 1200 - (ar - 5) * 150
-        adjusted_ms = ms * (4/3)
-        ar = (1800 - adjusted_ms) / 120 if adjusted_ms > 1200 else 5 + (1200 - adjusted_ms) / 150
+        ms *= (4/3)
+    
+    # Convert back to AR
+    if ms < 300:
+        ar = 11
+    elif ms < 1200:
+        ar = 11 - (ms - 300) / 150
+    else:
+        ar = 5 - (ms - 1200) / 120
     
     return round(max(0.0, min(10.0, ar)), 1)
 
