@@ -642,6 +642,7 @@ function addMapToPool(poolId) {
     id: uid(), type: 'map',
     code: `MAP${totalMaps() + 1}`,
     bid: '', title: 'New Map', diff: '', len: 0, stars: 0,
+    ar: 0, od: 0, cs: 0, hp: 0,
     tb: false, disallowed: false, mods: '', winCon: 'inherit',
   };
   pool.children = pool.children || [];
