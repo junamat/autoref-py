@@ -854,11 +854,17 @@ async function loadPoolList() {
         currentPoolId = pool.id;
         $('pb-pool-name').value = pool.name || '';
         tree = pool.tree || [];
-        await hydrateTreeFromCache(tree);
+        const hydrated = await hydrateTreeFromCache(tree);
         renderTree();
         renderDetail();
         history.replaceState(null, '', `?id=${encodeURIComponent(pool.id)}`);
         $('pb-load-overlay').classList.add('hidden');
+        
+        // Auto-save if hydration added data
+        if (hydrated) {
+          const payload = { name: pool.name, tree, id: currentPoolId };
+          await fetch('/api/pools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        }
       });
       
       // Delete button
@@ -1109,14 +1115,21 @@ let currentPoolId = null;
     currentPoolId = pool.id;
     $('pb-pool-name').value = pool.name || '';
     tree = pool.tree || [];
-    await hydrateTreeFromCache(tree);
+    const hydrated = await hydrateTreeFromCache(tree);
     renderTree();
     renderDetail();
+    
+    // Auto-save if hydration added data
+    if (hydrated) {
+      const payload = { name: pool.name, tree, id: currentPoolId };
+      await fetch('/api/pools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    }
   } catch (_) {}
 })();
 
 async function hydrateTreeFromCache(nodes, parentMods = '') {
   const promises = [];
+  let didFetch = false;
   
   for (const node of nodes) {
     const isPool = node.type === 'pool' || node.type === 'modpool';
@@ -1133,6 +1146,7 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
       const needsModdedSR = mods && mods !== 'NM' && !node.srCache[modsKey];
       
       if (needsHydration || needsModdedSR) {
+        didFetch = true;
         promises.push((async () => {
           try {
             // Fetch base data if needed
@@ -1171,11 +1185,14 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
     
     if (node.children) {
       const mods = isPool ? (node.mods || parentMods) : parentMods;
-      promises.push(hydrateTreeFromCache(node.children, mods));
+      const childResult = hydrateTreeFromCache(node.children, mods);
+      promises.push(childResult);
+      childResult.then(fetched => { if (fetched) didFetch = true; });
     }
   }
   
   await Promise.all(promises);
+  return didFetch;
 }
 
 $('pb-save-btn').addEventListener('click', async () => {
