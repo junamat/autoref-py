@@ -823,6 +823,7 @@ $('pb-separate-extract').addEventListener('click', async () => {
   
   try {
     const poolName = $('pb-pool-name').value.trim() || 'Untitled Pool';
+    const count = selectedNodes.size;
     
     for (const nodeId of selectedNodes) {
       const node = findNode(tree, nodeId);
@@ -851,7 +852,7 @@ $('pb-separate-extract').addEventListener('click', async () => {
     $('pb-separate-overlay').classList.add('hidden');
     selectedNodes.clear();
     
-    alert(`Extracted ${selectedNodes.size} pool(s) and saved separately`);
+    alert(`Extracted ${count} pool(s) and saved separately`);
   } catch (e) {
     alert('Extract failed: ' + e.message);
   } finally {
