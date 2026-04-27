@@ -151,13 +151,15 @@ class MatchDatabase:
         """Every game_scores row across every match — input for cross-match stats."""
         return pd.read_sql("SELECT * FROM game_scores", self._conn)
 
-    def get_leaderboard(self, *, method: str = "zscore", include=None) -> pd.DataFrame:
+    def get_leaderboard(self, *, method: str = "zscore", include=None, aggregate: str = "sum") -> pd.DataFrame:
         """Cross-match leaderboard. `method` selects the calculation strategy;
-        `include` is a row predicate (defaults to include_all)."""
+        `include` is a row predicate (defaults to include_all);
+        `aggregate` is "sum" or "mean" for per-map metric aggregation."""
         from .stats import leaderboard, include_all
         return leaderboard(self.get_all_scores(),
                            method=method,
-                           include=include or include_all)
+                           include=include or include_all,
+                           aggregate=aggregate)
 
     def get_z_sum_leaderboard(self, *, include=None) -> pd.DataFrame:
         """Backwards-compat alias for get_leaderboard(method='zscore')."""
