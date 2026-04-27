@@ -293,9 +293,9 @@ class WebServer:
         @app.get("/api/beatmap/{beatmap_id}")
         async def get_beatmap(beatmap_id: str):
             """Fetch beatmap metadata from osu! API."""
+            from ..client import make_client
+            client = make_client()
             try:
-                from ..client import make_client
-                client = make_client()
                 beatmap = await client.get_beatmap(int(beatmap_id))
                 return JSONResponse({
                     "id": beatmap.id,
@@ -308,6 +308,8 @@ class WebServer:
             except Exception as e:
                 logger.exception(f"failed to fetch beatmap {beatmap_id}")
                 return JSONResponse({"error": str(e)}, status_code=500)
+            finally:
+                await client.aclose()
 
         @app.get("/api/matches")
         async def api_matches():
