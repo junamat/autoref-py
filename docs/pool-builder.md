@@ -21,13 +21,18 @@ The pool builder is a web interface for creating, managing, and organizing tourn
 **Add Maps**
 - Click **+ map** to add a beatmap
 - Enter the beatmap ID or paste an osu! URL
-- The system fetches title, difficulty, length, and star rating from the osu! API
+- The system automatically fetches metadata from the osu! API:
+  - Song title and artist
+  - Difficulty name
+  - Length (in seconds)
+  - Star rating
 - Set map-specific properties:
   - **Code**: Map identifier (e.g., NM1, HD2)
   - **Tiebreaker**: Mark as TB map
   - **Disallowed**: Prevent picking (for banned maps)
   - **Mods**: Override pool mods for this map
   - **Win Condition**: Override pool win condition
+- Click **🔄 refresh** to update beatmap data from the API
 
 ### Import & Export
 
@@ -36,7 +41,7 @@ The pool builder is a web interface for creating, managing, and organizing tourn
 - Format: `<beatmap_id> <pool_name>` (e.g., `3814680 NM`)
 - If pool name is omitted, uses the default pool specified in the dialog
 - Maps are automatically grouped by pool name
-- Fetches metadata from osu! API
+- Beatmap metadata (title, artist, difficulty, length, stars) is fetched from the osu! API during import
 
 **⬇ Export**
 - Downloads a `.txt` file with all maps
@@ -151,6 +156,17 @@ Pools are stored as a tree structure:
 - `GET /api/pools` - List all saved pools
 - `POST /api/pools` - Save a pool (create or update)
 - `DELETE /api/pools/{pool_id}` - Delete a pool
+- `GET /api/beatmap/{beatmap_id}` - Fetch beatmap metadata from osu! API
+
+### Beatmap Data
+
+When importing maps or clicking the refresh button, the system fetches:
+- **Title & Artist**: Full song name
+- **Difficulty**: Difficulty version name
+- **Length**: Total length in seconds
+- **Stars**: Difficulty rating (rounded to 2 decimals)
+
+Data is fetched from the osu! API v2 and cached in the pool structure.
 
 ### Storage
 

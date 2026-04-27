@@ -290,6 +290,25 @@ class WebServer:
             _save_pools(pools)
             return JSONResponse({"ok": True})
 
+        @app.get("/api/beatmap/{beatmap_id}")
+        async def get_beatmap(beatmap_id: str):
+            """Fetch beatmap metadata from osu! API."""
+            try:
+                from ..client import make_client
+                client = make_client()
+                beatmap = await client.get_beatmap(int(beatmap_id))
+                return JSONResponse({
+                    "id": beatmap.id,
+                    "title": beatmap.beatmapset.title,
+                    "artist": beatmap.beatmapset.artist,
+                    "diff": beatmap.version,
+                    "len": beatmap.total_length,
+                    "stars": round(beatmap.difficulty_rating, 2),
+                })
+            except Exception as e:
+                logger.exception(f"failed to fetch beatmap {beatmap_id}")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
         @app.get("/api/matches")
         async def api_matches():
             all_matches = (

@@ -241,10 +241,37 @@ function renderMapDetail(body, node) {
   const actions = document.createElement('div');
   actions.className = 'pb-detail-actions';
   actions.innerHTML = `
+    <button class="ghost-btn" id="det-refresh-btn" title="Refresh beatmap data from osu! API">🔄 refresh</button>
     <button class="ghost-btn" id="det-move-btn" style="flex:1">move to pool…</button>
     <button class="ghost-btn" id="det-remove-btn" style="border-color:var(--red);color:var(--red)">remove</button>
   `;
   body.appendChild(actions);
+
+  $('det-refresh-btn').addEventListener('click', async () => {
+    if (!node.bid) {
+      alert('No beatmap ID set');
+      return;
+    }
+    const btn = $('det-refresh-btn');
+    btn.textContent = '⏳';
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/beatmap/${node.bid}`);
+      if (!res.ok) throw new Error('Failed to fetch beatmap data');
+      const data = await res.json();
+      node.title = `${data.artist} - ${data.title}`;
+      node.diff = data.diff;
+      node.len = data.len;
+      node.stars = data.stars;
+      renderTree();
+      renderDetail();
+    } catch (e) {
+      alert('Refresh failed: ' + e.message);
+    } finally {
+      btn.textContent = '🔄 refresh';
+      btn.disabled = false;
+    }
+  });
 
   $('det-remove-btn').addEventListener('click', () => {
     removeNode(tree, node.id);
@@ -531,6 +558,20 @@ $('pb-import-submit').addEventListener('click', async () => {
     return { bid, pool };
   }).filter(e => e.bid);
 
+  // Fetch beatmap data for all entries
+  const beatmapData = {};
+  for (const { bid } of entries) {
+    if (beatmapData[bid]) continue; // Skip duplicates
+    try {
+      const res = await fetch(`/api/beatmap/${bid}`);
+      if (res.ok) {
+        beatmapData[bid] = await res.json();
+      }
+    } catch (e) {
+      console.error(`Failed to fetch beatmap ${bid}:`, e);
+    }
+  }
+
   // Group by pool name, create pools if needed, add maps
   for (const { bid, pool: poolName } of entries) {
     let poolNode = findNodeByName(tree, poolName);
@@ -538,11 +579,16 @@ $('pb-import-submit').addEventListener('click', async () => {
       poolNode = { id: uid(), type: 'pool', name: poolName, mods: '', winCon: 'score_v2', open: true, children: [] };
       tree.push(poolNode);
     }
+    
+    const data = beatmapData[bid];
     const mapNode = {
       id: uid(), type: 'map',
       code: `${poolName}${(poolNode.children || []).length + 1}`,
       bid,
-      title: `beatmap #${bid}`, diff: '', len: 0, stars: 0,
+      title: data ? `${data.artist} - ${data.title}` : `beatmap #${bid}`,
+      diff: data?.diff || '',
+      len: data?.len || 0,
+      stars: data?.stars || 0,
       tb: false, disallowed: false, mods: '', winCon: 'inherit',
     };
     poolNode.children = poolNode.children || [];
