@@ -849,11 +849,12 @@ async function loadPoolList() {
       `;
       
       // Load pool on click (but not on delete button)
-      item.addEventListener('click', (e) => {
+      item.addEventListener('click', async (e) => {
         if (e.target.classList.contains('pb-delete-pool')) return;
         currentPoolId = pool.id;
         $('pb-pool-name').value = pool.name || '';
         tree = pool.tree || [];
+        await hydrateTreeFromCache(tree);
         renderTree();
         renderDetail();
         history.replaceState(null, '', `?id=${encodeURIComponent(pool.id)}`);
@@ -1128,6 +1129,7 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
       // Initialize SR cache if needed
       if (!node.srCache) node.srCache = {};
       
+      // Only fetch if we don't have the SR cached
       const needsModdedSR = mods && mods !== 'NM' && !node.srCache[modsKey];
       
       if (needsHydration || needsModdedSR) {
@@ -1153,16 +1155,17 @@ async function hydrateTreeFromCache(nodes, parentMods = '') {
                 node.srCache[modsKey] = attrs.star_rating;
               }
             }
-            
-            // Set current stars from cache
-            node.stars = node.srCache[modsKey] || node.srCache['NM'] || node.stars;
           } catch (e) {
             console.error(`Hydration error for ${node.bid}:`, e);
           }
         })());
-      } else {
-        // Use cached SR
-        node.stars = node.srCache[modsKey] || node.srCache['NM'] || node.stars;
+      }
+      
+      // Always set stars from cache (or use existing if cache empty)
+      if (node.srCache[modsKey]) {
+        node.stars = node.srCache[modsKey];
+      } else if (!node.stars && node.srCache['NM']) {
+        node.stars = node.srCache['NM'];
       }
     }
     
