@@ -198,9 +198,9 @@ All values are in seconds. Defaults:
 | `pick` | 120 | Time to name a map |
 | `ban` | 120 | Time to ban a map |
 | `protect` | 120 | Time to protect a map |
-| `ready_up` | 120 | Time for players to ready up |
-| `force_start` | 10 | Delay before force-starting when ready timer expires |
-| `between_maps` | 90 | Cooldown timer after a map ends, before the next step |
+| `ready_up` | 90 | `!mp timer` window for players to ready up after the map is set |
+| `force_start` | 10 | Delay used by `>startmap` for manual starts |
+| `between_maps` | 5 | Buffer after a map ends, before the bot moves on |
 | `closing` | 30 | Delay between win announcement and lobby close |
 
 ### Win Conditions
