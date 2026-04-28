@@ -29,7 +29,12 @@ def make_match(pool):
 
 def make_qar(pool, runs=1):
     match = make_match(pool)
-    ar = QualifiersAutoRef(MagicMock(spec=bancho.BanchoClient), match, "Room", runs=runs, mode=RefMode.AUTO)
+    ar = QualifiersAutoRef(MagicMock(spec=bancho.BanchoClient), match, "Room",
+                           runs=runs, mode=RefMode.AUTO,
+                           timers=Timers(between_maps=0, closing=0))
+    ar._beatmap_cache = MagicMock()
+    ar._beatmap_cache.prefetch = AsyncMock()
+    ar._beatmap_cache.get = MagicMock(return_value=None)
     ar.lobby = MagicMock()
     ar.lobby.create = AsyncMock(return_value=1)
     ar.lobby.set_room = AsyncMock()

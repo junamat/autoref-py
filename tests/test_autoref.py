@@ -52,7 +52,9 @@ def make_autoref(steps=None, match=None):
     client.on = MagicMock()
     if match is None:
         match = make_match()
-    ar = ConcreteAutoRef(client, match, "Test Room", steps=steps, mode=RefMode.AUTO)
+    ar = ConcreteAutoRef(client, match, "Test Room",
+                        timers=Timers(between_maps=0, closing=0),
+                        steps=steps, mode=RefMode.AUTO)
     ar.lobby = MagicMock()
     ar.lobby.create = AsyncMock(return_value=1)
     ar.lobby.set_room = AsyncMock()

@@ -9,7 +9,7 @@ from autoref.core.base import _find_map_by_input, _find_map_by_input_pick
 from autoref.core.enums import MapState, RefMode, Step, WinCondition
 from autoref.core.lobby import MatchResult, PlayerResult
 from autoref.core.models import (
-    Match, OrderScheme, PlayableMap, Pool, Ruleset, Team,
+    Match, OrderScheme, PlayableMap, Pool, Ruleset, Team, Timers,
 )
 
 
@@ -63,6 +63,7 @@ def make_bracket(*, best_of=1, bans=0, protects=0, schemes=None,
     ar = BracketAutoRef(
         MagicMock(spec=bancho.BanchoClient), match, "Room",
         schemes=schemes,
+        timers=Timers(between_maps=0, closing=0),
     )
     ar.lobby = MagicMock()
     return ar
