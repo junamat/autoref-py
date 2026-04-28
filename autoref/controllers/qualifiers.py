@@ -61,9 +61,6 @@ class QualifiersAutoRef(AutoRef):
         await self.announce_next_pick(team_index)
         # no pick timer — next map is predetermined, nothing to wait for
 
-    async def handle_other(self, team_index: int) -> None:
-        pass  # qualifiers has no OTHER steps
-
     async def announce_pick(self, team_index: int, beatmap_id: int) -> None:
         pass
 
@@ -83,7 +80,7 @@ class QualifiersAutoRef(AutoRef):
         maps_remaining = total_maps - total_played
 
         # ETA: sum lengths of remaining maps + per-map overhead
-        overhead = self.timers.between_maps + self.timers.force_start
+        overhead = self.timers.ready_up + self.timers.start_map
         eta = 0
 
         def _map_eta(pm) -> int:
