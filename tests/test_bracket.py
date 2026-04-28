@@ -463,9 +463,6 @@ async def test_roll_phase_auto_ranks_on_all_teams_rolled():
     ar = make_bracket()
     ar.roll_timeout = 1
     ar.lobby.say = AsyncMock()
-    ar.lobby.players = ["red1", "blue1"]  # Mock players present
-    ar.mode = RefMode.AUTO  # Set mode to non-OFF
-    # capture the registered handler
     handlers = []
     ar.lobby.channel = MagicMock()
     ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
@@ -486,8 +483,6 @@ async def test_roll_phase_ignores_non_banchobot():
     ar = make_bracket()
     ar.roll_timeout = 0.05  # short timeout
     ar.lobby.say = AsyncMock()
-    ar.lobby.players = ["red1", "blue1"]  # Mock players present
-    ar.mode = RefMode.AUTO  # Set mode to non-OFF
     handlers = []
     ar.lobby.channel = MagicMock()
     ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
@@ -508,8 +503,6 @@ async def test_roll_phase_ignores_unknown_user():
     ar = make_bracket()
     ar.roll_timeout = 0.05
     ar.lobby.say = AsyncMock()
-    ar.lobby.players = ["red1", "blue1"]  # Mock players present
-    ar.mode = RefMode.AUTO  # Set mode to non-OFF
     handlers = []
     ar.lobby.channel = MagicMock()
     ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
@@ -532,8 +525,6 @@ async def test_roll_phase_first_roll_per_team_wins():
     # two-player red team
     ar.match.teams = (make_team("Red", "r1", "r2"), make_team("Blue", "b1"))
     ar._wins = [0, 0]
-    ar.lobby.players = ["r1", "r2", "b1"]  # Mock players present
-    ar.mode = RefMode.AUTO  # Set mode to non-OFF
     handlers = []
     ar.lobby.channel = MagicMock()
     ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
@@ -551,13 +542,110 @@ async def test_roll_phase_first_roll_per_team_wins():
 
 
 @pytest.mark.asyncio
+async def test_roll_phase_custom_roll_ignored():
+    """!roll <number> result from BanchoBot should be ignored, flag cleared after."""
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 1
+    ar.lobby.say = AsyncMock()
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    # red1 uses !roll 100 — flagged, BanchoBot echo ignored
+    handler(_fake_msg("red1", "!roll 100"))
+    handler(_fake_msg("BanchoBot", "red1 rolls 100 point(s)"))  # ignored, flag cleared
+    # red1 then does a normal !roll — counts
+    handler(_fake_msg("BanchoBot", "red1 rolls 42 point(s)"))
+    handler(_fake_msg("BanchoBot", "blue1 rolls 30 point(s)"))
+    await task
+    assert ar._rolls == {0: 42, 1: 30}
+    assert ar.ranking == [0, 1]  # red rolled higher with valid roll
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_repeated_custom_roll_then_normal():
+    """!roll <number> twice then normal roll — only the normal roll counts."""
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 1
+    ar.lobby.say = AsyncMock()
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    handler(_fake_msg("red1", "!roll 100"))
+    handler(_fake_msg("BanchoBot", "red1 rolls 100 point(s)"))  # ignored, flag cleared
+    handler(_fake_msg("red1", "!roll 100"))                     # flagged again
+    handler(_fake_msg("BanchoBot", "red1 rolls 100 point(s)"))  # ignored again, flag cleared
+    handler(_fake_msg("BanchoBot", "red1 rolls 55 point(s)"))   # normal roll, counts
+    handler(_fake_msg("BanchoBot", "blue1 rolls 30 point(s)"))
+    await task
+    assert ar._rolls == {0: 55, 1: 30}
+    assert ar.ranking == [0, 1]
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_non_numeric_roll_arg_counts():
+    """!roll <non-number> should not be flagged — BanchoBot echo counts normally."""
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 1
+    ar.lobby.say = AsyncMock()
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    # !roll afjhbgfjasf — first arg is not a digit, should not be flagged
+    handler(_fake_msg("red1", "!roll afjhbgfjasf"))
+    handler(_fake_msg("BanchoBot", "red1 rolls 55 point(s)"))  # should count
+    handler(_fake_msg("BanchoBot", "blue1 rolls 30 point(s)"))
+    await task
+    assert ar._rolls == {0: 55, 1: 30}
+    assert ar.ranking == [0, 1]
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_mixed_arg_roll_counts():
+    """!roll jsfjfg 8 — first arg is not a digit, should not be flagged."""
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 1
+    ar.lobby.say = AsyncMock()
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    handler(_fake_msg("red1", "!roll jsfjfg 8"))
+    handler(_fake_msg("BanchoBot", "red1 rolls 77 point(s)"))  # should count
+    handler(_fake_msg("BanchoBot", "blue1 rolls 20 point(s)"))
+    await task
+    assert ar._rolls == {0: 77, 1: 20}
+    assert ar.ranking == [0, 1]
+
+
+@pytest.mark.asyncio
 async def test_roll_phase_released_by_override_command():
     import asyncio as _asyncio
     ar = make_bracket()
     ar.roll_timeout = 5
     ar.lobby.say = AsyncMock()
-    ar.lobby.players = ["red1", "blue1"]  # Mock players present
-    ar.mode = RefMode.AUTO  # Set mode to non-OFF
     ar.lobby.channel = MagicMock()
     ar.lobby.channel.on = lambda ev, fn: None
     ar.lobby.channel.remove_listener = lambda ev, fn: None
@@ -566,6 +654,42 @@ async def test_roll_phase_released_by_override_command():
     await _asyncio.sleep(0.01)
     await ar._dispatch_command("roll", ["Red", "Blue"], "cli")
     await task
+    assert ar.ranking == [0, 1]
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_timeout_partial_results():
+    """Timeout with only one team rolled uses partial results."""
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 0.05
+    ar.lobby.say = AsyncMock()
+    handlers = []
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: handlers.append(fn)
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    task = _asyncio.create_task(ar._run_roll_phase())
+    await _asyncio.sleep(0.01)
+    handler = handlers[0]
+    handler(_fake_msg("BanchoBot", "red1 rolls 99 point(s)"))
+    await task
+    # red rolled, blue didn't — red goes first
+    assert ar.ranking[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_roll_phase_timeout_no_rolls_defaults_to_order():
+    """Timeout with no rolls defaults to team order."""
+    import asyncio as _asyncio
+    ar = make_bracket()
+    ar.roll_timeout = 0.05
+    ar.lobby.say = AsyncMock()
+    ar.lobby.channel = MagicMock()
+    ar.lobby.channel.on = lambda ev, fn: None
+    ar.lobby.channel.remove_listener = lambda ev, fn: None
+
+    await ar._run_roll_phase()
     assert ar.ranking == [0, 1]
 
 

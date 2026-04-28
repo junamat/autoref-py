@@ -423,15 +423,8 @@ class BracketAutoRef(AutoRef):
     async def _run_roll_phase(self) -> None:
         self.phase = Phase.ROLL
         self._rolls = {}
-        self._invalid_rolls = set()  # Track users who used !roll <number>
-        
-        # Wait for all expected players to join AND mode to be auto/assisted
-        expected_players = sum(len(team.players) for team in self.match.teams)
-        while True:
-            if len(self.lobby.players) >= expected_players and self.mode != RefMode.OFF:
-                break
-            await asyncio.sleep(0.5)
-        
+        self._invalid_rolls: set[str] = set()  # players who used !roll <number>
+
         await self.lobby.say(
             f"All teams, please !roll. You have {self.roll_timeout}s — "
             "ref can override with >roll <team> <team> [...]."
@@ -439,29 +432,23 @@ class BracketAutoRef(AutoRef):
 
         def on_msg(msg) -> None:
             username = getattr(msg.user, "username", None)
-            
-            # Track user commands to detect !roll <number>
+            # Track players who typed !roll <number> so their BanchoBot echo is ignored.
+            # !roll <anything else> (e.g. !roll 100abc, !roll text) is fine and counts.
             if username and username != "BanchoBot":
-                # Check if user typed !roll followed by a number
                 if msg.message.startswith("!roll "):
-                    args = msg.message[6:].strip()
-                    if args and args.split()[0].isdigit():
-                        # User typed !roll <number>, mark as invalid
+                    first_arg = msg.message[6:].strip().split()[0] if msg.message[6:].strip() else ""
+                    if first_arg.isdigit():
                         self._invalid_rolls.add(_normalize(username))
                 return
-            
-            # Process BanchoBot's roll response
             if username != "BanchoBot":
                 return
             m = _ROLL_RE.match(msg.message)
             if not m:
                 return
             user = _normalize(m.group("user"))
-            
-            # Ignore rolls from users who used !roll <number>
             if user in self._invalid_rolls:
-                return
-                
+                self._invalid_rolls.discard(user)  # one-shot ignore; next roll counts
+                return  # ignore BanchoBot echo of a !roll <number> result
             value = int(m.group("n"))
             for ti, team in enumerate(self.match.teams):
                 if any(_normalize(p.username) == user for p in team.players):
