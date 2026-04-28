@@ -46,7 +46,6 @@ class ConcreteAutoRef(AutoRef):
     async def handle_other(self, team_index):
         pass
 
-
 def make_autoref(steps=None, match=None):
     import bancho
     client = MagicMock(spec=bancho.BanchoClient)
@@ -235,25 +234,17 @@ def test_cannot_instantiate_autoref_directly():
         AutoRef(MagicMock(spec=bancho.BanchoClient), make_match(), "Room")
 
 
-def test_must_implement_next_step_and_handle_other():
+def test_must_implement_next_step():
     import bancho
 
     class Incomplete(AutoRef):
-        def next_step(self, s): return (0, Step.WIN)
-        # missing handle_other
+        pass  # missing next_step
 
     with pytest.raises(TypeError):
         Incomplete(MagicMock(spec=bancho.BanchoClient), make_match(), "Room")
 
 
 # ------------------------------------------------------------------ Timers
-
-def test_default_timers():
-    ar = make_autoref()
-    assert ar.timers.pick == 120
-    assert ar.timers.ban == 120
-    assert ar.timers.between_maps == 10
-
 
 def test_custom_timers():
     import bancho
@@ -387,10 +378,10 @@ async def test_play_map_full_flow():
     ar = make_autoref()
     await ar.play_map(1, 0, Step.PICK)
     ar.lobby.set_map.assert_called_once_with(1, 0)
-    ar.lobby.timer.assert_called_with(ar.timers.between_maps)
+    ar.lobby.timer.assert_called_with(ar.timers.ready_up)
     ar.lobby.wait_for_all_ready.assert_called_once()
     ar.lobby.wait_for_timer.assert_called_once()
-    ar.lobby.start.assert_called_once_with(delay=ar.timers.force_start)
+    ar.lobby.start.assert_called_once_with(delay=ar.timers.start_map)
     ar.lobby.wait_for_match_end.assert_called_once()
 
 

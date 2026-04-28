@@ -267,9 +267,9 @@ class AutoRef(ABC):
     def next_step(self, match_status) -> tuple[int, Step]:
         """Return (team_index, Step) for the current match state."""
 
-    @abstractmethod
     async def handle_other(self, team_index: int) -> None:
-        """Handle a Step.OTHER turn — fully custom logic."""
+        """Handle a Step.OTHER turn — override for custom logic."""
+        pass
 
     # ---------------------------------------------------------- mode management
 
@@ -402,7 +402,6 @@ class AutoRef(ABC):
                 "pick": self.timers.pick,
                 "ban": self.timers.ban,
                 "protect": self.timers.protect, "pro": self.timers.protect,
-                "between": self.timers.between_maps, "btw": self.timers.between_maps,
                 "ready": self.timers.ready_up,
                 "force": self.timers.force_start, "fs": self.timers.force_start,
                 "closing": self.timers.closing,
@@ -414,7 +413,7 @@ class AutoRef(ABC):
                     seconds = int(args[0])
                 except ValueError:
                     await self.lobby.say(
-                        f"Usage: {self.ref_prefix}timer <seconds|pick|ban|protect|between|ready|force|closing>"
+                        f"Usage: {self.ref_prefix}timer <seconds|pick|ban|protect|ready|force|closing>"
                     )
                     return True
             asyncio.ensure_future(self.lobby.timer(seconds))
@@ -819,8 +818,9 @@ class AutoRef(ABC):
                 if self._close_event.is_set():
                     return None
 
-                await self.lobby.timer(self.timers.between_maps)
+                await asyncio.sleep(self.timers.between_maps)
 
+                await self.lobby.timer(self.timers.ready_up)
                 ready_t = asyncio.create_task(self.lobby.wait_for_all_ready())
                 timer_t = asyncio.create_task(self.lobby.wait_for_timer())
                 abort_t = asyncio.create_task(self._abort_event.wait())
@@ -837,7 +837,7 @@ class AutoRef(ABC):
                     await self.lobby.say("Map aborted. Waiting for everyone to ready up again.")
                     continue
 
-                await self.lobby.start(delay=self.timers.force_start)
+                await self.lobby.start(delay=self.timers.start_map)
 
                 result_t = asyncio.create_task(self.lobby.wait_for_match_end())
                 abort_t2 = asyncio.create_task(self._abort_event.wait())

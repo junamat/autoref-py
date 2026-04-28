@@ -34,9 +34,10 @@ class Timers:
     pick: int = 120        # seconds a team has to pick
     ban: int = 120         # seconds a team has to ban
     protect: int = 120     # seconds a team has to protect
-    ready_up: int = 120    # seconds players have to ready up after map is set
-    force_start: int = 10  # seconds before force-starting when ready timer expires
-    between_maps: int = 10 # seconds between maps
+    ready_up: int = 90     # !mp timer after map is set; players ready up during this window
+    start_map: int = 5     # delay passed to !mp start after ready; auto-start countdown
+    force_start: int = 10  # delay used by >go / >startmap for manual starts
+    between_maps: int = 5  # asyncio.sleep buffer after a map ends, before the bot moves on
     closing: int = 30      # seconds between win announcement and lobby close
 
 
