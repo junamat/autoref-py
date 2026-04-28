@@ -131,11 +131,11 @@ stateDiagram-v2
     state Dispatch {
         [*] --> CheckIndex
         CheckIndex --> EmitPick: map_index < len(maps)
-        CheckIndex --> EmitWin: map_index >= len(maps)
+        CheckIndex --> EmitFinish: map_index >= len(maps)
     }
 
     Dispatch --> AwaitPick: step = PICK
-    Dispatch --> Win: step = WIN
+    Dispatch --> Finish: step = FINISH
 
     state AwaitPick {
         [*] --> AnnounceNext: announce_next_pick()
