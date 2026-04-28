@@ -5,7 +5,7 @@ The pool builder is a web interface for creating, managing, and organizing tourn
 ## Quick Start
 
 1. Start the web server: `python server.py`
-2. Navigate to `http://localhost:8000/pool-builder`
+2. Navigate to `http://localhost:8080/pool-builder`
 3. Build your pool using the interface
 4. Click **save pool** to persist it
 
