@@ -100,7 +100,7 @@ async def main():
     blue = Team(blue_player)
     blue.players = [type("junamat", (), {"username": blue_player})()]
 
-    match = Match(RULESET, POOL, lambda _: (0, Step.WIN), red, blue)
+    match = Match(RULESET, POOL, lambda _: (0, Step.FINISH), red, blue)
 
     mode = RefMode(getenv("AUTOREF_MODE", "off").lower())
     prefix = getenv("AUTOREF_PREFIX", ">")

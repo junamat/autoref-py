@@ -29,7 +29,7 @@ class Step(Enum):
     PICK    = 0
     BAN     = 1
     PROTECT = 2
-    WIN     = 3
+    FINISH  = 3
     OTHER   = 11
 
 

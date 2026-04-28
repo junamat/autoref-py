@@ -25,7 +25,7 @@ class QualifiersAutoRef(AutoRef):
     def next_step(self, match_status) -> tuple[int, Step]:
         if self._map_index < len(self._maps):
             return (0, Step.PICK)
-        return (0, Step.WIN)
+        return (0, Step.FINISH)
 
     async def _pre_loop(self) -> None:
         ids = [pm.beatmap_id for pm in self._maps]
@@ -63,6 +63,9 @@ class QualifiersAutoRef(AutoRef):
 
     async def announce_pick(self, team_index: int, beatmap_id: int) -> None:
         pass
+
+    async def announce_finish(self, team_index: int) -> None:
+        await self.lobby.say(f"Qualifiers complete — {self.runs * len(self._maps)} map(s) played.")
 
     async def announce_next_pick(self, team_index: int) -> None:
         pm = self._maps[self._map_index]

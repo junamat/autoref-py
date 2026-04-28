@@ -108,7 +108,7 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
         schemes=[OrderScheme("standard", ban_pattern="ABBA")] if match_type == "bracket" else None,
     )
 
-    match = Match(ruleset, pool, lambda _: (0, Step.WIN), *teams)
+    match = Match(ruleset, pool, lambda _: (0, Step.FINISH), *teams)
     client = bancho_lib.BanchoClient(username=bancho_username, password=bancho_password)
 
     # API-side score enrichment. AutoRef.run() will aclose the fetcher when the match ends.

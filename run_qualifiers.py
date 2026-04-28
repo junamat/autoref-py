@@ -67,7 +67,7 @@ async def main():
     team = Team("junamat")
     team.players = [type("Player", (), {"username": "junamat"})()]
 
-    match = Match(RULESET, POOL, lambda _: (0, Step.WIN), team)  # next_step overridden by QualifiersAutoRef
+    match = Match(RULESET, POOL, lambda _: (0, Step.FINISH), team)  # next_step overridden by QualifiersAutoRef
 
     mode = RefMode(getenv("AUTOREF_MODE", "off").lower())
     prefix = getenv("AUTOREF_PREFIX", ">")

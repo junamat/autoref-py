@@ -38,7 +38,7 @@ class ConcreteAutoRef(AutoRef):
     """Minimal concrete subclass for testing."""
     def __init__(self, *args, steps=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._steps = iter(steps or [(0, Step.WIN)])
+        self._steps = iter(steps or [(0, Step.FINISH)])
 
     def next_step(self, match_status):
         return next(self._steps)
@@ -260,7 +260,7 @@ def test_custom_timers():
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_run_creates_and_closes(mock_sleep):
-    ar = make_autoref(steps=[(0, Step.WIN)])
+    ar = make_autoref(steps=[(0, Step.FINISH)])
     await ar.run()
     ar.lobby.create.assert_called_once_with("Test Room")
     ar.lobby.close.assert_called_once()
@@ -269,7 +269,7 @@ async def test_run_creates_and_closes(mock_sleep):
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_run_sets_room_and_mods(mock_sleep):
-    ar = make_autoref(steps=[(0, Step.WIN)])
+    ar = make_autoref(steps=[(0, Step.FINISH)])
     await ar.run()
     ar.lobby.set_room.assert_called_once_with(team_mode=2, score_mode=3, size=4)
     ar.lobby.set_mods.assert_called_once_with("NF")
@@ -280,7 +280,7 @@ async def test_run_sets_room_and_mods(mock_sleep):
 async def test_run_skips_mods_when_empty(mock_sleep):
     match = make_match()
     match.ruleset.enforced_mods = ""
-    ar = make_autoref(steps=[(0, Step.WIN)], match=match)
+    ar = make_autoref(steps=[(0, Step.FINISH)], match=match)
     await ar.run()
     ar.lobby.set_mods.assert_not_called()
 
@@ -293,7 +293,7 @@ async def test_run_invites_players(mock_sleep):
     p1.username, p2.username = "Alice", "Bob"
     match.teams[0].players = [p1]
     match.teams[1].players = [p2]
-    ar = make_autoref(steps=[(0, Step.WIN)], match=match)
+    ar = make_autoref(steps=[(0, Step.FINISH)], match=match)
     await ar.run()
     ar.lobby.invite.assert_any_call("Alice")
     ar.lobby.invite.assert_any_call("Bob")
@@ -302,7 +302,7 @@ async def test_run_invites_players(mock_sleep):
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_run_announces_win(mock_sleep):
-    ar = make_autoref(steps=[(0, Step.WIN)])
+    ar = make_autoref(steps=[(0, Step.FINISH)])
     await ar.run()
     ar.lobby.say.assert_called()
 
@@ -310,7 +310,7 @@ async def test_run_announces_win(mock_sleep):
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_run_closing_sequence(mock_sleep):
-    ar = make_autoref(steps=[(0, Step.WIN)])
+    ar = make_autoref(steps=[(0, Step.FINISH)])
     await ar.run()
     mock_sleep.assert_awaited_once_with(ar.timers.closing)
     ar.lobby.close.assert_called_once()
@@ -319,7 +319,7 @@ async def test_run_closing_sequence(mock_sleep):
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_run_starts_pick_timer(mock_sleep):
-    ar = make_autoref(steps=[(0, Step.PICK), (0, Step.WIN)])
+    ar = make_autoref(steps=[(0, Step.PICK), (0, Step.FINISH)])
     ar.await_pick = AsyncMock(return_value=1)
     ar.handle_pick = AsyncMock()
     await ar.run()
@@ -331,7 +331,7 @@ async def test_run_starts_pick_timer(mock_sleep):
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_run_starts_ban_timer(mock_sleep):
-    ar = make_autoref(steps=[(0, Step.BAN), (0, Step.WIN)])
+    ar = make_autoref(steps=[(0, Step.BAN), (0, Step.FINISH)])
     ar.await_ban = AsyncMock(return_value=2)
     ar.handle_ban = AsyncMock()
     await ar.run()
@@ -343,7 +343,7 @@ async def test_run_starts_ban_timer(mock_sleep):
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_run_starts_protect_timer(mock_sleep):
-    ar = make_autoref(steps=[(0, Step.PROTECT), (0, Step.WIN)])
+    ar = make_autoref(steps=[(0, Step.PROTECT), (0, Step.FINISH)])
     ar.await_protect = AsyncMock(return_value=3)
     ar.handle_protect = AsyncMock()
     await ar.run()
@@ -364,7 +364,7 @@ async def test_run_calls_handle_other(mock_sleep):
     import bancho
     ar = TrackingAutoRef(
         MagicMock(spec=bancho.BanchoClient), make_match(), "Room",
-        steps=[(1, Step.OTHER), (0, Step.WIN)], mode=RefMode.AUTO,
+        steps=[(1, Step.OTHER), (0, Step.FINISH)], mode=RefMode.AUTO,
     )
     ar.lobby = make_autoref().lobby
     await ar.run()

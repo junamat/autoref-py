@@ -24,7 +24,7 @@ def test_step_values():
     assert Step.PICK.value == 0
     assert Step.BAN.value == 1
     assert Step.PROTECT.value == 2
-    assert Step.WIN.value == 3
+    assert Step.FINISH.value == 3
     assert Step.OTHER.value == 11
 
 

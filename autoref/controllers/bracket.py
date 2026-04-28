@@ -140,7 +140,7 @@ class BracketAutoRef(AutoRef):
         for ti, w in enumerate(self._wins):
             if w >= needed:
                 self.phase = Phase.DONE
-                return (ti, Step.WIN)
+                return (ti, Step.FINISH)
 
         # 2. tiebreaker — only meaningful when needed > 1 (BO1 has no tiebreak)
         if not self._tb_triggered and needed > 1:

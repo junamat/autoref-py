@@ -213,7 +213,7 @@ def test_next_step_wins_ends_match():
     ar.commit_scheme(OrderScheme("s"))
     ar._wins[1] = 1
     ti, step = ar.next_step(None)
-    assert (ti, step) == (1, Step.WIN)
+    assert (ti, step) == (1, Step.FINISH)
     assert ar.phase == Phase.DONE
 
 

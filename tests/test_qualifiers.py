@@ -61,7 +61,7 @@ def test_next_step_returns_win_after_pool_exhausted():
     pool = Pool("p", PlayableMap(1))
     ar = make_qar(pool)
     ar._map_index = 1  # simulate pool exhausted
-    assert ar.next_step(None) == (0, Step.WIN)
+    assert ar.next_step(None) == (0, Step.FINISH)
 
 
 @pytest.mark.asyncio
@@ -71,7 +71,7 @@ async def test_next_step_loops_for_multiple_runs():
     for _ in range(4):
         assert ar.next_step(None) == (0, Step.PICK)
         await ar.await_pick(0)
-    assert ar.next_step(None) == (0, Step.WIN)
+    assert ar.next_step(None) == (0, Step.FINISH)
 
 
 # ------------------------------------------------------------------ await_pick

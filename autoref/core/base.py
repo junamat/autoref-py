@@ -670,8 +670,13 @@ class AutoRef(ABC):
         name = pm.name if pm and pm.name else str(beatmap_id)
         await self.lobby.say(f"{team.name} protected {name}")
 
-    async def announce_win(self, team_index: int) -> None:
-        await self.lobby.say(f"{self.match.teams[team_index].name} wins!")
+    async def announce_finish(self, team_index: int) -> None:
+        if team_index is not None and 0 <= team_index < len(self.match.teams):
+            await self.lobby.say(
+                f"Match finished — {self.match.teams[team_index].name} wins!"
+            )
+        else:
+            await self.lobby.say("Match closed.")
 
     async def announce_closing(self) -> None:
         await self.lobby.say(f"Lobby closing in {self.timers.closing}s.")
@@ -745,8 +750,8 @@ class AutoRef(ABC):
 
                 team_index, step = self.next_step(self.match.match_status)
 
-                if step == Step.WIN:
-                    await self.announce_win(team_index)
+                if step == Step.FINISH:
+                    await self.announce_finish(team_index)
                     break
                 elif step == Step.PICK:
                     await self._pre_pick(team_index)

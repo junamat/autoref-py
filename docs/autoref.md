@@ -121,6 +121,53 @@ All commands are prefixed with `>`. Commands marked *(anyone)* can be used by an
 - In `assisted`/`off` mode, the ref advances to the next map with `>next`
 - The web dashboard shows maps played, maps remaining, and an ETA based on beatmap lengths
 
+**State diagram**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Prefetch
+    Prefetch --> Dispatch: cache beatmap metadata
+
+    state Dispatch {
+        [*] --> CheckIndex
+        CheckIndex --> EmitPick: map_index < len(maps)
+        CheckIndex --> EmitWin: map_index >= len(maps)
+    }
+
+    Dispatch --> AwaitPick: step = PICK
+    Dispatch --> Win: step = WIN
+
+    state AwaitPick {
+        [*] --> AnnounceNext: announce_next_pick()
+        AnnounceNext --> ModeBranch
+        ModeBranch --> AutoAdvance: mode = AUTO
+        ModeBranch --> WaitNext: mode = ASSISTED / OFF
+        WaitNext --> AutoAdvance: ref >next (or close)
+        AutoAdvance --> AdvanceIndex: return current beatmap_id
+    }
+
+    AwaitPick --> PlayMap
+    PlayMap --> AdvanceIndex: result received
+    AdvanceIndex --> RunCheck: map_index += 1
+
+    state RunCheck {
+        [*] --> SameRun: map_index < len(maps)
+        [*] --> NextRun: map_index >= len(maps) AND run_index+1 < runs
+        [*] --> AllDone: map_index >= len(maps) AND run_index+1 >= runs
+        NextRun --> SameRun: run_index += 1, map_index = 0
+    }
+
+    RunCheck --> Dispatch: SameRun / NextRun
+    RunCheck --> Finish: AllDone
+    Finish --> Closing: announce_finish()
+    Closing --> [*]
+```
+
+Notes:
+- `next_step()` is stateless: it just compares `_map_index` against the pool length.
+- `await_pick()` returns the predetermined map ID rather than waiting on chat — there is no pick timer (`_pre_pick` skips `lobby.timer`).
+- `>close` aborts the wait in `ASSISTED`/`OFF` mode by setting `_close_event`.
+
 ## Workflow Examples
 
 ### Running a Bracket Match (Auto Mode)
@@ -155,6 +202,93 @@ All commands are prefixed with `>`. Commands marked *(anyone)* can be used by an
 5. Use `>close` when done to save scores
 
 ## Technical Details
+
+### Main Loop State Diagram
+
+The abstract `AutoRef.run()` loop, after `_pre_loop()` setup, dispatches steps returned by the subclass's `next_step()`. Picks, bans, and protects each go through their own await path depending on the active mode.
+
+```mermaid
+stateDiagram-v2
+    [*] --> CreateLobby
+    CreateLobby --> PreLoop: invite players, set room
+    PreLoop --> Dispatch: subclass setup (roll, scheme...)
+
+    state Dispatch {
+        [*] --> WaitTimeout
+        WaitTimeout --> WaitMode: timeout cleared
+        WaitMode --> CheckClose: mode != OFF
+        CheckClose --> NextStep: not closing
+        NextStep --> RouteStep: (team, step) = next_step()
+    }
+
+    Dispatch --> Pick: step = PICK
+    Dispatch --> Ban: step = BAN
+    Dispatch --> Protect: step = PROTECT
+    Dispatch --> Other: step = OTHER
+    Dispatch --> Finish: step = FINISH
+    Dispatch --> Closing: >close
+
+    state Pick {
+        [*] --> AnnouncePick: mode != OFF
+        AnnouncePick --> AwaitPick
+        [*] --> AwaitPick: mode = OFF
+        AwaitPick --> PlayMap: map chosen
+        AwaitPick --> [*]: undo
+        PlayMap --> RecordPick: result received
+    }
+
+    state Ban {
+        [*] --> AnnounceBan: mode != OFF
+        AnnounceBan --> AwaitBan
+        [*] --> AwaitBan: mode = OFF
+        AwaitBan --> RecordBan: map chosen
+        AwaitBan --> [*]: undo
+    }
+
+    state Protect {
+        [*] --> AnnounceProtect: mode != OFF
+        AnnounceProtect --> AwaitProtect
+        [*] --> AwaitProtect: mode = OFF
+        AwaitProtect --> RecordProtect: map chosen
+        AwaitProtect --> [*]: undo
+    }
+
+    state "await_*" as Await {
+        [*] --> ChannelWatch: mode = AUTO
+        [*] --> ProposalFlow: mode = ASSISTED
+        [*] --> RefOnly: mode = OFF
+        ChannelWatch --> [*]: player names map
+        ProposalFlow --> [*]: ref >next confirms
+        RefOnly --> [*]: ref >next
+    }
+
+    Pick --> Dispatch
+    Ban --> Dispatch
+    Protect --> Dispatch
+    Other --> Dispatch: handle_other()
+    Finish --> Closing: announce_finish()
+    Closing --> CloseLobby: sleep(timers.closing)
+    CloseLobby --> [*]
+```
+
+**Mode transitions** apply at any point in the loop:
+
+```mermaid
+stateDiagram-v2
+    [*] --> OFF: default
+    OFF --> ASSISTED: >mode assisted
+    OFF --> AUTO: >mode auto
+    ASSISTED --> AUTO: >mode auto
+    ASSISTED --> OFF: >mode off / !panic
+    AUTO --> ASSISTED: >mode assisted
+    AUTO --> OFF: >mode off / !panic
+
+    note right of OFF
+        Main loop blocks on
+        _mode_event until a
+        ref switches mode.
+    end note
+```
 
 ### Data Models
 
