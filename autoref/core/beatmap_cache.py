@@ -51,19 +51,28 @@ class BeatmapCache:
     def get(self, beatmap_id: int) -> dict | None:
         return self._data.get(int(beatmap_id))
 
-    async def prefetch(self, beatmap_ids: list[int]) -> None:
-        """Fetch metadata for any IDs not already cached. Safe to call concurrently."""
+    async def prefetch(self, beatmap_ids: list[int], client=None) -> None:
+        """Fetch metadata for any IDs not already cached. Safe to call concurrently.
+
+        Pass `client` (an aiosu.v2.Client) to reuse an existing API session.
+        If omitted, a fresh client is created via autoref.client.make_client().
+        """
         missing = [int(bid) for bid in beatmap_ids if int(bid) not in self._data]
         if not missing:
             return
 
-        from ..client import make_client
-
-        async with make_client() as client:
+        if client is not None:
             results = await asyncio.gather(
                 *(client.get_beatmap(bid) for bid in missing),
                 return_exceptions=True,
             )
+        else:
+            from ..client import make_client
+            async with make_client() as c:
+                results = await asyncio.gather(
+                    *(c.get_beatmap(bid) for bid in missing),
+                    return_exceptions=True,
+                )
 
         async with self._lock:
             fetched = 0

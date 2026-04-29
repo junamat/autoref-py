@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pandas as pd
 import pytest
@@ -269,11 +269,8 @@ async def test_team_create_fetches_players():
 
     mock_client = AsyncMock()
     mock_client.get_user = AsyncMock(return_value=mock_user)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("autoref.core.models.make_client", return_value=mock_client):
-        team = await Team.create("TestTeam", 123)
+    team = await Team.create("TestTeam", 123, client=mock_client)
 
     assert team.name == "TestTeam"
     assert len(team.players) == 1
@@ -289,11 +286,8 @@ async def test_playable_map_create_fetches_beatmap():
 
     mock_client = AsyncMock()
     mock_client.get_beatmap = AsyncMock(return_value=mock_beatmap)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("autoref.core.models.make_client", return_value=mock_client):
-        pmap = await PlayableMap.create(75)
+    pmap = await PlayableMap.create(75, client=mock_client)
 
     assert pmap.beatmap_id == 75
     assert pmap.beatmap.id == 75
