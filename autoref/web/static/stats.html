@@ -77,6 +77,24 @@
   .pick-bar { display: inline-block; height: 6px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
 
   .empty-msg { padding: 16px 8px; color: var(--muted); font-size: 11px; font-style: italic; }
+
+  /* plots */
+  .plot-block { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--panel); border: 1.5px solid var(--border); border-radius: 3px; }
+  .plot-head { display: flex; align-items: center; gap: 8px; }
+  .plot-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text); }
+  .plot-actions { margin-left: auto; display: flex; gap: 4px; }
+  .plot-action {
+    font-size: 9px; font-weight: 700; padding: 2px 8px; border: 1.5px solid var(--border);
+    border-radius: 2px; color: var(--muted); text-decoration: none;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .plot-action:hover { color: var(--text); border-color: var(--text); }
+  .plot-img { width: 100%; max-width: 100%; height: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 2px; }
+  .plot-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 10px; color: var(--muted); }
+  .plot-controls select {
+    background: var(--head); color: var(--text); border: 1.5px solid var(--border);
+    border-radius: 2px; padding: 2px 6px; font-family: inherit; font-size: 10px;
+  }
 </style>
 </head>
 <body>
@@ -124,6 +142,12 @@
       <div id="mappool-wrap">
         <div class="empty-msg">loading…</div>
       </div>
+    </div>
+
+    <!-- graphs -->
+    <div class="stats-section" id="plots-section" hidden>
+      <div class="stats-section-head">graphs</div>
+      <div id="plots-wrap"></div>
     </div>
 
   </div>

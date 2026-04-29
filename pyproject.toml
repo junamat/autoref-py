@@ -18,6 +18,11 @@ web = [
     "fastapi",
     "uvicorn[standard]",
 ]
+# pip install -e ".[plots]" → matplotlib-based stat graphs
+plots = [
+    "matplotlib",
+    "scipy",
+]
 # pip install -e ".[dev]"   → adds test + env-loading tooling
 dev = [
     "pytest",
@@ -26,5 +31,5 @@ dev = [
 ]
 # pip install -e ".[all]"   → everything
 all = [
-    "autoref-py[web,dev]",
+    "autoref-py[web,plots,dev]",
 ]

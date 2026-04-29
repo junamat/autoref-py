@@ -9,6 +9,7 @@ if (localStorage.getItem('theme') === 'light') document.body.classList.add('ligh
 document.getElementById('theme-toggle').addEventListener('click', () => {
   document.body.classList.toggle('light');
   localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+  load();  // re-fetch so plots re-render in the new palette
 });
 
 /* ── state ───────────────────────────────────────────────────── */
@@ -82,6 +83,7 @@ async function load() {
 
   renderLeaderboard(data.leaderboard || [], data.metric_col, data.ascending, data.method);
   renderMappool(data.mappool || []);
+  renderPlots(data.mappool || []);
 }
 
 /* ── leaderboard ─────────────────────────────────────────────── */
@@ -166,6 +168,88 @@ function renderMappool(rows) {
     </tr></thead>
     <tbody>${tbody}</tbody>
   </table>`;
+}
+
+/* ── plots ───────────────────────────────────────────────────── */
+let plotsAvailable = null;  // null = unknown, true/false = checked
+
+async function checkPlotsAvailable() {
+  if (plotsAvailable !== null) return plotsAvailable;
+  try {
+    const res = await fetch('/api/stats/plots');
+    const data = await res.json();
+    plotsAvailable = !!data.available;
+  } catch { plotsAvailable = false; }
+  return plotsAvailable;
+}
+
+function plotUrl(name, params = {}) {
+  const theme = document.body.classList.contains('light') ? 'light' : 'dark';
+  const countFailed = activeVal('cfg-failed') !== 'false';
+  const qs = new URLSearchParams({
+    theme, count_failed: countFailed, format: 'png', _t: Date.now(),
+    ...params,
+  });
+  return `/api/stats/plot/${name}?${qs.toString()}`;
+}
+
+function plotBlock(name, title, params = {}) {
+  const baseQs = new URLSearchParams({
+    theme: document.body.classList.contains('light') ? 'light' : 'dark',
+    count_failed: activeVal('cfg-failed') !== 'false',
+    ...params,
+  });
+  const svgUrl   = `/api/stats/plot/${name}?format=svg&${baseQs.toString()}`;
+  const hiresUrl = `/api/stats/plot/${name}?format=hires&${baseQs.toString()}`;
+  return `<div class="plot-block" data-plot="${esc(name)}">
+    <div class="plot-head">
+      <span class="plot-title">${esc(title)}</span>
+      <div class="plot-actions">
+        <a class="plot-action" href="${svgUrl}" download>SVG</a>
+        <a class="plot-action" href="${hiresUrl}" download>HQ PNG</a>
+      </div>
+    </div>
+    <img class="plot-img" loading="lazy" alt="${esc(title)}" src="${plotUrl(name, params)}">
+  </div>`;
+}
+
+async function renderPlots(mappoolRows) {
+  const section = document.getElementById('plots-section');
+  const wrap = document.getElementById('plots-wrap');
+  if (!await checkPlotsAvailable()) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  // played-only: maps with at least one play (avg_score present means scores exist)
+  const played = mappoolRows.filter(r => r.avg_score != null);
+
+  const beatmapSelect = played.length
+    ? `<label>map <select id="plot-beatmap">${
+        played.map(r => `<option value="${r.beatmap_id}">${esc(r.beatmap_id)}</option>`).join('')
+      }</select></label>`
+    : '<span>no played maps yet</span>';
+
+  wrap.innerHTML = `
+    <div class="plot-controls">${beatmapSelect}</div>
+    <div id="plot-distribution"></div>
+    ${plotBlock('pickban_heat', 'Pick / ban / protect heat')}
+    ${plotBlock('consistency_scatter', 'Player consistency')}
+  `;
+
+  if (played.length) {
+    const sel = document.getElementById('plot-beatmap');
+    const renderDist = () => {
+      document.getElementById('plot-distribution').innerHTML = plotBlock(
+        'score_distribution',
+        `Score distribution · beatmap ${sel.value}`,
+        { beatmap_id: sel.value },
+      );
+    };
+    sel.addEventListener('change', renderDist);
+    renderDist();
+  }
 }
 
 /* ── boot ────────────────────────────────────────────────────── */

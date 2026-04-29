@@ -30,6 +30,18 @@ Shows pick/ban/protect counts and average score per beatmap, sorted by total act
 - **protects** — times protected
 - **avg score** — mean score across all plays (respects the failed score filter)
 
+### Graphs
+
+A "graphs" section appears below the tables when the `[plots]` extra is installed (`pip install -e ".[plots]"`). Three plots are rendered server-side via matplotlib + scipy:
+
+- **Score distribution** — per-map histogram + KDE of passing scores. Pick a beatmap from the dropdown. Vertical lines mark μ and μ ± σ; the title shows `n` (sample size) and number of fails filtered out.
+- **Pick / ban / protect heat** — stacked horizontal bars per beatmap, sorted by total activity. Quickly shows which maps were contested vs. ignored.
+- **Player consistency** — scatter of per-player mean z-score (x) vs. stddev of z-scores (y). Top-right corner = high-skill / high-variance players (carries on their pick); top-left = consistent high-skill (hardest to scout against). The top 5 are labeled.
+
+Each graph block has **SVG** and **HQ PNG** download buttons. Default display PNG is 144 DPI / ~800px wide; the HQ download is 300 DPI / ~1800px wide, suitable for post-tournament writeups. SVGs are bounded by the data and scale cleanly.
+
+If matplotlib/scipy aren't installed, the graphs section is hidden silently and the stats page still works.
+
 ### Calculation Methods
 
 Select how player performance is scored across maps. The method toggle is populated from the API.
@@ -84,7 +96,7 @@ All calculations run over the `game_scores` table in the SQLite database. Scores
 
 The database path defaults to `matches.db` in the working directory. Override with the `$AUTOREF_DB` environment variable.
 
-### API Endpoint
+### API Endpoints
 
 `GET /api/stats` — returns leaderboard and mappool data.
 
@@ -111,3 +123,15 @@ Response shape:
   ]
 }
 ```
+
+`GET /api/stats/plots` — discoverability for graphs. Returns `{"available": bool, "plots": [{"name", "label"}, ...]}`. `available=false` when the `[plots]` extra isn't installed.
+
+`GET /api/stats/plot/{name}` — render a graph. `name ∈ {score_distribution, pickban_heat, consistency_scatter}`.
+
+Query parameters:
+- `format` — `png` (default, ~800px), `hires` (300 DPI download), `svg` (vector download)
+- `theme` — `dark` (default) or `light` to match the page palette
+- `count_failed` — `true` (default) or `false`; passes through to `exclude_failed` for distribution / scatter plots
+- `beatmap_id` — required for `score_distribution`
+
+Returns the encoded image with a `content-disposition: attachment` header for `hires`/`svg`. Returns 501 with a JSON error body if matplotlib/scipy aren't installed.

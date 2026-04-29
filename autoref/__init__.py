@@ -27,3 +27,9 @@ try:
     from .core.beatmap_cache import BeatmapCache
 except ImportError:
     pass
+
+# optional: stat plots (requires matplotlib + scipy)
+try:
+    from . import plots as plots
+except ImportError:
+    plots = None  # type: ignore

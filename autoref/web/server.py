@@ -263,6 +263,71 @@ class WebServer:
                 "mappool":     mappool,
             })
 
+        @app.get("/api/stats/plot/{name}")
+        async def api_stats_plot(name: str, format: str = "png", theme: str = "dark",
+                                 count_failed: bool = True, beatmap_id: int | None = None):
+            try:
+                from .. import plots as _plots
+            except ImportError:
+                _plots = None
+            if _plots is None:
+                return JSONResponse(
+                    {"error": "plot rendering requires the [plots] extra (pip install -e '.[plots]')"},
+                    status_code=501,
+                )
+            if format not in ("png", "hires", "svg"):
+                return JSONResponse({"error": "format must be png|hires|svg"}, status_code=400)
+            if name not in _plots.PLOTS:
+                return JSONResponse(
+                    {"error": f"unknown plot {name!r}; choose from {list(_plots.PLOTS)}"},
+                    status_code=404,
+                )
+            theme = theme if theme in ("dark", "light") else "dark"
+
+            scores = server.db.get_all_scores()
+            map_stats = server.db.get_map_stats()
+            try:
+                if name == "score_distribution":
+                    if beatmap_id is None:
+                        return JSONResponse({"error": "beatmap_id required"}, status_code=400)
+                    payload = _plots.score_distribution(
+                        scores, int(beatmap_id), fmt=format, theme=theme,
+                        exclude_failed=not count_failed,
+                    )
+                elif name == "pickban_heat":
+                    payload = _plots.pickban_heat(map_stats, fmt=format, theme=theme)
+                elif name == "consistency_scatter":
+                    payload = _plots.consistency_scatter(
+                        scores, fmt=format, theme=theme,
+                        exclude_failed=not count_failed,
+                    )
+                else:
+                    return JSONResponse({"error": f"unknown plot {name}"}, status_code=404)
+            except Exception as e:
+                logger.exception("plot %s failed", name)
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+            media_type = "image/svg+xml" if format == "svg" else "image/png"
+            ext = "svg" if format == "svg" else "png"
+            headers = {}
+            if format in ("hires", "svg"):
+                headers["content-disposition"] = f'attachment; filename="{name}.{ext}"'
+            from fastapi.responses import Response
+            return Response(content=payload, media_type=media_type, headers=headers)
+
+        @app.get("/api/stats/plots")
+        async def api_stats_plot_list():
+            try:
+                from .. import plots as _plots
+            except ImportError:
+                _plots = None
+            if _plots is None:
+                return JSONResponse({"available": False, "plots": []})
+            return JSONResponse({
+                "available": True,
+                "plots": [{"name": k, "label": v} for k, v in _plots.PLOTS.items()],
+            })
+
         @app.get("/api/pools")
         async def list_pools():
             return JSONResponse(_POOL_STORE.list())
