@@ -7,7 +7,6 @@ import aiosu
 import pandas as pd
 
 from .enums import WinCondition, MapState, Step
-from ..client import make_client
 
 
 @dataclass
@@ -100,10 +99,15 @@ class PlayableMap:
         win_condition: WinCondition = WinCondition.INHERIT,
         name: str = None,
         is_tiebreaker: bool = False,
+        client: "aiosu.v2.Client | None" = None,
     ) -> "PlayableMap":
         instance = cls(beatmap_id, mods, win_condition, name, is_tiebreaker)
-        async with make_client() as client:
+        if client is not None:
             instance.beatmap = await client.get_beatmap(beatmap_id)
+        else:
+            from ..client import make_client
+            async with make_client() as c:
+                instance.beatmap = await c.get_beatmap(beatmap_id)
         return instance
 
 
@@ -148,12 +152,19 @@ class Team:
         self.players: list = []
 
     @classmethod
-    async def create(cls, name: str, *player_ids: int) -> "Team":
+    async def create(cls, name: str, *player_ids: int,
+                     client: "aiosu.v2.Client | None" = None) -> "Team":
         instance = cls(name)
-        async with make_client() as client:
+        if client is not None:
             results = await asyncio.gather(
                 *(client.get_user(pid) for pid in player_ids)
             )
+        else:
+            from ..client import make_client
+            async with make_client() as c:
+                results = await asyncio.gather(
+                    *(c.get_user(pid) for pid in player_ids)
+                )
         instance.players = list(results)
         return instance
 
