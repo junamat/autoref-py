@@ -43,12 +43,12 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
     """
     import bancho as bancho_lib
     import aiosu
-    from ..core.models import Match, Pool, PlayableMap, ModdedPool, Ruleset, Team, OrderScheme
-    from ..core.enums import WinCondition, RefMode, Step
-    from ..core.score_fetcher import ScoreFetcher
-    from ..client import make_client
-    from .bracket import BracketAutoRef
-    from .qualifiers import QualifiersAutoRef
+    from .core.models import Match, Pool, PlayableMap, ModdedPool, Ruleset, Team, OrderScheme
+    from .core.enums import WinCondition, RefMode, Step
+    from .core.score_fetcher import ScoreFetcher
+    from .client import make_client
+    from .controllers.bracket import BracketAutoRef
+    from .controllers.qualifiers import QualifiersAutoRef
 
     match_type = payload.get("type", "bracket")
     room_name  = payload.get("room_name", "autoref match")

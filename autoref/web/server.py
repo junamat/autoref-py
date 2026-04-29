@@ -11,20 +11,10 @@ logger = logging.getLogger(__name__)
 _STATIC_DIR = Path(__file__).parent / "static"
 
 
-_POOLS_FILE = Path.home() / ".cache" / "autoref" / "pools.json"
 _BEATMAP_CACHE_FILE = Path.home() / ".cache" / "autoref" / "beatmaps.json"
 
-
-def _load_pools() -> dict:
-    try:
-        return json.loads(_POOLS_FILE.read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def _save_pools(pools: dict) -> None:
-    _POOLS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _POOLS_FILE.write_text(json.dumps(pools, indent=2))
+from ..core.pool_store import PoolStore
+_POOL_STORE = PoolStore()
 
 
 def _load_beatmap_cache() -> dict:
@@ -40,7 +30,7 @@ def _save_beatmap_cache(cache: dict) -> None:
 
 
 def _flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
-    from ..controllers.factory import flatten_pool_tree as _ft
+    from ..factory import flatten_pool_tree as _ft
     return _ft(nodes, parent_mods)
 
 
@@ -169,10 +159,10 @@ class WebServer:
 
     async def _create_match(self, payload: dict, match_id: str | None = None) -> WebInterface:
         """Spin up an AutoRef from a web payload and register it."""
-        from ..controllers.factory import build_autoref
+        from ..factory import build_autoref
 
         def _pool_loader(pool_id):
-            return _load_pools().get(pool_id)
+            return _POOL_STORE.get(pool_id)
 
         ar, client = await build_autoref(
             payload,
@@ -275,31 +265,23 @@ class WebServer:
 
         @app.get("/api/pools")
         async def list_pools():
-            return JSONResponse(list(_load_pools().values()))
+            return JSONResponse(_POOL_STORE.list())
 
         @app.post("/api/pools")
         async def save_pool(request: Request):
             try:
                 body = await request.json()
-                name = body.get("name", "").strip()
-                if not name:
-                    return JSONResponse({"error": "name required"}, status_code=400)
-                pools = _load_pools()
-                # use name as key (overwrite if same name)
-                pool_id = body.get("id") or name.lower().replace(" ", "_")
-                pools[pool_id] = {**body, "id": pool_id}
-                _save_pools(pools)
+                pool_id = _POOL_STORE.save(body)
                 return JSONResponse({"id": pool_id}, status_code=201)
+            except ValueError as e:
+                return JSONResponse({"error": str(e)}, status_code=400)
             except Exception as e:
                 return JSONResponse({"error": str(e)}, status_code=500)
 
         @app.delete("/api/pools/{pool_id}")
         async def delete_pool(pool_id: str):
-            pools = _load_pools()
-            if pool_id not in pools:
+            if not _POOL_STORE.delete(pool_id):
                 return JSONResponse({"error": "not found"}, status_code=404)
-            del pools[pool_id]
-            _save_pools(pools)
             return JSONResponse({"ok": True})
 
         @app.get("/api/beatmap/{beatmap_id}")

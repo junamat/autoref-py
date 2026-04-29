@@ -2,6 +2,7 @@
 from .core.enums import WinCondition, MapState, Step, RefMode
 from .core.models import PlayableMap, Pool, ModdedPool, Team, Ruleset, Match, Timers, NO_MODS, OrderScheme
 from .core.storage import MatchDatabase
+from .core.pool_store import PoolStore
 from .core.lobby import Lobby, MatchResult, PlayerResult, SlotInfo
 from .core.output import OutputSink
 from .core.score_fetcher import ScoreFetcher
@@ -11,6 +12,9 @@ from .core.base import AutoRef
 # controllers — always available (depend only on core)
 from .controllers.bracket import BracketAutoRef, Phase
 from .controllers.qualifiers import QualifiersAutoRef
+
+# factory — package-level glue for dict payloads (web/CLI/Discord)
+from .factory import build_autoref, flatten_pool_tree
 
 # optional: web UI (requires fastapi + uvicorn)
 try:
