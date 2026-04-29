@@ -147,8 +147,9 @@ function renderMappool(rows) {
   const tbody = rows.map(r => {
     const barW = Math.round((r.picks / maxPicks) * 60);
     const avgFmt = r.avg_score != null ? Math.round(r.avg_score).toLocaleString() : '—';
+    const label = r.name || r.beatmap_id;
     return `<tr>
-      <td class="mono" style="color:var(--blue);font-weight:700">${esc(r.beatmap_id)}</td>
+      <td class="mono" style="color:var(--blue);font-weight:700" title="beatmap ${esc(r.beatmap_id)}">${esc(label)}</td>
       <td class="r" style="color:var(--blue)">${r.picks}
         <span class="pick-bar" style="width:${barW}px;background:var(--blue);opacity:0.5"></span>
       </td>
@@ -227,7 +228,10 @@ async function renderPlots(mappoolRows) {
 
   const beatmapSelect = played.length
     ? `<label>map <select id="plot-beatmap">${
-        played.map(r => `<option value="${r.beatmap_id}">${esc(r.beatmap_id)}</option>`).join('')
+        played.map(r => {
+          const label = r.name || r.beatmap_id;
+          return `<option value="${r.beatmap_id}" data-label="${esc(label)}">${esc(label)}</option>`;
+        }).join('')
       }</select></label>`
     : '<span>no played maps yet</span>';
 
@@ -241,10 +245,11 @@ async function renderPlots(mappoolRows) {
   if (played.length) {
     const sel = document.getElementById('plot-beatmap');
     const renderDist = () => {
+      const label = sel.options[sel.selectedIndex]?.dataset.label || sel.value;
       document.getElementById('plot-distribution').innerHTML = plotBlock(
         'score_distribution',
-        `Score distribution · beatmap ${sel.value}`,
-        { beatmap_id: sel.value },
+        `Score distribution · ${label}`,
+        { beatmap_id: sel.value, label },
       );
     };
     sel.addEventListener('change', renderDist);

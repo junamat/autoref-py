@@ -99,12 +99,15 @@ def score_distribution(
     fmt: Format = "png",
     theme: str = "dark",
     exclude_failed: bool = True,
+    label: str | None = None,
 ) -> bytes:
     """Histogram + KDE of passing scores on a single map.
 
     `scores` must include columns: beatmap_id, score, passed.
+    `label` is shown in the title in place of the raw beatmap id (e.g. "NM1").
     Returns encoded image bytes.
     """
+    map_label = label or f"beatmap {beatmap_id}"
     p = _palette(theme)
     fig = _new_fig(fmt)
     ax = fig.add_subplot(111)
@@ -116,7 +119,7 @@ def score_distribution(
         df = df[df["passed"] == 1]
 
     if df.empty:
-        ax.text(0.5, 0.5, f"no scores for beatmap {beatmap_id}",
+        ax.text(0.5, 0.5, f"no scores for {map_label}",
                 ha="center", va="center", color=p["muted"], transform=ax.transAxes)
         ax.set_xticks([]); ax.set_yticks([])
         return _encode(fig, fmt)
@@ -146,7 +149,7 @@ def score_distribution(
 
     ax.set_xlabel("score")
     ax.set_ylabel("density")
-    ax.set_title(f"score distribution · beatmap {beatmap_id}  (n={n}, fails={fails})")
+    ax.set_title(f"score distribution · {map_label}  (n={n}, fails={fails})")
     ax.legend(facecolor=p["panel"], edgecolor=p["border"], labelcolor=p["text"], framealpha=0.9)
     ax.ticklabel_format(axis="x", style="plain")
     return _encode(fig, fmt)
@@ -159,8 +162,13 @@ def pickban_heat(
     *,
     fmt: Format = "png",
     theme: str = "dark",
+    code_by_bid: dict[int, str] | None = None,
 ) -> bytes:
-    """Stacked horizontal bars: picks / bans / protects per map, sorted by total."""
+    """Stacked horizontal bars: picks / bans / protects per map, sorted by total.
+
+    `code_by_bid` maps beatmap_id → tournament code (e.g. {3814680: "NM1"}); when
+    present, the y-axis shows codes instead of raw IDs.
+    """
     p = _palette(theme)
     fig = _new_fig(fmt)
     ax = fig.add_subplot(111)
@@ -191,7 +199,11 @@ def pickban_heat(
     ax.barh(y, protects, left=picks + bans, color=p["yellow"], edgecolor=p["border"], linewidth=0.5, label="protects")
 
     ax.set_yticks(y)
-    ax.set_yticklabels([str(int(b)) for b in wide.index], fontsize=8)
+    code_by_bid = code_by_bid or {}
+    ax.set_yticklabels(
+        [code_by_bid.get(int(b)) or str(int(b)) for b in wide.index],
+        fontsize=8,
+    )
     ax.set_xlabel("count")
     ax.set_title("map activity · picks / bans / protects")
     ax.legend(facecolor=p["panel"], edgecolor=p["border"], labelcolor=p["text"], framealpha=0.9)

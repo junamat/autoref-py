@@ -34,6 +34,32 @@ def _flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
     return _ft(nodes, parent_mods)
 
 
+def _build_map_code_lookup() -> dict[int, str]:
+    """Walk every saved pool, return {beatmap_id: code} (e.g. {3814680: "NM1"}).
+
+    On collisions across pools, the last one wins. Acceptable for one-tournament
+    use; revisit if multi-tournament aggregation becomes a real use case.
+    """
+    lookup: dict[int, str] = {}
+
+    def _walk(nodes):
+        for n in nodes:
+            if n.get("type") == "map":
+                bid = n.get("bid")
+                code = n.get("code")
+                if bid and code:
+                    try:
+                        lookup[int(bid)] = str(code)
+                    except (TypeError, ValueError):
+                        pass
+            elif n.get("children"):
+                _walk(n["children"])
+
+    for pool in _POOL_STORE.list():
+        _walk(pool.get("tree", []))
+    return lookup
+
+
 class WebInterface:
     """Attaches to one AutoRef instance; registered into a WebServer."""
 
@@ -240,9 +266,11 @@ class WebServer:
                 pool_rows.setdefault(bid, {})
                 pool_rows[bid][row["step"]] = int(row["count"])
 
+            code_by_bid = _build_map_code_lookup()
             mappool = [
                 {
                     "beatmap_id": bid,
+                    "name":       code_by_bid.get(bid),
                     "picks":    counts.get("PICK", 0),
                     "bans":     counts.get("BAN", 0),
                     "protects": counts.get("PROTECT", 0),
@@ -265,7 +293,8 @@ class WebServer:
 
         @app.get("/api/stats/plot/{name}")
         async def api_stats_plot(name: str, format: str = "png", theme: str = "dark",
-                                 count_failed: bool = True, beatmap_id: int | None = None):
+                                 count_failed: bool = True, beatmap_id: int | None = None,
+                                 label: str | None = None):
             try:
                 from .. import plots as _plots
             except ImportError:
@@ -290,12 +319,17 @@ class WebServer:
                 if name == "score_distribution":
                     if beatmap_id is None:
                         return JSONResponse({"error": "beatmap_id required"}, status_code=400)
+                    if label is None:
+                        label = _build_map_code_lookup().get(int(beatmap_id))
                     payload = _plots.score_distribution(
                         scores, int(beatmap_id), fmt=format, theme=theme,
-                        exclude_failed=not count_failed,
+                        exclude_failed=not count_failed, label=label,
                     )
                 elif name == "pickban_heat":
-                    payload = _plots.pickban_heat(map_stats, fmt=format, theme=theme)
+                    payload = _plots.pickban_heat(
+                        map_stats, fmt=format, theme=theme,
+                        code_by_bid=_build_map_code_lookup(),
+                    )
                 elif name == "consistency_scatter":
                     payload = _plots.consistency_scatter(
                         scores, fmt=format, theme=theme,
