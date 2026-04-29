@@ -4,6 +4,9 @@
 
 IRC-based osu! tournament auto-referee. Handles pick/ban/protect sequences, qualifiers pools, and timers — with an optional web dashboard.
 
+# readme status
+
+OUTDATED
 ---
 
 ## Project layout
