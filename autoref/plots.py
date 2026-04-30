@@ -212,6 +212,38 @@ def pickban_heat(
 
 # ── plot 3: consistency scatter (mean z vs. stddev z) ────────────────────────
 
+def consistency_aggregate(
+    scores: pd.DataFrame,
+    *,
+    exclude_failed: bool = True,
+) -> pd.DataFrame:
+    """Per-player aggregate of map z-scores: mean_z, std_z, n.
+
+    Shared by the matplotlib renderer and the JSON data endpoint so the
+    interactive client and the export image stay in sync.
+    """
+    df = scores.copy()
+    if exclude_failed and "passed" in df.columns:
+        df = df[df["passed"] == 1]
+    if df.empty:
+        return pd.DataFrame(columns=["user_id", "username", "mean_z", "std_z", "n"])
+
+    df = (df.sort_values("score", ascending=False)
+            .drop_duplicates(subset=["user_id", "beatmap_id"]))
+    map_stats = df.groupby("beatmap_id")["score"].agg(["mean", "std"])
+    df = df.join(map_stats, on="beatmap_id")
+    df["z"] = ((df["score"] - df["mean"]) / df["std"]).fillna(0.0)
+
+    agg = (df.groupby("user_id")
+             .agg(username=("username", "last"),
+                  mean_z=("z", "mean"),
+                  std_z=("z", "std"),
+                  n=("beatmap_id", "nunique"))
+             .reset_index())
+    agg["std_z"] = agg["std_z"].fillna(0.0)
+    return agg
+
+
 def consistency_scatter(
     scores: pd.DataFrame,
     *,
@@ -226,32 +258,9 @@ def consistency_scatter(
     ax = fig.add_subplot(111)
     _style(fig, ax, p)
 
-    df = scores.copy()
-    if exclude_failed and "passed" in df.columns:
-        df = df[df["passed"] == 1]
-    if df.empty:
-        ax.text(0.5, 0.5, "no score data", ha="center", va="center",
-                color=p["muted"], transform=ax.transAxes)
-        ax.set_xticks([]); ax.set_yticks([])
-        return _encode(fig, fmt)
-
-    # z-score per (beatmap_id) — same logic as core.stats.z_sum_leaderboard
-    df = (df.sort_values("score", ascending=False)
-            .drop_duplicates(subset=["user_id", "beatmap_id"]))
-    map_stats = df.groupby("beatmap_id")["score"].agg(["mean", "std"])
-    df = df.join(map_stats, on="beatmap_id")
-    df["z"] = ((df["score"] - df["mean"]) / df["std"]).fillna(0.0)
-
-    agg = (df.groupby("user_id")
-             .agg(username=("username", "last"),
-                  mean_z=("z", "mean"),
-                  std_z=("z", "std"),
-                  n=("beatmap_id", "nunique"))
-             .reset_index())
-    agg["std_z"] = agg["std_z"].fillna(0.0)
-
+    agg = consistency_aggregate(scores, exclude_failed=exclude_failed)
     if agg.empty:
-        ax.text(0.5, 0.5, "not enough data", ha="center", va="center",
+        ax.text(0.5, 0.5, "no score data", ha="center", va="center",
                 color=p["muted"], transform=ax.transAxes)
         ax.set_xticks([]); ax.set_yticks([])
         return _encode(fig, fmt)

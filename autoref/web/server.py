@@ -349,6 +349,29 @@ class WebServer:
             from fastapi.responses import Response
             return Response(content=payload, media_type=media_type, headers=headers)
 
+        @app.get("/api/stats/plot/consistency_scatter/data")
+        async def api_stats_consistency_data(count_failed: bool = True):
+            try:
+                from .. import plots as _plots
+            except ImportError:
+                return JSONResponse({"error": "plot module unavailable"}, status_code=501)
+            scores = server.db.get_all_scores()
+            agg = _plots.consistency_aggregate(scores, exclude_failed=not count_failed)
+            if agg.empty:
+                return JSONResponse({"points": []})
+            points = [
+                {
+                    "user_id": int(r["user_id"]),
+                    "username": str(r["username"]),
+                    "mean_z": float(r["mean_z"]),
+                    "std_z": float(r["std_z"]),
+                    "n": int(r["n"]),
+                }
+                for _, r in agg.iterrows()
+            ]
+            std_median = float(agg["std_z"].median()) if len(agg) > 1 else None
+            return JSONResponse({"points": points, "std_median": std_median})
+
         @app.get("/api/stats/plots")
         async def api_stats_plot_list():
             try:

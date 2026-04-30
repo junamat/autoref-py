@@ -95,6 +95,38 @@
     background: var(--head); color: var(--text); border: 1.5px solid var(--border);
     border-radius: 2px; padding: 2px 6px; font-family: inherit; font-size: 10px;
   }
+
+  /* interactive scatter */
+  .iplot { width: 100%; display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 2px; }
+  .iplot .axis text { fill: var(--muted); font-size: 9px; font-family: inherit; }
+  .iplot .axis line, .iplot .axis path { stroke: var(--border); stroke-width: 1; }
+  .iplot .grid line { stroke: var(--border); stroke-width: 0.5; opacity: 0.6; }
+  .iplot .guide { stroke: var(--muted); stroke-width: 0.6; stroke-dasharray: 3 3; opacity: 0.5; }
+  .iplot .axis-label { fill: var(--text); font-size: 10px; font-family: inherit; }
+  .iplot .title { fill: var(--text); font-size: 11px; font-weight: 700; font-family: inherit; }
+  .iplot .dot { fill: var(--blue); fill-opacity: 0.65; stroke: var(--border); stroke-width: 0.6; cursor: pointer; transition: fill-opacity 0.1s; }
+  .iplot .dot:hover, .iplot .dot.active { fill-opacity: 1; stroke: var(--text); stroke-width: 1.2; }
+  .iplot .dot.dim { fill-opacity: 0.18; }
+  .iplot .label { fill: var(--text); font-size: 9px; font-family: inherit; pointer-events: none; }
+
+  .iplot-wrap { position: relative; }
+  .iplot-tip {
+    position: absolute; pointer-events: none; opacity: 0;
+    background: var(--head); border: 1.5px solid var(--border); border-radius: 3px;
+    padding: 5px 8px; font-size: 10px; color: var(--text);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25); transition: opacity 0.1s;
+    white-space: nowrap; z-index: 5;
+  }
+  .iplot-tip .tip-name { font-weight: 700; color: var(--blue); margin-bottom: 2px; }
+  .iplot-tip .tip-row { color: var(--muted); }
+  .iplot-tip .tip-row b { color: var(--text); font-weight: 700; }
+
+  .iplot-search {
+    background: var(--head); color: var(--text); border: 1.5px solid var(--border);
+    border-radius: 2px; padding: 2px 6px; font-family: inherit; font-size: 10px;
+    width: 140px;
+  }
+  .iplot-hint { font-size: 9px; color: var(--muted); }
 </style>
 </head>
 <body>
