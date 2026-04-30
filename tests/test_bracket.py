@@ -165,6 +165,20 @@ def test_map_winner_counts_failed_scores():
     winner = ar._map_winner(result)
     assert winner == 1
 
+def test_map_winner_when_both_fail():
+    """Test that failed scores are excluded from team total."""
+    ar = make_bracket(teams=("Blue", "Red"))
+    
+    result = MatchResult()
+    result.scores = [
+        PlayerResult("blue1", 100000, False),  # Blue team, failed
+        PlayerResult("red1", 50000, False),     # Red team, failed
+    ]
+    
+    # Blue should win because both failed and
+    winner = ar._map_winner(result)
+    assert winner == 0
+
 
 def test_map_winner_returns_none_on_tie():
     """Test that ties return None."""

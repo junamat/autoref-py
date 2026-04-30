@@ -513,20 +513,28 @@ class BracketAutoRef(AutoRef):
         return state
 
     def _map_winner(self, result: MatchResult) -> int | None:
-        """Team_index whose players' scores sum highest. None on tie/no scores."""
+        """Team_index whose players' scores sum highest. None on tie/no scores.
+
+        Failed scores are normally excluded. When *every* team's passed total
+        is zero (everyone failed), fall back to raw scores so the map still
+        has a winner instead of being declared a tie by default.
+        """
         if result is None or not result.scores:
             return None
-        totals = [0] * len(self.match.teams)
+        passed_totals = [0] * len(self.match.teams)
+        raw_totals    = [0] * len(self.match.teams)
         u2t: dict[str, int] = {}
         for i, team in enumerate(self.match.teams):
             for p in team.players:
                 u2t[_normalize(p.username)] = i
         for pr in result.scores:
-            if not pr.passed:
-                continue
             ti = u2t.get(_normalize(pr.username))
-            if ti is not None:
-                totals[ti] += pr.score
+            if ti is None:
+                continue
+            raw_totals[ti] += pr.score
+            if pr.passed:
+                passed_totals[ti] += pr.score
+        totals = passed_totals if any(passed_totals) else raw_totals
         top = max(totals)
         winners = [i for i, t in enumerate(totals) if t == top]
         return winners[0] if len(winners) == 1 else None
