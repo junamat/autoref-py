@@ -102,8 +102,10 @@ def seed_4wc(db_path: str) -> None:
 
         cur = conn.execute(
             "INSERT INTO matches (ruleset_vs, gamemode, win_condition, best_of, "
-            "bans_per_team, protects_per_team, winner_team) VALUES (?,?,?,?,?,?,?)",
-            (1, "osu", "SCORE_V2", 1, "0", "0", f"seed:{mp_id}"),
+            "bans_per_team, protects_per_team, winner_team, pool_id, round_name) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (1, "osu", "SCORE_V2", 1, "0", "0", f"seed:{mp_id}",
+             "seed_4wc_qualifiers", "Qualifiers"),
         )
         match_id = cur.lastrowid
 
@@ -224,8 +226,10 @@ def seed_2v2(db_path: str) -> None:
 
         cur = conn.execute(
             "INSERT INTO matches (ruleset_vs, gamemode, win_condition, best_of, "
-            "bans_per_team, protects_per_team, winner_team) VALUES (?,?,?,?,?,?,?)",
-            (1, "osu", "SCORE_V2", 9, "2", "0", f"seed2v2:{mp_id}"),
+            "bans_per_team, protects_per_team, winner_team, pool_id, round_name) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (1, "osu", "SCORE_V2", 9, "2", "0", f"seed2v2:{mp_id}",
+             "seed_2v2_round_of_16", "Round of 16"),
         )
         match_id = cur.lastrowid
 

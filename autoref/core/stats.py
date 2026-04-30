@@ -27,9 +27,9 @@ def exclude_failed(row: Mapping) -> bool:
 
 # Registry: method key → (label, ascending_sort)
 METHODS: dict[str, tuple[str, bool]] = {
-    "zscore":      ("Z-Sum",                    False),
+    "zscore":      ("Z-Score",                  False),
     "avg_score":   ("Average Score",            False),
-    "placements":  ("Avg Sum of Placements",    True),
+    "placements":  ("Placements",               True),
     "percentile":  ("Percentile",               False),
     "zipf":        ("Zipf's Law",               False),
     "pct_diff":    ("Percent Difference",       False),

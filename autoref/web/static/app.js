@@ -266,12 +266,14 @@ $('qs-submit').addEventListener('click', async () => {
   const bo    = parseInt($('qs-bo').value)  || 1;
   const bans  = parseInt($('qs-bans').value) || 0;
   const poolId = $('qs-pool').value || null;
+  const round  = $('qs-round')?.value.trim() || null;
 
   const payload = {
     type, mode, room_name: name,
     best_of: bo, bans_per_team: bans,
     teams: qsTeams,
     ...(poolId ? { pool_id: poolId } : {}),
+    ...(round  ? { round_name: round } : {}),
   };
 
   $('qs-submit').textContent = 'creating…';

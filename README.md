@@ -65,9 +65,12 @@ CLIENT_SECRET=...
 - ~~Match persistence~~ — `MatchDatabase` (SQLite) - not set in stone
 - ~~Score enrichment~~ — background `ScoreFetcher` polls the osu! match endpoint for mods/acc/combo/rank per game
 - ~~Project structure~~ — `core/` / `controllers/` / `web/` split; modular `pyproject.toml` extras
+- ~~Stats page (cross-match)~~ — `/stats`: configurable leaderboard, mappool table, score-distribution KDE per map, pick/ban/protect heat (with protect→pick overlay), interactive player-consistency scatter; SVG + hi-res PNG exports
+- ~~Per-round stats~~ — matches are tagged with `pool_id` + `round_name` (schema + match-creation form); `/stats` exposes round / pool selectors that re-filter every chart and the leaderboard
 
 ### Planned
-- Stat calculation and serving — endpoints + a `/stats` page over `MatchDatabase`
+- Cross-round stats when rounds share a pool — auto-detect pool equivalence (same beatmap set) and aggregate matches across compatible rounds
+- Cross-pool stats — needs an abstraction layer (mod-class / difficulty bucket / star-range) so scores from different pools can be normalised before aggregation
 - Safe multi-ref support — credential handling, sign-in flow
 - IO — Discord interface
 - CI stat badge

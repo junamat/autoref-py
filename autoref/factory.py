@@ -38,6 +38,7 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
         teams           [{"name": str, "players": [str, ...]}, ...]
         maps            [{"beatmap_id", "name", "mod_group", "mods", "is_tiebreaker"}, ...]
         pool_id         str  (alternative to maps; loaded via pool_loader(id) -> saved pool dict)
+        round_name      str  (optional tournament round, e.g. "RO16", "QF", "Grand Finals")
 
     pool_loader: optional callable(pool_id) -> saved pool dict (with "tree" key).
     """
@@ -108,7 +109,11 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
         schemes=[OrderScheme("standard", ban_pattern="ABBA")] if match_type == "bracket" else None,
     )
 
-    match = Match(ruleset, pool, lambda _: (0, Step.FINISH), *teams)
+    match = Match(
+        ruleset, pool, lambda _: (0, Step.FINISH), *teams,
+        pool_id=payload.get("pool_id"),
+        round_name=(payload.get("round_name") or payload.get("round") or None),
+    )
     client = bancho_lib.BanchoClient(username=bancho_username, password=bancho_password)
 
     # API-side score enrichment. AutoRef.run() will aclose the fetcher when the match ends.

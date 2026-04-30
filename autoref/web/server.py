@@ -240,16 +240,18 @@ class WebServer:
             return FileResponse(self.static_dir / "stats.html")
 
         @app.get("/api/stats")
-        async def api_stats(method: str = "zscore", count_failed: bool = True, aggregate: str = "sum"):
+        async def api_stats(method: str = "zscore", count_failed: bool = True, aggregate: str = "sum",
+                            pool_id: str | None = None, round_name: str | None = None):
             from ..core.stats import include_all, exclude_failed, METHODS
             if method not in METHODS:
                 return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
             if aggregate not in ("sum", "mean"):
                 return JSONResponse({"error": f"aggregate must be 'sum' or 'mean'"}, status_code=400)
             predicate = include_all if count_failed else exclude_failed
-            leaderboard = server.db.get_leaderboard(method=method, include=predicate, aggregate=aggregate)
-            map_stats   = server.db.get_map_stats()
-            all_scores  = server.db.get_all_scores()
+            leaderboard = server.db.get_leaderboard(method=method, include=predicate, aggregate=aggregate,
+                                                    pool_id=pool_id, round_name=round_name)
+            map_stats   = server.db.get_map_stats(pool_id=pool_id, round_name=round_name)
+            all_scores  = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
 
             avg_by_map: dict = {}
             if not all_scores.empty:
@@ -294,7 +296,8 @@ class WebServer:
         @app.get("/api/stats/plot/{name}")
         async def api_stats_plot(name: str, format: str = "png", theme: str = "dark",
                                  count_failed: bool = True, beatmap_id: int | None = None,
-                                 label: str | None = None):
+                                 label: str | None = None,
+                                 pool_id: str | None = None, round_name: str | None = None):
             try:
                 from .. import plots as _plots
             except ImportError:
@@ -313,7 +316,7 @@ class WebServer:
                 )
             theme = theme if theme in ("dark", "light") else "dark"
 
-            scores = server.db.get_all_scores()
+            scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
             try:
                 if name == "score_distribution":
                     if beatmap_id is None:
@@ -326,7 +329,7 @@ class WebServer:
                     )
                 elif name == "pickban_heat":
                     payload = _plots.pickban_heat(
-                        server.db.get_map_action_breakdown(),
+                        server.db.get_map_action_breakdown(pool_id=pool_id, round_name=round_name),
                         fmt=format, theme=theme,
                         code_by_bid=_build_map_code_lookup(),
                     )
@@ -350,12 +353,14 @@ class WebServer:
             return Response(content=payload, media_type=media_type, headers=headers)
 
         @app.get("/api/stats/plot/consistency_scatter/data")
-        async def api_stats_consistency_data(count_failed: bool = True):
+        async def api_stats_consistency_data(count_failed: bool = True,
+                                             pool_id: str | None = None,
+                                             round_name: str | None = None):
             try:
                 from .. import plots as _plots
             except ImportError:
                 return JSONResponse({"error": "plot module unavailable"}, status_code=501)
-            scores = server.db.get_all_scores()
+            scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
             agg = _plots.consistency_aggregate(scores, exclude_failed=not count_failed)
             if agg.empty:
                 return JSONResponse({"points": []})
@@ -383,6 +388,19 @@ class WebServer:
             return JSONResponse({
                 "available": True,
                 "plots": [{"name": k, "label": v} for k, v in _plots.PLOTS.items()],
+            })
+
+        @app.get("/api/stats/filters")
+        async def api_stats_filters():
+            """Available pool / round combinations for the /stats filter UI.
+            Pool ids are joined with their human-readable names from PoolStore.
+            """
+            opts = server.db.get_filter_options()
+            pool_names = {p["id"]: p.get("name", p["id"]) for p in _POOL_STORE.list()}
+            return JSONResponse({
+                "pools":  [{"id": pid, "name": pool_names.get(pid, pid)} for pid in opts["pools"]],
+                "rounds": opts["rounds"],
+                "combos": opts["combos"],
             })
 
         @app.get("/api/pools")

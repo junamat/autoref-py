@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS matches (
     best_of           INTEGER NOT NULL DEFAULT 1,
     bans_per_team     TEXT NOT NULL DEFAULT '0',      -- JSON: int or list[int]
     protects_per_team TEXT NOT NULL DEFAULT '0',      -- JSON: int or list[int]
-    winner_team       TEXT
+    winner_team       TEXT,
+    pool_id           TEXT,
+    round_name        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS match_teams (
@@ -59,6 +61,15 @@ class MatchDatabase:
     def __init__(self, path: str | Path = "matches.db"):
         self._conn = sqlite3.connect(str(path))
         self._conn.executescript(_SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after the original schema. Cheap idempotent ALTERs."""
+        existing = {row[1] for row in self._conn.execute("PRAGMA table_info(matches)")}
+        for col, decl in (("pool_id", "TEXT"), ("round_name", "TEXT")):
+            if col not in existing:
+                self._conn.execute(f"ALTER TABLE matches ADD COLUMN {col} {decl}")
+        self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()
@@ -75,7 +86,10 @@ class MatchDatabase:
             winner_name = match.teams[winner_team_index].name
 
         cursor = self._conn.execute(
-            "INSERT INTO matches (ruleset_vs, gamemode, win_condition, best_of, bans_per_team, protects_per_team, winner_team) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO matches "
+            "(ruleset_vs, gamemode, win_condition, best_of, bans_per_team, "
+            " protects_per_team, winner_team, pool_id, round_name) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 match.ruleset.vs,
                 match.ruleset.gamemode.name_api,
@@ -84,6 +98,8 @@ class MatchDatabase:
                 json.dumps(match.ruleset.bans_per_team),
                 json.dumps(match.ruleset.protects_per_team),
                 winner_name,
+                getattr(match, "pool_id", None),
+                getattr(match, "round_name", None),
             ),
         )
         match_id = cursor.lastrowid
@@ -126,21 +142,58 @@ class MatchDatabase:
     def get_match_history(self) -> pd.DataFrame:
         return pd.read_sql("SELECT * FROM matches ORDER BY created_at DESC", self._conn)
 
-    def get_map_stats(self) -> pd.DataFrame:
+    def _match_filter(self, pool_id: str | None, round_name: str | None) -> tuple[str, list]:
+        """Build a `match_id IN (…)` subquery clause restricting to matches with
+        the given pool / round. Returns ('', []) when no filter is requested.
+
+        Both args are optional and combine with AND. None or empty means "any".
+        """
+        conds, params = [], []
+        if pool_id:
+            conds.append("pool_id = ?")
+            params.append(pool_id)
+        if round_name:
+            conds.append("round_name = ?")
+            params.append(round_name)
+        if not conds:
+            return "", []
+        return f" match_id IN (SELECT match_id FROM matches WHERE {' AND '.join(conds)}) ", params
+
+    def get_filter_options(self) -> dict:
+        """Distinct (pool_id, round_name) combinations seen in the DB, plus the
+        list of pool_ids and round_names individually. Used to populate the
+        /stats filter UI.
+        """
+        rows = self._conn.execute(
+            "SELECT DISTINCT pool_id, round_name FROM matches "
+            "WHERE pool_id IS NOT NULL OR round_name IS NOT NULL"
+        ).fetchall()
+        combos = [{"pool_id": p, "round_name": r} for p, r in rows]
+        pools  = sorted({p for p, _ in rows if p})
+        rounds = sorted({r for _, r in rows if r})
+        return {"combos": combos, "pools": pools, "rounds": rounds}
+
+    def get_map_stats(self, *, pool_id: str | None = None,
+                      round_name: str | None = None) -> pd.DataFrame:
+        clause, params = self._match_filter(pool_id, round_name)
+        where = f"WHERE {clause}" if clause else ""
         return pd.read_sql(
-            """
+            f"""
             SELECT
                 beatmap_id,
                 step,
                 COUNT(*) AS count
             FROM match_actions
+            {where}
             GROUP BY beatmap_id, step
             ORDER BY beatmap_id, step
             """,
             self._conn,
+            params=params,
         )
 
-    def get_map_action_breakdown(self) -> pd.DataFrame:
+    def get_map_action_breakdown(self, *, pool_id: str | None = None,
+                                  round_name: str | None = None) -> pd.DataFrame:
         """Per-beatmap counts that distinguish protect→pick overlap from
         protect-without-pick. Used by the pick/ban/protect heat plot.
 
@@ -150,8 +203,10 @@ class MatchDatabase:
         - protect_only: protect events on maps that were NOT subsequently
           picked in the same match.
         """
+        clause, params = self._match_filter(pool_id, round_name)
+        where = f"WHERE {clause}" if clause else ""
         return pd.read_sql(
-            """
+            f"""
             WITH per_match_map AS (
                 SELECT
                     match_id, beatmap_id,
@@ -159,6 +214,7 @@ class MatchDatabase:
                     SUM(CASE WHEN step = 'BAN'     THEN 1 ELSE 0 END) AS bans,
                     SUM(CASE WHEN step = 'PROTECT' THEN 1 ELSE 0 END) AS protects
                 FROM match_actions
+                {where}
                 GROUP BY match_id, beatmap_id
             )
             SELECT
@@ -172,6 +228,7 @@ class MatchDatabase:
             ORDER BY beatmap_id
             """,
             self._conn,
+            params=params,
         )
 
     def get_game_scores(self, match_id: int) -> pd.DataFrame:
@@ -181,16 +238,25 @@ class MatchDatabase:
             params=(match_id,),
         )
 
-    def get_all_scores(self) -> pd.DataFrame:
-        """Every game_scores row across every match — input for cross-match stats."""
-        return pd.read_sql("SELECT * FROM game_scores", self._conn)
+    def get_all_scores(self, *, pool_id: str | None = None,
+                       round_name: str | None = None) -> pd.DataFrame:
+        """Every game_scores row across every match — input for cross-match stats.
+        Optionally restrict to matches matching pool_id / round_name.
+        """
+        clause, params = self._match_filter(pool_id, round_name)
+        where = f"WHERE {clause}" if clause else ""
+        return pd.read_sql(f"SELECT * FROM game_scores {where}",
+                           self._conn, params=params)
 
-    def get_leaderboard(self, *, method: str = "zscore", include=None, aggregate: str = "sum") -> pd.DataFrame:
+    def get_leaderboard(self, *, method: str = "zscore", include=None,
+                        aggregate: str = "sum",
+                        pool_id: str | None = None,
+                        round_name: str | None = None) -> pd.DataFrame:
         """Cross-match leaderboard. `method` selects the calculation strategy;
         `include` is a row predicate (defaults to include_all);
         `aggregate` is "sum" or "mean" for per-map metric aggregation."""
         from .stats import leaderboard, include_all
-        return leaderboard(self.get_all_scores(),
+        return leaderboard(self.get_all_scores(pool_id=pool_id, round_name=round_name),
                            method=method,
                            include=include or include_all,
                            aggregate=aggregate)

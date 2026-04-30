@@ -15,6 +15,7 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 /* ── state ───────────────────────────────────────────────────── */
 let currentMethod = 'zscore';
 let methodsReady  = false;
+let filterOptions = null;  // { pools:[{id,name}], rounds:[str], combos:[{pool_id,round_name}] }
 
 /* ── config toggles ──────────────────────────────────────────── */
 function activeVal(groupId) {
@@ -39,6 +40,67 @@ document.getElementById('cfg-aggregate').addEventListener('click', e => {
 
 document.getElementById('stats-reload').addEventListener('click', load);
 
+document.getElementById('cfg-round').addEventListener('change', () => {
+  refreshPoolOptions();
+  load();
+});
+document.getElementById('cfg-pool').addEventListener('change', load);
+
+/* ── pool/round filter ───────────────────────────────────────── */
+async function loadFilterOptions() {
+  try {
+    const res = await fetch('/api/stats/filters');
+    if (!res.ok) return;
+    filterOptions = await res.json();
+  } catch { return; }
+
+  const roundSel = document.getElementById('cfg-round');
+  const poolSel  = document.getElementById('cfg-pool');
+  const poolLbl  = document.getElementById('cfg-pool-label');
+
+  // Round selector — only show if at least one round was recorded.
+  if (filterOptions.rounds && filterOptions.rounds.length) {
+    roundSel.innerHTML = `<option value="">all rounds</option>` +
+      filterOptions.rounds.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
+    roundSel.hidden = false;
+  }
+  // Pool selector — show only when more than one pool exists, or filtering by round
+  // would otherwise be ambiguous. We re-render the options based on current round.
+  refreshPoolOptions();
+  if (filterOptions.pools && filterOptions.pools.length > 1) {
+    poolSel.hidden = false;
+    poolLbl.hidden = false;
+  }
+}
+
+function refreshPoolOptions() {
+  if (!filterOptions) return;
+  const round = document.getElementById('cfg-round').value;
+  const poolSel = document.getElementById('cfg-pool');
+  const poolLbl = document.getElementById('cfg-pool-label');
+
+  // Pools that actually have data for the chosen round (or all pools if no round).
+  const allowed = round
+    ? new Set(filterOptions.combos.filter(c => c.round_name === round).map(c => c.pool_id))
+    : new Set(filterOptions.pools.map(p => p.id));
+
+  const visiblePools = filterOptions.pools.filter(p => allowed.has(p.id));
+  const prev = poolSel.value;
+  poolSel.innerHTML = `<option value="">all pools</option>` +
+    visiblePools.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  // Restore previous selection if still valid; otherwise fall back to "all".
+  poolSel.value = visiblePools.some(p => p.id === prev) ? prev : '';
+
+  // Auto-hide the pool dropdown when a round narrows it to a single option.
+  if (visiblePools.length <= 1 && (filterOptions.pools.length <= 1)) {
+    poolSel.hidden = true;
+    poolLbl.hidden = true;
+  } else {
+    poolSel.hidden = false;
+    poolLbl.hidden = false;
+  }
+}
+
 /* ── method toggle (populated from API) ─────────────────────── */
 function buildMethodToggle(methods) {
   const toggle = document.getElementById('cfg-calc');
@@ -56,10 +118,23 @@ function buildMethodToggle(methods) {
 }
 
 /* ── fetch + render ──────────────────────────────────────────── */
+function currentFilterParams() {
+  const round = document.getElementById('cfg-round')?.value || '';
+  const pool  = document.getElementById('cfg-pool')?.value  || '';
+  const out = {};
+  if (round) out.round_name = round;
+  if (pool)  out.pool_id    = pool;
+  return out;
+}
+
 async function load() {
   const countFailed = activeVal('cfg-failed') !== 'false';
   const aggregate = activeVal('cfg-aggregate') || 'sum';
-  const url = `/api/stats?method=${currentMethod}&count_failed=${countFailed}&aggregate=${aggregate}`;
+  const params = new URLSearchParams({
+    method: currentMethod, count_failed: countFailed, aggregate,
+    ...currentFilterParams(),
+  });
+  const url = `/api/stats?${params.toString()}`;
 
   document.getElementById('leaderboard-wrap').innerHTML = '<div class="empty-msg">loading…</div>';
   document.getElementById('mappool-wrap').innerHTML     = '<div class="empty-msg">loading…</div>';
@@ -189,6 +264,7 @@ function plotUrl(name, params = {}) {
   const countFailed = activeVal('cfg-failed') !== 'false';
   const qs = new URLSearchParams({
     theme, count_failed: countFailed, format: 'png', _t: Date.now(),
+    ...currentFilterParams(),
     ...params,
   });
   return `/api/stats/plot/${name}?${qs.toString()}`;
@@ -198,6 +274,7 @@ function plotBlock(name, title, params = {}) {
   const baseQs = new URLSearchParams({
     theme: document.body.classList.contains('light') ? 'light' : 'dark',
     count_failed: activeVal('cfg-failed') !== 'false',
+    ...currentFilterParams(),
     ...params,
   });
   const svgUrl   = `/api/stats/plot/${name}?format=svg&${baseQs.toString()}`;
@@ -264,6 +341,7 @@ function interactiveConsistencyBlock() {
   const baseQs = new URLSearchParams({
     theme: document.body.classList.contains('light') ? 'light' : 'dark',
     count_failed: activeVal('cfg-failed') !== 'false',
+    ...currentFilterParams(),
   });
   const svgUrl   = `/api/stats/plot/consistency_scatter?format=svg&${baseQs.toString()}`;
   const hiresUrl = `/api/stats/plot/consistency_scatter?format=hires&${baseQs.toString()}`;
@@ -287,9 +365,10 @@ async function loadConsistencyPlot() {
   const host = document.getElementById('iplot-consistency');
   if (!host) return;
   const countFailed = activeVal('cfg-failed') !== 'false';
+  const params = new URLSearchParams({ count_failed: countFailed, ...currentFilterParams() });
   let data;
   try {
-    const res = await fetch(`/api/stats/plot/consistency_scatter/data?count_failed=${countFailed}`);
+    const res = await fetch(`/api/stats/plot/consistency_scatter/data?${params.toString()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     data = await res.json();
   } catch (e) {
@@ -444,4 +523,4 @@ function renderConsistencySVG(host, data) {
 }
 
 /* ── boot ────────────────────────────────────────────────────── */
-load();
+loadFilterOptions().then(load);

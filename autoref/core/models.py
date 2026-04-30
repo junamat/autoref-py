@@ -218,6 +218,8 @@ class Match:
         pool: Pool,
         next_step: Callable[[pd.DataFrame], tuple[int, Step]],
         *teams: Team,
+        pool_id: str | None = None,
+        round_name: str | None = None,
     ):
         self.ruleset = ruleset
         self.pool = pool
@@ -225,6 +227,9 @@ class Match:
         self.teams = teams
         self.match_status = pd.DataFrame(columns=self._STATUS_COLUMNS)
         self.match_id: int | None = None  # assigned by MatchDatabase after persisting
+        # Tournament context — used by /stats filters; either may be None for ad-hoc matches.
+        self.pool_id = pool_id
+        self.round_name = round_name
         # API-enriched per-player score data, populated asynchronously by ScoreFetcher.
         # List of (turn, beatmap_id, list[score_dict]).
         self.game_scores: list[tuple[int, int, list[dict]]] = []
