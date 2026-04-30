@@ -194,6 +194,8 @@ def pickban_heat(
     bans     = wide["BAN"].to_numpy()
     protects = wide["PROTECT"].to_numpy()
 
+    ax.grid(axis="y", visible=False)
+
     ax.barh(y, picks,    color=p["blue"],   edgecolor=p["border"], linewidth=0.5, label="picks")
     ax.barh(y, bans,     left=picks,        color=p["red"],    edgecolor=p["border"], linewidth=0.5, label="bans")
     ax.barh(y, protects, left=picks + bans, color=p["yellow"], edgecolor=p["border"], linewidth=0.5, label="protects")
