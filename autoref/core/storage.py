@@ -140,6 +140,40 @@ class MatchDatabase:
             self._conn,
         )
 
+    def get_map_action_breakdown(self) -> pd.DataFrame:
+        """Per-beatmap counts that distinguish protect→pick overlap from
+        protect-without-pick. Used by the pick/ban/protect heat plot.
+
+        Columns: beatmap_id, bans, picks, picks_while_protected, protect_only.
+        - picks_while_protected: picks of a map in a match where the same map
+          was also protected at least once.
+        - protect_only: protect events on maps that were NOT subsequently
+          picked in the same match.
+        """
+        return pd.read_sql(
+            """
+            WITH per_match_map AS (
+                SELECT
+                    match_id, beatmap_id,
+                    SUM(CASE WHEN step = 'PICK'    THEN 1 ELSE 0 END) AS picks,
+                    SUM(CASE WHEN step = 'BAN'     THEN 1 ELSE 0 END) AS bans,
+                    SUM(CASE WHEN step = 'PROTECT' THEN 1 ELSE 0 END) AS protects
+                FROM match_actions
+                GROUP BY match_id, beatmap_id
+            )
+            SELECT
+                beatmap_id,
+                SUM(bans)  AS bans,
+                SUM(picks) AS picks,
+                SUM(CASE WHEN protects > 0 THEN picks    ELSE 0 END) AS picks_while_protected,
+                SUM(CASE WHEN picks    = 0 THEN protects ELSE 0 END) AS protect_only
+            FROM per_match_map
+            GROUP BY beatmap_id
+            ORDER BY beatmap_id
+            """,
+            self._conn,
+        )
+
     def get_game_scores(self, match_id: int) -> pd.DataFrame:
         return pd.read_sql(
             "SELECT * FROM game_scores WHERE match_id = ? ORDER BY turn, score DESC",

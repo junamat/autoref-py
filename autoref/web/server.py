@@ -314,7 +314,6 @@ class WebServer:
             theme = theme if theme in ("dark", "light") else "dark"
 
             scores = server.db.get_all_scores()
-            map_stats = server.db.get_map_stats()
             try:
                 if name == "score_distribution":
                     if beatmap_id is None:
@@ -327,7 +326,8 @@ class WebServer:
                     )
                 elif name == "pickban_heat":
                     payload = _plots.pickban_heat(
-                        map_stats, fmt=format, theme=theme,
+                        server.db.get_map_action_breakdown(),
+                        fmt=format, theme=theme,
                         code_by_bid=_build_map_code_lookup(),
                     )
                 elif name == "consistency_scatter":

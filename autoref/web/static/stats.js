@@ -320,7 +320,8 @@ function renderConsistencySVG(host, data) {
     return [lo - span * 0.08, hi + span * 0.08];
   };
   const [xMin, xMax] = pad(Math.min(...xs, 0), Math.max(...xs, 0));
-  const [yMin, yMax] = pad(Math.min(...ys), Math.max(...ys));
+  let [yMin, yMax]   = pad(Math.min(...ys), Math.max(...ys));
+  yMin = 0;  // stddev cannot be negative
 
   const sx = v => M.left + ((v - xMin) / (xMax - xMin)) * innerW;
   const sy = v => M.top + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
