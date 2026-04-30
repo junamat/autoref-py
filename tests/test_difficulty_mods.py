@@ -184,7 +184,7 @@ class TestARModAdjustments:
         """DT increases AR by speeding up timing windows."""
         # DT makes AR higher (faster approach)
         assert get_adjusted_ar(5.0, 'DT') > 5.0
-        assert get_adjusted_ar(8.0, 'DT') > 8.0
+        assert get_adjusted_ar(8.0, 'DT') == 9.7
         # Can go above 10
         assert get_adjusted_ar(10.0, 'DT') == 11.0
     

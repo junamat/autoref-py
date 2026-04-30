@@ -176,12 +176,7 @@ def test_matches_4wc_qualifiers_spreadsheet():
     → matches our defaults (include_all + best score per (player, map)).
     Uses `modded_score` because the sheet feeds that into Z-Sum, not raw `score`
     (mod multipliers applied upstream; for this stage they're all 1.0 except 1.06).
-    
-    NOTE: This test is currently skipped because our implementation now fills missing
-    scores with 0 (as per requirement), while the spreadsheet excludes them from
-    calculation. This is a deliberate design difference.
     """
-    pytest.skip("Behavior diverges from spreadsheet: we fill missing scores with 0")
     from pathlib import Path
     fixtures = Path(__file__).parent / "fixtures"
     scores = pd.read_csv(fixtures / "qualifiers_4wc_scores.csv")
