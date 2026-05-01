@@ -52,6 +52,58 @@ _MOD_INFERENCE: dict[str, str] = {
 }
 
 
+def _canonical_mods(mods) -> list[str]:
+    """Normalize mod input → sorted list of 2-char tokens, NF excluded.
+
+    Accepts: aiosu Mods instance, str like "HDHR" / "HD HR", iterable of tokens.
+    """
+    if mods is None:
+        return []
+    if isinstance(mods, str):
+        s = mods.replace(" ", "")
+        toks = [s[i:i + 2].upper() for i in range(0, len(s), 2) if s[i:i + 2]]
+    else:
+        toks = []
+        for m in mods:
+            if hasattr(m, "value") or hasattr(m, "name"):
+                toks.append(getattr(m, "short_name", None) or m.name if hasattr(m, "name") else str(m))
+            else:
+                toks.append(str(m))
+        toks = [t.upper() for t in toks if t]
+    return sorted(t for t in toks if t and t != "NF")
+
+
+def apply_score_multiplier(score: int | float, mods, multipliers: dict[str, float] | None) -> float:
+    """Apply mod multipliers to a raw score.
+
+    Resolution: exact-combo key (sorted concat e.g. "HDHR") wins; otherwise the
+    score is multiplied by each per-mod entry cumulatively. Missing mods → 1.0.
+    Returns the adjusted score (float — caller rounds/casts as needed).
+    """
+    if not multipliers or score is None:
+        return float(score) if score is not None else 0.0
+    toks = _canonical_mods(mods)
+    if not toks:
+        return float(score)
+    combo_key = "".join(toks)
+    if combo_key in multipliers:
+        return float(score) * float(multipliers[combo_key])
+    out = float(score)
+    for t in toks:
+        if t in multipliers:
+            out *= float(multipliers[t])
+    return out
+
+
+def _merge_multipliers(*dicts: "dict[str, float] | None") -> dict[str, float]:
+    """Merge multiplier dicts; later overrides earlier, per-key."""
+    out: dict[str, float] = {}
+    for d in dicts:
+        if d:
+            out.update(d)
+    return out
+
+
 class PlayableMap:
     def __init__(
         self,
@@ -60,6 +112,7 @@ class PlayableMap:
         win_condition: WinCondition = WinCondition.INHERIT,
         name: str = None,
         is_tiebreaker: bool = False,
+        score_multipliers: dict[str, float] | None = None,
     ):
         self.beatmap_id = beatmap_id
         self.beatmap = None
@@ -67,7 +120,15 @@ class PlayableMap:
         self.win_condition = win_condition
         self.name = name
         self.is_tiebreaker = is_tiebreaker
+        self.score_multipliers = score_multipliers
         self.state = MapState.PICKABLE
+        # Set by Pool.flatten — list of pool multiplier dicts outer→inner.
+        self._pool_mult_chain: list[dict[str, float]] = []
+
+    def effective_multipliers(self, ruleset_mults: dict[str, float] | None = None) -> dict[str, float]:
+        """Resolve effective multiplier table by merging ruleset → pool chain → map.
+        Most-specific wins (map > inner pool > outer pool > ruleset)."""
+        return _merge_multipliers(ruleset_mults, *self._pool_mult_chain, self.score_multipliers)
 
     def effective_mods(self, pool_mods=None):
         """Resolve extra mods with priority: explicit (or NO_MODS) > pool_mods > name inference.
@@ -113,22 +174,29 @@ class PlayableMap:
 
 class Pool:
     def __init__(self, name: str, *maps: "Pool | PlayableMap",
-                 order: "Callable[[list[PlayableMap]], list[PlayableMap]] | None" = None):
+                 order: "Callable[[list[PlayableMap]], list[PlayableMap]] | None" = None,
+                 score_multipliers: dict[str, float] | None = None):
         self.name = name
         self.maps = list(maps)
         self.order = order  # optional callable to reorder the flattened list
+        self.score_multipliers = score_multipliers
 
-    def flatten(self, _pool_mods=None) -> "list[PlayableMap]":
-        """Depth-first flatten, propagating pool mods and applying order."""
+    def flatten(self, _pool_mods=None, _mult_chain: list | None = None) -> "list[PlayableMap]":
+        """Depth-first flatten, propagating pool mods, multiplier chain, and order."""
+        chain = list(_mult_chain or [])
+        if self.score_multipliers:
+            chain = chain + [self.score_multipliers]
         result = []
         for item in self.maps:
             if isinstance(item, Pool):
-                result.extend(item.flatten(_pool_mods=_pool_mods))
+                result.extend(item.flatten(_pool_mods=_pool_mods, _mult_chain=chain))
             else:
                 pm = PlayableMap(item.beatmap_id, item.mods, item.win_condition,
-                                 item.name, item.is_tiebreaker)
+                                 item.name, item.is_tiebreaker,
+                                 score_multipliers=item.score_multipliers)
                 pm.beatmap = item.beatmap
                 pm._pool_mods = _pool_mods
+                pm._pool_mult_chain = chain
                 result.append(pm)
         if self.order:
             result = self.order(result)
@@ -137,13 +205,13 @@ class Pool:
 
 class ModdedPool(Pool):
     def __init__(self, name: str, mods: aiosu.models.mods.Mods, *maps: "Pool | PlayableMap",
-                 order=None):
-        super().__init__(name, *maps, order=order)
+                 order=None, score_multipliers: dict[str, float] | None = None):
+        super().__init__(name, *maps, order=order, score_multipliers=score_multipliers)
         self.mods = mods
 
-    def flatten(self, _pool_mods=None) -> "list[PlayableMap]":
+    def flatten(self, _pool_mods=None, _mult_chain: list | None = None) -> "list[PlayableMap]":
         # own mods take priority over parent pool mods
-        return super().flatten(_pool_mods=self.mods)
+        return super().flatten(_pool_mods=self.mods, _mult_chain=_mult_chain)
 
 
 class Team:
@@ -184,6 +252,7 @@ class Ruleset:
         bans_per_team: "int | list[int]" = 0,
         protects_per_team: "int | list[int]" = 0,
         schemes: "list[OrderScheme] | None" = None,
+        score_multipliers: dict[str, float] | None = None,
     ):
         self.vs = vs
         self.gamemode = gamemode
@@ -195,6 +264,7 @@ class Ruleset:
         self.bans_per_team = bans_per_team
         self.protects_per_team = protects_per_team
         self.schemes = schemes
+        self.score_multipliers = score_multipliers
 
     @property
     def wins_needed(self) -> int:

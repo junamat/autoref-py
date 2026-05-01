@@ -17,7 +17,7 @@
     position: sticky; top: 0; z-index: 10;
   }
 
-  #stats-body { padding: 16px; display: flex; flex-direction: column; gap: 20px; max-width: 960px; }
+  #stats-body { padding: 16px 24px; display: flex; flex-direction: column; gap: 20px; max-width: min(1800px, 100%); margin: 0 auto; width: 100%; box-sizing: border-box; }
 
   /* config bar */
   #stats-config {
@@ -45,6 +45,27 @@
     background: var(--head); color: var(--text); border: 1.5px solid var(--border);
     border-radius: 2px; padding: 2px 6px; font-family: inherit; font-size: 10px;
   }
+
+  /* tabs */
+  #stats-tabs {
+    display: flex; gap: 2px; border-bottom: 1.5px solid var(--border);
+  }
+  .stats-tab {
+    padding: 6px 14px; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    border: 1.5px solid transparent; border-bottom: none;
+    border-radius: 3px 3px 0 0;
+    cursor: pointer; color: var(--muted);
+    background: transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    margin-bottom: -1.5px;
+  }
+  .stats-tab:hover { color: var(--text); }
+  .stats-tab.active {
+    color: var(--blue); background: var(--panel);
+    border-color: var(--border); border-bottom-color: var(--panel);
+  }
+  .tab-panel[hidden] { display: none; }
 
   /* section */
   .stats-section { display: flex; flex-direction: column; gap: 6px; }
@@ -131,6 +152,26 @@
     width: 140px;
   }
   .iplot-hint { font-size: 9px; color: var(--muted); }
+
+  /* standings grid */
+  .standings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 12px;
+  }
+  .standings-card {
+    background: var(--panel); border: 1.5px solid var(--border); border-radius: 3px;
+    overflow: hidden;
+    min-width: 0;
+    display: flex; flex-direction: column;
+  }
+  .standings-card-body { overflow-x: auto; }
+  .standings-card table { width: 100%; table-layout: auto; }
+  .standings-card td, .standings-card th { white-space: nowrap; }
+  .standings-card-head {
+    padding: 6px 10px; font-size: 10px; font-weight: 700;
+    border-bottom: 1px solid var(--border); background: var(--head);
+  }
 </style>
 </head>
 <body>
@@ -168,26 +209,89 @@
       <button id="stats-reload">↻ reload</button>
     </div>
 
-    <!-- leaderboard -->
-    <div class="stats-section">
-      <div class="stats-section-head">leaderboard</div>
-      <div id="leaderboard-wrap">
-        <div class="empty-msg">loading…</div>
+    <!-- tabs -->
+    <div id="stats-tabs">
+      <div class="stats-tab" data-tab="results">Results</div>
+      <div class="stats-tab" data-tab="standings">Standings</div>
+      <div class="stats-tab" data-tab="mappool">Mappool</div>
+      <div class="stats-tab active" data-tab="performances">Performances</div>
+      <div class="stats-tab" data-tab="extras">Extras</div>
+    </div>
+
+    <!-- results tab -->
+    <div class="tab-panel" data-panel="results" hidden>
+      <div class="stats-section">
+        <div class="stats-section-head">qualifiers results</div>
+        <div id="results-wrap"><div class="empty-msg">loading…</div></div>
       </div>
     </div>
 
-    <!-- mappool stats -->
-    <div class="stats-section">
-      <div class="stats-section-head">mappool statistics</div>
-      <div id="mappool-wrap">
-        <div class="empty-msg">loading…</div>
+    <!-- standings tab -->
+    <div class="tab-panel" data-panel="standings" hidden>
+      <div class="stats-section">
+        <div class="stats-section-head">top players per map</div>
+        <div id="standings-wrap"><div class="empty-msg">loading…</div></div>
+      </div>
+      <div class="stats-section" id="team-standings-section" hidden>
+        <div class="stats-section-head">team standings</div>
+        <div id="team-standings-wrap"></div>
       </div>
     </div>
 
-    <!-- graphs -->
-    <div class="stats-section" id="plots-section" hidden>
-      <div class="stats-section-head">graphs</div>
-      <div id="plots-wrap"></div>
+    <!-- mappool tab -->
+    <div class="tab-panel" data-panel="mappool" hidden>
+      <div class="stats-section">
+        <div class="stats-section-head">mappool statistics</div>
+        <div id="mappool-wrap">
+          <div class="empty-msg">loading…</div>
+        </div>
+      </div>
+      <div class="stats-section" id="plots-mappool-section" hidden>
+        <div class="stats-section-head">pick / ban / protect heat</div>
+        <div id="plots-mappool-wrap"></div>
+      </div>
+    </div>
+
+    <!-- performances tab -->
+    <div class="tab-panel" data-panel="performances">
+      <div class="stats-section">
+        <div class="stats-section-head">individual performance</div>
+        <div id="leaderboard-wrap">
+          <div class="empty-msg">loading…</div>
+        </div>
+      </div>
+      <div class="stats-section" id="team-performances-section" hidden>
+        <div class="stats-section-head">team performance</div>
+        <div id="team-perf-wrap"><div class="empty-msg">loading…</div></div>
+      </div>
+      <div class="stats-section" id="plots-perf-section" hidden>
+        <div class="stats-section-head">graphs</div>
+        <div id="plots-perf-wrap"></div>
+      </div>
+    </div>
+
+    <!-- extras tab -->
+    <div class="tab-panel" data-panel="extras" hidden>
+      <div class="stats-section">
+        <div class="stats-section-head">closest maps</div>
+        <div id="extras-closest-wrap"><div class="empty-msg">loading…</div></div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-head">biggest blowouts</div>
+        <div id="extras-blowouts-wrap"><div class="empty-msg">loading…</div></div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-head">biggest carry performances</div>
+        <div id="extras-carries-wrap"><div class="empty-msg">loading…</div></div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-head">highest pp</div>
+        <div class="empty-msg">blocked — osu API limitation</div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-head">highest z-pp</div>
+        <div class="empty-msg">blocked — osu API limitation</div>
+      </div>
     </div>
 
   </div>

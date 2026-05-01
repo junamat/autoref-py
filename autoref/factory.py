@@ -7,20 +7,36 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
-    """Flatten a pool-builder tree into the flat map-entry list build_autoref expects."""
+def flatten_pool_tree(nodes: list, parent_mods: str = "",
+                      parent_mults_chain: list | None = None) -> list:
+    """Flatten a pool-builder tree into the flat map-entry list build_autoref expects.
+
+    Pre-resolves effective per-map score multipliers by walking the tree and
+    merging outer→inner→map dicts (most-specific wins per mod key)."""
     entries = []
+    chain = list(parent_mults_chain or [])
     for node in nodes:
+        node_mults = node.get("score_multipliers")
         if node.get("type") == "map":
+            merged: dict[str, float] = {}
+            for d in chain:
+                if d:
+                    merged.update(d)
+            if node_mults:
+                merged.update(node_mults)
             entries.append({
                 "beatmap_id":   node.get("bid", ""),
                 "name":         node.get("code") or node.get("name", ""),
                 "mod_group":    node.get("code", "MAP").rstrip("0123456789") or "NM",
                 "mods":         node.get("mods") or parent_mods,
                 "is_tiebreaker": node.get("tb", False),
+                "score_multipliers": merged or None,
             })
         elif node.get("children"):
-            entries.extend(flatten_pool_tree(node["children"], node.get("mods") or parent_mods))
+            sub_chain = chain + ([node_mults] if node_mults else [])
+            entries.extend(flatten_pool_tree(node["children"],
+                                             node.get("mods") or parent_mods,
+                                             sub_chain))
     return entries
 
 
@@ -78,6 +94,7 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
             int(e["beatmap_id"]),
             name=e.get("name") or f"{group_name}{i+1}",
             is_tiebreaker=e.get("is_tiebreaker", False),
+            score_multipliers=e.get("score_multipliers"),
         ) for i, e in enumerate(entries)]
         if mods_str and mods_str.lower() not in ("", "nm", "nomod"):
             mods_val = "Freemod" if mods_str.lower() == "freemod" else aiosu.models.mods.Mods(mods_str)

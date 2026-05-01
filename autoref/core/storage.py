@@ -116,9 +116,22 @@ class MatchDatabase:
             actions["timestamp"] = actions["timestamp"].astype(str)
             actions.to_sql("match_actions", self._conn, if_exists="append", index=False)
 
+        # Resolve effective per-mod multipliers for each beatmap in this match.
+        from .models import apply_score_multiplier
+        ruleset_mults = getattr(match.ruleset, "score_multipliers", None)
+        mults_by_bid: dict[int, dict[str, float]] = {}
+        try:
+            for pm in match.pool.flatten():
+                mults_by_bid[int(pm.beatmap_id)] = pm.effective_multipliers(ruleset_mults)
+        except Exception:
+            mults_by_bid = {}
+
         # API-enriched per-player scores keyed by turn.
         for turn, beatmap_id, scores in getattr(match, "game_scores", []):
+            mult = mults_by_bid.get(int(beatmap_id))
             for s in scores:
+                raw_score = s["score"]
+                adj = apply_score_multiplier(raw_score, s.get("mods", []), mult)
                 self._conn.execute(
                     "INSERT INTO game_scores "
                     "(match_id, turn, beatmap_id, user_id, username, team_index, "
@@ -127,7 +140,7 @@ class MatchDatabase:
                     (
                         match_id, turn, beatmap_id,
                         s["user_id"], s.get("username"), s.get("team_index"),
-                        s["score"], s["accuracy"], s["max_combo"],
+                        int(round(adj)), s["accuracy"], s["max_combo"],
                         json.dumps(s.get("mods", [])),
                         int(bool(s["passed"])),
                         int(bool(s.get("perfect", False))),
@@ -142,11 +155,14 @@ class MatchDatabase:
     def get_match_history(self) -> pd.DataFrame:
         return pd.read_sql("SELECT * FROM matches ORDER BY created_at DESC", self._conn)
 
-    def _match_filter(self, pool_id: str | None, round_name: str | None) -> tuple[str, list]:
+    def _match_filter(self, pool_id: str | None, round_name: str | None,
+                      alias: str = "") -> tuple[str, list]:
         """Build a `match_id IN (…)` subquery clause restricting to matches with
         the given pool / round. Returns ('', []) when no filter is requested.
 
         Both args are optional and combine with AND. None or empty means "any".
+        `alias` qualifies the outer `match_id` column (e.g. 'a' → 'a.match_id')
+        when the surrounding query joins multiple tables that share that name.
         """
         conds, params = [], []
         if pool_id:
@@ -157,7 +173,8 @@ class MatchDatabase:
             params.append(round_name)
         if not conds:
             return "", []
-        return f" match_id IN (SELECT match_id FROM matches WHERE {' AND '.join(conds)}) ", params
+        col = f"{alias}.match_id" if alias else "match_id"
+        return f" {col} IN (SELECT match_id FROM matches WHERE {' AND '.join(conds)}) ", params
 
     def get_filter_options(self) -> dict:
         """Distinct (pool_id, round_name) combinations seen in the DB, plus the
@@ -172,6 +189,25 @@ class MatchDatabase:
         pools  = sorted({p for p, _ in rows if p})
         rounds = sorted({r for _, r in rows if r})
         return {"combos": combos, "pools": pools, "rounds": rounds}
+
+    def get_pick_actions(self, *, pool_id: str | None = None,
+                          round_name: str | None = None) -> pd.DataFrame:
+        """All PICK events with their match context. Columns: match_id, turn,
+        team_index (the team that picked), beatmap_id, round_name."""
+        clause, params = self._match_filter(pool_id, round_name, alias="a")
+        where = f"AND {clause}" if clause else ""
+        return pd.read_sql(
+            f"""
+            SELECT a.match_id, a.turn, a.team_index AS picker_team,
+                   a.beatmap_id, m.round_name
+            FROM match_actions a
+            LEFT JOIN matches m ON m.match_id = a.match_id
+            WHERE a.step = 'PICK' {where}
+            ORDER BY a.match_id, a.turn
+            """,
+            self._conn,
+            params=params,
+        )
 
     def get_map_stats(self, *, pool_id: str | None = None,
                       round_name: str | None = None) -> pd.DataFrame:
@@ -242,11 +278,19 @@ class MatchDatabase:
                        round_name: str | None = None) -> pd.DataFrame:
         """Every game_scores row across every match — input for cross-match stats.
         Optionally restrict to matches matching pool_id / round_name.
+        Includes team_name joined from match_teams on (match_id, team_index).
         """
-        clause, params = self._match_filter(pool_id, round_name)
+        clause, params = self._match_filter(pool_id, round_name, alias="g")
         where = f"WHERE {clause}" if clause else ""
-        return pd.read_sql(f"SELECT * FROM game_scores {where}",
-                           self._conn, params=params)
+        return pd.read_sql(
+            f"""
+            SELECT g.*, mt.team_name
+            FROM game_scores g
+            LEFT JOIN match_teams mt
+                ON mt.match_id = g.match_id AND mt.team_index = g.team_index
+            {where}
+            """,
+            self._conn, params=params)
 
     def get_leaderboard(self, *, method: str = "zscore", include=None,
                         aggregate: str = "sum",

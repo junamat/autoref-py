@@ -223,7 +223,10 @@ def test_get_z_sum_leaderboard_via_db():
 # --------------------------------------------------------- new calculation methods
 
 def test_methods_registry_has_all_keys():
-    assert set(METHODS) == {"zscore", "avg_score", "placements", "percentile", "zipf", "pct_diff"}
+    assert set(METHODS) == {
+        "zscore", "avg_score", "placements", "percentile", "zipf", "pct_diff",
+        "mc_flashlight", "mc_bathbot", "beta_dist",
+    }
 
 
 def test_leaderboard_dispatcher_unknown_method():

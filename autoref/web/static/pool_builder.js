@@ -125,6 +125,13 @@ let selectedId = null;
 
 const WIN_CONDITIONS = ['score_v2', 'score', 'accuracy', 'combo'];
 const MOD_OPTIONS    = ['NM', 'HD', 'HR', 'DT', 'FL', 'EZ', 'FM', 'HDHR', 'HDDT'];
+const MOD_PREFIXES   = { NM: 'NM', HD: 'HD', HR: 'HR', DT: 'DT', FL: 'FL', EZ: 'EZ', FM: 'FM' };
+
+function inferModsFromName(name) {
+  if (!name) return null;
+  const prefix = name.slice(0, 2).toUpperCase();
+  return MOD_PREFIXES[prefix] || null;
+}
 
 /* ── tree helpers ────────────────────────────────────────────── */
 function findNode(nodes, id) {
@@ -362,6 +369,10 @@ function renderMapDetail(body, node) {
   flags.appendChild(makeCheckbox('disallowed', node.disallowed, v => { node.disallowed = v; renderTree(); }));
   body.appendChild(flags);
 
+  // score multipliers (override pool/ruleset)
+  body.appendChild(makeMultipliersSection(node, 'score multipliers',
+    'overrides parent pool/ruleset per mod. Exact-combo key (e.g. HDHR) wins; otherwise per-mod product.'));
+
   // actions
   const actions = document.createElement('div');
   actions.className = 'pb-detail-actions';
@@ -465,6 +476,10 @@ function renderPoolDetail(body, node) {
 
   // win condition
   body.appendChild(makeWinConSection(node, 'win condition', false));
+
+  // score multipliers — propagate to children unless they override
+  body.appendChild(makeMultipliersSection(node, 'score multipliers',
+    'inherited by maps in this pool unless overridden. Exact-combo key (e.g. HDHR) wins.'));
 
   // contains summary
   const contains = document.createElement('div');
@@ -608,6 +623,62 @@ function makeWinConSection(node, title, allowInherit) {
     hint.className = 'pb-inherit-hint';
     hint.textContent = `inherits from parent pool: ${parent ? parent.name + ' → ' + (parent.winCon || 'score_v2') : 'score_v2'}`;
     wrap.appendChild(hint);
+  }
+
+  return wrap;
+}
+
+function makeMultipliersSection(node, title, hint) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div class="pb-field-label">${title}</div>`;
+
+  const list = document.createElement('div');
+  list.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-bottom:5px';
+  wrap.appendChild(list);
+
+  function commit() {
+    const out = {};
+    list.querySelectorAll('.pb-mult-row').forEach(row => {
+      const k = row.querySelector('.pb-mult-key').value.trim().toUpperCase();
+      const v = parseFloat(row.querySelector('.pb-mult-val').value);
+      if (k && Number.isFinite(v)) out[k] = v;
+    });
+    if (Object.keys(out).length) node.score_multipliers = out;
+    else delete node.score_multipliers;
+  }
+
+  function addRow(k = '', v = '') {
+    const row = document.createElement('div');
+    row.className = 'pb-mult-row';
+    row.style.cssText = 'display:flex;gap:4px;align-items:center';
+    row.innerHTML = `
+      <input class="pb-field-val pb-mult-key" placeholder="MOD (e.g. EZ, HDHR)" value="${esc(k)}" style="flex:1">
+      <input class="pb-field-val pb-mult-val" placeholder="multiplier" type="number" step="0.01" value="${esc(v)}" style="width:90px">
+      <button class="ghost-btn pb-mult-rm" title="remove" style="padding:2px 6px">✕</button>
+    `;
+    row.querySelector('.pb-mult-key').addEventListener('change', commit);
+    row.querySelector('.pb-mult-val').addEventListener('change', commit);
+    row.querySelector('.pb-mult-rm').addEventListener('click', () => {
+      row.remove();
+      commit();
+    });
+    list.appendChild(row);
+  }
+
+  const existing = node.score_multipliers || {};
+  for (const [k, v] of Object.entries(existing)) addRow(k, v);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'ghost-btn xs';
+  addBtn.textContent = '+ add multiplier';
+  addBtn.addEventListener('click', () => addRow());
+  wrap.appendChild(addBtn);
+
+  if (hint) {
+    const h = document.createElement('div');
+    h.className = 'pb-inherit-hint';
+    h.textContent = hint;
+    wrap.appendChild(h);
   }
 
   return wrap;
@@ -759,7 +830,14 @@ $('pb-import-submit').addEventListener('click', async () => {
   for (const { bid, pool: poolName } of entries) {
     let poolNode = findNodeByName(tree, poolName);
     if (!poolNode) {
-      poolNode = { id: uid(), type: 'pool', name: poolName, mods: '', winCon: 'score_v2', open: true, children: [] };
+      const inferredMods = inferModsFromName(poolName);
+      poolNode = {
+        id: uid(),
+        type: inferredMods ? 'modpool' : 'pool',
+        name: poolName,
+        mods: inferredMods || '',
+        winCon: 'score_v2', open: true, children: [],
+      };
       tree.push(poolNode);
     }
     

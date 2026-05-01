@@ -43,6 +43,7 @@ body {
   color: var(--text);
   font-family: 'Space Mono', 'Cascadia Code', 'Fira Code', monospace;
   font-size: 12px;
+  zoom: 1.7;
   height: 100vh;
   overflow: hidden;
   display: flex;
