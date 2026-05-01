@@ -6,23 +6,52 @@ Cache file: ~/.cache/autoref/beatmaps.json (one JSON object, beatmap_id → info
 import asyncio
 import json
 import logging
+import os
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CACHE_FILE = Path.home() / ".cache" / "autoref" / "beatmaps.json"
+_DEFAULT_OSU_DIR = Path.home() / ".cache" / "autoref" / "osu"
+_PREFETCH_CONCURRENCY = 10
+_OSU_FILE_URL = "https://osu.ppy.sh/osu/{bid}"
+
+
+def _extract_meta(beatmap) -> dict:
+    """Pull a uniform metadata dict out of an aiosu Beatmap object."""
+    bset = getattr(beatmap, "beatmapset", None)
+    return {
+        "id":             getattr(beatmap, "id", None),
+        "beatmapset_id":  getattr(beatmap, "beatmapset_id", None),
+        "total_length":   getattr(beatmap, "total_length", 0),
+        "title":          getattr(bset, "title", "")  if bset else "",
+        "artist":         getattr(bset, "artist", "") if bset else "",
+        "version":        getattr(beatmap, "version", ""),
+        "stars":          round(getattr(beatmap, "difficulty_rating", 0.0) or 0.0, 2),
+        "ar":             round(getattr(beatmap, "ar", 0.0) or 0.0, 1),
+        "od":             round(getattr(beatmap, "accuracy", 0.0) or 0.0, 1),
+        "cs":             round(getattr(beatmap, "cs", 0.0) or 0.0, 1),
+        "hp":             round(getattr(beatmap, "drain", 0.0) or 0.0, 1),
+        "cached_at":      int(time.time()),
+    }
 
 
 class BeatmapCache:
-    """Thread-safe in-memory dict backed by a JSON file.
+    """Async-safe in-memory dict backed by a JSON file.
 
-    Info dict per entry: {total_length, title, artist, version}
+    Single source of truth for beatmap metadata. Metadata schema is the union
+    of fields needed by the lobby (total_length) and the web UI (stars, ar,
+    od, cs, hp, beatmapset_id, etc).
     """
 
-    def __init__(self, cache_file: Path = _DEFAULT_CACHE_FILE):
+    def __init__(self, cache_file: Path = _DEFAULT_CACHE_FILE,
+                 osu_dir: Path = _DEFAULT_OSU_DIR):
         self._path = Path(cache_file)
+        self._osu_dir = Path(osu_dir)
         self._data: dict[int, dict] = {}
         self._lock = asyncio.Lock()
+        self._osu_locks: dict[int, asyncio.Lock] = {}
         self._load()
 
     # ---------------------------------------------------------------- disk I/O
@@ -38,11 +67,16 @@ class BeatmapCache:
             logger.warning("beatmap cache: failed to load %s: %s", self._path, exc)
 
     def _save(self) -> None:
+        """Atomic write: dump to a temp file, fsync, then os.replace()."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(
-                json.dumps({str(k): v for k, v in self._data.items()}, indent=2)
-            )
+            tmp = self._path.with_suffix(self._path.suffix + ".tmp")
+            payload = json.dumps({str(k): v for k, v in self._data.items()}, indent=2)
+            with open(tmp, "w") as f:
+                f.write(payload)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, self._path)
         except Exception as exc:
             logger.warning("beatmap cache: failed to save: %s", exc)
 
@@ -50,6 +84,105 @@ class BeatmapCache:
 
     def get(self, beatmap_id: int) -> dict | None:
         return self._data.get(int(beatmap_id))
+
+    async def fetch_one(self, beatmap_id: int, client=None,
+                        force: bool = False) -> dict | None:
+        """Return cached metadata for `beatmap_id`, fetching once on miss.
+
+        Set `force=True` to bypass the cache and re-fetch from the API.
+        """
+        bid = int(beatmap_id)
+        if not force:
+            cached = self._data.get(bid)
+            if cached is not None:
+                return cached
+
+        if client is not None:
+            try:
+                beatmap = await client.get_beatmap(bid)
+            except Exception as exc:
+                logger.warning("beatmap cache: failed to fetch %d: %s", bid, exc)
+                return None
+        else:
+            from ..client import make_client
+            async with make_client() as c:
+                try:
+                    beatmap = await c.get_beatmap(bid)
+                except Exception as exc:
+                    logger.warning("beatmap cache: failed to fetch %d: %s", bid, exc)
+                    return None
+
+        meta = _extract_meta(beatmap)
+        async with self._lock:
+            self._data[bid] = meta
+            self._save()
+        return meta
+
+    async def refresh(self, beatmap_id: int, client=None) -> dict | None:
+        """Re-fetch a single beatmap, overwriting any cached entry."""
+        return await self.fetch_one(beatmap_id, client=client, force=True)
+
+    def is_stale(self, beatmap_id: int, max_age_s: int) -> bool:
+        """True if entry missing or `cached_at` older than `max_age_s` seconds."""
+        entry = self._data.get(int(beatmap_id))
+        if entry is None:
+            return True
+        cached_at = entry.get("cached_at")
+        if not isinstance(cached_at, (int, float)):
+            return True
+        return (time.time() - cached_at) > max_age_s
+
+    # ----------------------------------------------------------- .osu files
+
+    def osu_path(self, beatmap_id: int) -> Path:
+        """Return the on-disk path for a beatmap's `.osu` file (may not exist)."""
+        return self._osu_dir / f"{int(beatmap_id)}.osu"
+
+    async def get_osu_path(self, beatmap_id: int) -> Path | None:
+        """Return path to the cached `.osu` file, downloading once on miss.
+
+        Returns None on download failure. Concurrent calls for the same
+        beatmap_id share a single download.
+        """
+        bid = int(beatmap_id)
+        path = self.osu_path(bid)
+        if path.exists() and path.stat().st_size > 0:
+            return path
+
+        lock = self._osu_locks.setdefault(bid, asyncio.Lock())
+        async with lock:
+            if path.exists() and path.stat().st_size > 0:
+                return path
+            try:
+                import aiohttp
+            except ImportError:
+                logger.error("beatmap cache: aiohttp not installed; cannot fetch .osu")
+                return None
+            url = _OSU_FILE_URL.format(bid=bid)
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as resp:
+                        if resp.status != 200:
+                            logger.warning("beatmap cache: %s returned HTTP %d", url, resp.status)
+                            return None
+                        body = await resp.read()
+            except Exception as exc:
+                logger.warning("beatmap cache: failed to download %s: %s", url, exc)
+                return None
+
+            if not body:
+                logger.warning("beatmap cache: empty .osu body for %d", bid)
+                return None
+
+            try:
+                self._osu_dir.mkdir(parents=True, exist_ok=True)
+                tmp = path.with_suffix(path.suffix + ".tmp")
+                tmp.write_bytes(body)
+                os.replace(tmp, path)
+            except Exception as exc:
+                logger.warning("beatmap cache: failed to write %s: %s", path, exc)
+                return None
+            return path
 
     async def prefetch(self, beatmap_ids: list[int], client=None) -> None:
         """Fetch metadata for any IDs not already cached. Safe to call concurrently.
@@ -61,16 +194,22 @@ class BeatmapCache:
         if not missing:
             return
 
+        sem = asyncio.Semaphore(_PREFETCH_CONCURRENCY)
+
+        async def _one(c, bid):
+            async with sem:
+                return await c.get_beatmap(bid)
+
         if client is not None:
             results = await asyncio.gather(
-                *(client.get_beatmap(bid) for bid in missing),
+                *(_one(client, bid) for bid in missing),
                 return_exceptions=True,
             )
         else:
             from ..client import make_client
             async with make_client() as c:
                 results = await asyncio.gather(
-                    *(c.get_beatmap(bid) for bid in missing),
+                    *(_one(c, bid) for bid in missing),
                     return_exceptions=True,
                 )
 
@@ -80,14 +219,24 @@ class BeatmapCache:
                 if isinstance(result, Exception):
                     logger.warning("beatmap cache: failed to fetch %d: %s", bid, result)
                     continue
-                bset = getattr(result, "beatmapset", None)
-                self._data[bid] = {
-                    "total_length": getattr(result, "total_length", 0),
-                    "title":   getattr(bset, "title", "")   if bset else "",
-                    "artist":  getattr(bset, "artist", "")  if bset else "",
-                    "version": getattr(result, "version", ""),
-                }
+                self._data[bid] = _extract_meta(result)
                 fetched += 1
             if fetched:
                 self._save()
                 logger.info("beatmap cache: fetched %d new entries", fetched)
+
+
+# ----------------------------------------------------------------------------
+# Process-wide singleton: bot + web server share one BeatmapCache instance so
+# they coordinate through the same in-memory dict + asyncio.Lock instead of
+# racing each other through the JSON file on disk.
+# ----------------------------------------------------------------------------
+
+_SHARED: BeatmapCache | None = None
+
+
+def get_beatmap_cache() -> BeatmapCache:
+    global _SHARED
+    if _SHARED is None:
+        _SHARED = BeatmapCache()
+    return _SHARED

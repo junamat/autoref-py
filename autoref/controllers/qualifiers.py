@@ -4,7 +4,7 @@ import asyncio
 import bancho
 
 from ..core.base import AutoRef
-from ..core.beatmap_cache import BeatmapCache
+from ..core.beatmap_cache import BeatmapCache, get_beatmap_cache
 from ..core.enums import RefMode, Step
 from ..core.models import Match, Timers
 
@@ -20,7 +20,7 @@ class QualifiersAutoRef(AutoRef):
         self._maps = match.pool.flatten()
         self._map_index = 0
         self._run_index = 0
-        self._beatmap_cache: BeatmapCache = beatmap_cache or BeatmapCache()
+        self._beatmap_cache: BeatmapCache = beatmap_cache or get_beatmap_cache()
 
     def next_step(self, match_status) -> tuple[int, Step]:
         if self._map_index < len(self._maps):

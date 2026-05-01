@@ -13,22 +13,9 @@ logger = logging.getLogger(__name__)
 _STATIC_DIR = Path(__file__).parent / "static"
 
 
-_BEATMAP_CACHE_FILE = Path.home() / ".cache" / "autoref" / "beatmaps.json"
-
 from ..core.pool_store import PoolStore
+from ..core.beatmap_cache import get_beatmap_cache
 _POOL_STORE = PoolStore()
-
-
-def _load_beatmap_cache() -> dict:
-    try:
-        return json.loads(_BEATMAP_CACHE_FILE.read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def _save_beatmap_cache(cache: dict) -> None:
-    _BEATMAP_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _BEATMAP_CACHE_FILE.write_text(json.dumps(cache, indent=2))
 
 
 def _flatten_pool_tree(nodes: list, parent_mods: str = "") -> list:
@@ -887,38 +874,28 @@ class WebServer:
 
         @app.get("/api/beatmap/{beatmap_id}")
         async def get_beatmap(beatmap_id: str):
-            """Fetch beatmap metadata from osu! API."""
-            # Check cache first
-            cache = _load_beatmap_cache()
-            if beatmap_id in cache:
-                return JSONResponse(cache[beatmap_id])
-            
-            from ..client import make_client
-            client = make_client()
+            """Fetch beatmap metadata from osu! API (cache-backed)."""
             try:
-                beatmap = await client.get_beatmap(int(beatmap_id))
-                data = {
-                    "id": beatmap.id,
-                    "beatmapset_id": beatmap.beatmapset_id,
-                    "title": beatmap.beatmapset.title,
-                    "artist": beatmap.beatmapset.artist,
-                    "diff": beatmap.version,
-                    "len": beatmap.total_length,
-                    "stars": round(beatmap.difficulty_rating, 2),
-                    "ar": round(beatmap.ar, 1),
-                    "od": round(beatmap.accuracy, 1),
-                    "cs": round(beatmap.cs, 1),
-                    "hp": round(beatmap.drain, 1),
-                }
-                # Cache the result
-                cache[beatmap_id] = data
-                _save_beatmap_cache(cache)
-                return JSONResponse(data)
+                meta = await get_beatmap_cache().fetch_one(int(beatmap_id))
             except Exception as e:
                 logger.exception(f"failed to fetch beatmap {beatmap_id}")
                 return JSONResponse({"error": str(e)}, status_code=500)
-            finally:
-                await client.aclose()
+            if meta is None:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            # API response shape kept stable: web UI consumes `len`/`diff`.
+            return JSONResponse({
+                "id":            meta.get("id"),
+                "beatmapset_id": meta.get("beatmapset_id"),
+                "title":         meta.get("title", ""),
+                "artist":        meta.get("artist", ""),
+                "diff":          meta.get("version", ""),
+                "len":           meta.get("total_length", 0),
+                "stars":         meta.get("stars", 0.0),
+                "ar":            meta.get("ar", 0.0),
+                "od":            meta.get("od", 0.0),
+                "cs":            meta.get("cs", 0.0),
+                "hp":            meta.get("hp", 0.0),
+            })
 
         @app.get("/api/beatmap/{beatmap_id}/attributes")
         async def get_beatmap_attributes(beatmap_id: str, mods: str = ""):
