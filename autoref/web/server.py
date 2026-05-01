@@ -262,14 +262,19 @@ class WebServer:
         @app.get("/api/stats")
         async def api_stats(method: str = "zscore", count_failed: bool = True, aggregate: str = "sum",
                             pool_id: str | None = None, round_name: str | None = None):
-            from ..core.stats import include_all, exclude_failed, METHODS
+            from ..core.stats import include_all, exclude_failed, METHODS, PP_METHODS, leaderboard_async
             if method not in METHODS:
                 return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
             if aggregate not in ("sum", "mean"):
                 return JSONResponse({"error": f"aggregate must be 'sum' or 'mean'"}, status_code=400)
             predicate = include_all if count_failed else exclude_failed
-            leaderboard = server.db.get_leaderboard(method=method, include=predicate, aggregate=aggregate,
-                                                    pool_id=pool_id, round_name=round_name)
+            if method in PP_METHODS:
+                all_scores_for_lb = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
+                leaderboard = await leaderboard_async(all_scores_for_lb, method=method,
+                                                      include=predicate, aggregate=aggregate)
+            else:
+                leaderboard = server.db.get_leaderboard(method=method, include=predicate, aggregate=aggregate,
+                                                        pool_id=pool_id, round_name=round_name)
             map_stats   = server.db.get_map_stats(pool_id=pool_id, round_name=round_name)
             map_breakdown = server.db.get_map_action_breakdown(pool_id=pool_id, round_name=round_name)
             all_scores  = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
@@ -474,10 +479,62 @@ class WebServer:
                     "carry_z":    round(float(r["carry_z"]), 3),
                 })
 
+            # ── pp / z-pp top performances (rosu-pp-py required) ──
+            highest_pp: list = []
+            highest_zpp: list = []
+            try:
+                from ..core.stats import augment_pp
+                aug = await augment_pp(pick_scores)
+                if "pp" in aug.columns and aug["pp"].notna().any():
+                    pp_df = aug.dropna(subset=["pp"]).copy()
+                    pp_top = pp_df.nlargest(top_n, "pp")
+                    for _, r in pp_top.iterrows():
+                        bid = int(r["beatmap_id"])
+                        mods = json.loads(r["mods"]) if pd.notna(r["mods"]) and r["mods"] else []
+                        highest_pp.append({
+                            "match_id":   int(r["match_id"]),
+                            "round_name": r["round_name"] if "round_name" in r and pd.notna(r["round_name"]) else None,
+                            "user_id":    int(r["user_id"]),
+                            "username":   r["username"],
+                            "beatmap_id": bid,
+                            "name":       code_by_bid.get(bid),
+                            "mods":       mods,
+                            "score":      int(r["score"]),
+                            "accuracy":   round(float(r["accuracy"]), 4),
+                            "rank":       (r["rank"] if pd.notna(r["rank"]) else None),
+                            "pp":         round(float(r["pp"]), 1),
+                        })
+
+                    map_pp = pp_df.groupby("beatmap_id")["pp"].agg(["mean", "std"])
+                    pp_df = pp_df.join(map_pp, on="beatmap_id", rsuffix="_map")
+                    pp_df["zpp"] = ((pp_df["pp"] - pp_df["mean"]) / pp_df["std"]).fillna(0.0)
+                    zpp_top = pp_df.nlargest(top_n, "zpp")
+                    for _, r in zpp_top.iterrows():
+                        bid = int(r["beatmap_id"])
+                        mods = json.loads(r["mods"]) if pd.notna(r["mods"]) and r["mods"] else []
+                        highest_zpp.append({
+                            "match_id":   int(r["match_id"]),
+                            "round_name": r["round_name"] if "round_name" in r and pd.notna(r["round_name"]) else None,
+                            "user_id":    int(r["user_id"]),
+                            "username":   r["username"],
+                            "beatmap_id": bid,
+                            "name":       code_by_bid.get(bid),
+                            "mods":       mods,
+                            "score":      int(r["score"]),
+                            "accuracy":   round(float(r["accuracy"]), 4),
+                            "rank":       (r["rank"] if pd.notna(r["rank"]) else None),
+                            "pp":         round(float(r["pp"]), 1),
+                            "zpp":        round(float(r["zpp"]), 3),
+                        })
+            except Exception as e:
+                logger.warning(f"pp augmentation failed: {e}")
+
             return JSONResponse({
                 "closest_maps":     closest,
                 "biggest_blowouts": blowouts,
                 "biggest_carries":  carries,
+                "highest_pp":       highest_pp,
+                "highest_zpp":      highest_zpp,
             })
 
         @app.get("/api/stats/plot/{name}")
@@ -690,9 +747,14 @@ class WebServer:
               map_order: [beatmap_id, ...]  — ordered by pool position / pick count
               has_data: bool
             """
-            from ..core.stats import include_all, exclude_failed, METHODS, team_leaderboard
+            from ..core.stats import include_all, exclude_failed, METHODS, PP_METHODS, team_leaderboard
             if method not in METHODS:
                 return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
+            if method in PP_METHODS:
+                return JSONResponse(
+                    {"error": f"method {method!r} not yet supported on team-level results"},
+                    status_code=400,
+                )
             predicate = include_all if count_failed else exclude_failed
             scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
             code_by_bid = _build_map_code_lookup()

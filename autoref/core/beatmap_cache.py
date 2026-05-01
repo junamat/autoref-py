@@ -52,6 +52,7 @@ class BeatmapCache:
         self._data: dict[int, dict] = {}
         self._lock = asyncio.Lock()
         self._osu_locks: dict[int, asyncio.Lock] = {}
+        self._failed_osu: set[int] = set()
         self._load()
 
     # ---------------------------------------------------------------- disk I/O
@@ -138,25 +139,48 @@ class BeatmapCache:
         """Return the on-disk path for a beatmap's `.osu` file (may not exist)."""
         return self._osu_dir / f"{int(beatmap_id)}.osu"
 
+    def is_osu_unavailable(self, beatmap_id: int) -> bool:
+        """True if a previous fetch for this bid failed within the current process."""
+        return int(beatmap_id) in self._failed_osu
+
+    def mark_osu_unavailable(self, beatmap_id: int) -> None:
+        """Mark a beatmap's `.osu` as unfetchable so future calls short-circuit."""
+        self._failed_osu.add(int(beatmap_id))
+
+    def clear_osu_unavailable(self, beatmap_id: int | None = None) -> None:
+        """Clear the in-process unfetchable flag. Pass None to clear all."""
+        if beatmap_id is None:
+            self._failed_osu.clear()
+        else:
+            self._failed_osu.discard(int(beatmap_id))
+
     async def get_osu_path(self, beatmap_id: int) -> Path | None:
         """Return path to the cached `.osu` file, downloading once on miss.
 
-        Returns None on download failure. Concurrent calls for the same
-        beatmap_id share a single download.
+        Returns None on download failure. Subsequent calls for the same bid
+        within the same process short-circuit via the in-memory negative
+        cache so a single bad map doesn't trigger N network calls per stats
+        recompute. Restart the process (or call `clear_osu_unavailable()`)
+        to retry.
         """
         bid = int(beatmap_id)
+        if bid in self._failed_osu:
+            return None
         path = self.osu_path(bid)
         if path.exists() and path.stat().st_size > 0:
             return path
 
         lock = self._osu_locks.setdefault(bid, asyncio.Lock())
         async with lock:
+            if bid in self._failed_osu:
+                return None
             if path.exists() and path.stat().st_size > 0:
                 return path
             try:
                 import aiohttp
             except ImportError:
                 logger.error("beatmap cache: aiohttp not installed; cannot fetch .osu")
+                self._failed_osu.add(bid)
                 return None
             url = _OSU_FILE_URL.format(bid=bid)
             try:
@@ -164,14 +188,17 @@ class BeatmapCache:
                     async with session.get(url) as resp:
                         if resp.status != 200:
                             logger.warning("beatmap cache: %s returned HTTP %d", url, resp.status)
+                            self._failed_osu.add(bid)
                             return None
                         body = await resp.read()
             except Exception as exc:
                 logger.warning("beatmap cache: failed to download %s: %s", url, exc)
+                self._failed_osu.add(bid)
                 return None
 
             if not body:
-                logger.warning("beatmap cache: empty .osu body for %d", bid)
+                logger.warning("beatmap cache: empty .osu body for %d (marked unavailable)", bid)
+                self._failed_osu.add(bid)
                 return None
 
             try:
@@ -181,6 +208,7 @@ class BeatmapCache:
                 os.replace(tmp, path)
             except Exception as exc:
                 logger.warning("beatmap cache: failed to write %s: %s", path, exc)
+                self._failed_osu.add(bid)
                 return None
             return path
 

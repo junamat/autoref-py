@@ -225,7 +225,7 @@ def test_get_z_sum_leaderboard_via_db():
 def test_methods_registry_has_all_keys():
     assert set(METHODS) == {
         "zscore", "avg_score", "placements", "percentile", "zipf", "pct_diff",
-        "mc_flashlight", "mc_bathbot", "beta_dist",
+        "mc_flashlight", "mc_bathbot", "beta_dist", "pp", "z_pp",
     }
 
 
@@ -358,7 +358,10 @@ def test_get_leaderboard_method_param():
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", r,
         )
     db._conn.commit()
+    from autoref.core.stats import PP_METHODS
     for method in METHODS:
+        if method in PP_METHODS:
+            continue  # async-only, exercised separately
         out = db.get_leaderboard(method=method)
         assert not out.empty, f"method={method} returned empty"
         assert "user_id" in out.columns

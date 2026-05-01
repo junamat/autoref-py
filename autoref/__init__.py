@@ -6,7 +6,11 @@ from .core.pool_store import PoolStore
 from .core.lobby import Lobby, MatchResult, PlayerResult, SlotInfo
 from .core.output import OutputSink
 from .core.score_fetcher import ScoreFetcher
-from .core.stats import leaderboard, z_sum_leaderboard, include_all, exclude_failed, METHODS
+from .core.stats import (
+    leaderboard, leaderboard_async, z_sum_leaderboard,
+    pp_leaderboard, z_pp_leaderboard, augment_pp,
+    include_all, exclude_failed, METHODS, PP_METHODS,
+)
 from .core.base import AutoRef
 
 # controllers — always available (depend only on core)

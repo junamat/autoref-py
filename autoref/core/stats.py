@@ -36,7 +36,13 @@ METHODS: dict[str, tuple[str, bool]] = {
     "mc_flashlight": ("Match Cost (Flashlight)", False),
     "mc_bathbot":    ("Match Cost (Bathbot)",    False),
     "beta_dist":     ("Beta Distribution",       False),
+    "pp":            ("Performance Points",      False),
+    "z_pp":          ("Z-PP",                    False),
 }
+
+# Methods that require local pp calc (rosu-pp-py). Async-only — the sync
+# `leaderboard()` dispatcher rejects these; use `leaderboard_async()` instead.
+PP_METHODS: frozenset[str] = frozenset({"pp", "z_pp"})
 
 _BASE_COLUMNS = ["user_id", "username", "maps_played"]
 
@@ -54,6 +60,8 @@ def leaderboard(
     """
     if method not in METHODS:
         raise ValueError(f"unknown method {method!r}; choose from {list(METHODS)}")
+    if method in PP_METHODS:
+        raise ValueError(f"method {method!r} requires async; use leaderboard_async()")
 
     fn = {
         "zscore":        z_sum_leaderboard,
@@ -67,6 +75,21 @@ def leaderboard(
         "beta_dist":     beta_distribution_leaderboard,
     }[method]
     return fn(scores, include=include, aggregate=aggregate)
+
+
+async def leaderboard_async(
+    scores: pd.DataFrame,
+    *,
+    method: str = "zscore",
+    include: ScorePredicate = include_all,
+    aggregate: str = "sum",
+) -> pd.DataFrame:
+    """Async dispatcher. Handles pp/z_pp methods; delegates others to sync path."""
+    if method == "pp":
+        return await pp_leaderboard(scores, include=include, aggregate=aggregate)
+    if method == "z_pp":
+        return await z_pp_leaderboard(scores, include=include, aggregate=aggregate)
+    return leaderboard(scores, method=method, include=include, aggregate=aggregate)
 
 
 # ── team-aggregation entry point ─────────────────────────────────────────────
@@ -479,3 +502,121 @@ def beta_distribution_leaderboard(
         df.loc[idx, "beta_dist"] = betainc(alpha, beta, x.values)
 
     return _finish(df, "username", "beta_dist", ascending=False, aggregate=aggregate)
+
+
+# ── PP / Z-PP ────────────────────────────────────────────────────────────────
+
+import asyncio
+import json as _json
+
+
+def _row_mods(row) -> list[str]:
+    """Decode the JSON mods field on a score row to a list of acronyms."""
+    raw = row.get("mods") if isinstance(row, dict) else row["mods"]
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [str(m).upper() for m in raw if m]
+    try:
+        parsed = _json.loads(raw)
+        return [str(m).upper() for m in parsed if m]
+    except Exception:
+        return []
+
+
+async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8) -> pd.DataFrame:
+    """Return a copy of `scores` with a `pp` column populated via rosu-pp-py.
+
+    Rows where pp can't be computed (rosu-pp-py missing, .osu fetch failed,
+    parse error) get pp = NaN. Identical (bid, mods, accuracy, max_combo)
+    plays are computed once and reused.
+    """
+    from .pp_calc import compute_pp
+
+    if scores is None or scores.empty:
+        out = scores.copy() if scores is not None else pd.DataFrame()
+        out["pp"] = pd.Series(dtype=float)
+        return out
+
+    df = scores.copy()
+    sem = asyncio.Semaphore(concurrency)
+    cache: dict[tuple, float | None] = {}
+
+    async def _one(idx, row):
+        bid = int(row["beatmap_id"])
+        mods = tuple(sorted(_row_mods(row)))
+        acc = float(row.get("accuracy", 0.0) or 0.0)
+        if acc <= 1.0:
+            acc *= 100.0  # stored as 0.xx instead of 0–100
+        combo = int(row.get("max_combo", 0) or 0)
+        misses = int(row.get("nmiss", 0) or 0)
+        key = (bid, mods, round(acc, 2), combo, misses)
+        if key in cache:
+            return idx, cache[key]
+        async with sem:
+            pp = await compute_pp(
+                bid,
+                mods=list(mods),
+                accuracy=acc,
+                max_combo=combo or None,
+                misses=misses,
+            )
+        cache[key] = pp
+        return idx, pp
+
+    results = await asyncio.gather(*(_one(i, r) for i, r in df.iterrows()))
+    df["pp"] = pd.Series({i: pp for i, pp in results}, dtype="float64")
+    return df
+
+
+def _prep_pp(df: pd.DataFrame) -> pd.DataFrame | None:
+    """Drop rows without a usable pp value, dedupe to best pp per (player, map)."""
+    if df.empty or "pp" not in df.columns:
+        return None
+    df = df.dropna(subset=["pp"])
+    if df.empty:
+        return None
+    return (df.sort_values("pp", ascending=False)
+              .drop_duplicates(subset=["user_id", "beatmap_id"]))
+
+
+async def pp_leaderboard(
+    scores: pd.DataFrame,
+    *,
+    include: ScorePredicate = include_all,
+    aggregate: str = "sum",
+) -> pd.DataFrame:
+    """Per-player pp leaderboard. Requires rosu-pp-py."""
+    if scores.empty:
+        return _empty("pp")
+    filt = scores.loc[scores.apply(include, axis=1)].copy()
+    if filt.empty:
+        return _empty("pp")
+    aug = await augment_pp(filt)
+    df = _prep_pp(aug)
+    if df is None:
+        return _empty("pp")
+    return _finish(df, "username", "pp", ascending=False, aggregate=aggregate)
+
+
+async def z_pp_leaderboard(
+    scores: pd.DataFrame,
+    *,
+    include: ScorePredicate = include_all,
+    aggregate: str = "sum",
+) -> pd.DataFrame:
+    """Per-player Z-PP leaderboard. Z = (pp − map_mean_pp) / map_std_pp."""
+    if scores.empty:
+        return _empty("z_pp")
+    filt = scores.loc[scores.apply(include, axis=1)].copy()
+    if filt.empty:
+        return _empty("z_pp")
+    aug = await augment_pp(filt)
+    df = _prep_pp(aug)
+    if df is None:
+        return _empty("z_pp")
+
+    map_stats = df.groupby("beatmap_id")["pp"].agg(["mean", "std"])
+    df = df.join(map_stats, on="beatmap_id")
+    df["z_pp"] = ((df["pp"] - df["mean"]) / df["std"]).fillna(0.0)
+    return _finish(df, "username", "z_pp", ascending=False, aggregate=aggregate)
