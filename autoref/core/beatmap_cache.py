@@ -53,6 +53,7 @@ class BeatmapCache:
         self._lock = asyncio.Lock()
         self._osu_locks: dict[int, asyncio.Lock] = {}
         self._failed_osu: set[int] = set()
+        self._failed_meta: set[int] = set()
         self._load()
 
     # ---------------------------------------------------------------- disk I/O
@@ -97,12 +98,15 @@ class BeatmapCache:
             cached = self._data.get(bid)
             if cached is not None:
                 return cached
+            if bid in self._failed_meta:
+                return None
 
         if client is not None:
             try:
                 beatmap = await client.get_beatmap(bid)
             except Exception as exc:
                 logger.warning("beatmap cache: failed to fetch %d: %s", bid, exc)
+                self._failed_meta.add(bid)
                 return None
         else:
             from ..client import make_client
@@ -111,11 +115,13 @@ class BeatmapCache:
                     beatmap = await c.get_beatmap(bid)
                 except Exception as exc:
                     logger.warning("beatmap cache: failed to fetch %d: %s", bid, exc)
+                    self._failed_meta.add(bid)
                     return None
 
         meta = _extract_meta(beatmap)
         async with self._lock:
             self._data[bid] = meta
+            self._failed_meta.discard(bid)
             self._save()
         return meta
 
@@ -138,6 +144,17 @@ class BeatmapCache:
     def osu_path(self, beatmap_id: int) -> Path:
         """Return the on-disk path for a beatmap's `.osu` file (may not exist)."""
         return self._osu_dir / f"{int(beatmap_id)}.osu"
+
+    def is_meta_unavailable(self, beatmap_id: int) -> bool:
+        """True if a previous metadata fetch for this bid failed in this process."""
+        return int(beatmap_id) in self._failed_meta
+
+    def clear_meta_unavailable(self, beatmap_id: int | None = None) -> None:
+        """Clear the in-process metadata negative cache. Pass None to clear all."""
+        if beatmap_id is None:
+            self._failed_meta.clear()
+        else:
+            self._failed_meta.discard(int(beatmap_id))
 
     def is_osu_unavailable(self, beatmap_id: int) -> bool:
         """True if a previous fetch for this bid failed within the current process."""
@@ -218,7 +235,10 @@ class BeatmapCache:
         Pass `client` (an aiosu.v2.Client) to reuse an existing API session.
         If omitted, a fresh client is created via autoref.client.make_client().
         """
-        missing = [int(bid) for bid in beatmap_ids if int(bid) not in self._data]
+        missing = [
+            int(bid) for bid in beatmap_ids
+            if int(bid) not in self._data and int(bid) not in self._failed_meta
+        ]
         if not missing:
             return
 
@@ -246,6 +266,7 @@ class BeatmapCache:
             for bid, result in zip(missing, results):
                 if isinstance(result, Exception):
                     logger.warning("beatmap cache: failed to fetch %d: %s", bid, result)
+                    self._failed_meta.add(bid)
                     continue
                 self._data[bid] = _extract_meta(result)
                 fetched += 1

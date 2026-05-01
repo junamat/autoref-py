@@ -83,12 +83,13 @@ async def leaderboard_async(
     method: str = "zscore",
     include: ScorePredicate = include_all,
     aggregate: str = "sum",
+    db=None,
 ) -> pd.DataFrame:
     """Async dispatcher. Handles pp/z_pp methods; delegates others to sync path."""
     if method == "pp":
-        return await pp_leaderboard(scores, include=include, aggregate=aggregate)
+        return await pp_leaderboard(scores, include=include, aggregate=aggregate, db=db)
     if method == "z_pp":
-        return await z_pp_leaderboard(scores, include=include, aggregate=aggregate)
+        return await z_pp_leaderboard(scores, include=include, aggregate=aggregate, db=db)
     return leaderboard(scores, method=method, include=include, aggregate=aggregate)
 
 
@@ -524,14 +525,20 @@ def _row_mods(row) -> list[str]:
         return []
 
 
-async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8) -> pd.DataFrame:
+async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8, db=None) -> pd.DataFrame:
     """Return a copy of `scores` with a `pp` column populated via rosu-pp-py.
 
-    Rows where pp can't be computed (rosu-pp-py missing, .osu fetch failed,
-    parse error) get pp = NaN. Identical (bid, mods, accuracy, max_combo)
-    plays are computed once and reused.
+    If `scores` already carries a non-null `pp` value for a row, it's reused
+    and not recomputed. Rows where pp can't be computed (rosu-pp-py missing,
+    .osu fetch failed, parse error) get pp = NaN. Identical
+    (bid, mods, accuracy, max_combo, misses) plays are computed once and
+    reused within the call.
+
+    If `db` is provided (a `MatchDatabase`), newly-computed pp values are
+    persisted back to `game_scores.pp` (keyed by the row's `id` column),
+    making subsequent calls a DB read instead of a recompute.
     """
-    from .pp_calc import compute_pp
+    from .pp_calc import compute_pp, current_pp_version
 
     if scores is None or scores.empty:
         out = scores.copy() if scores is not None else pd.DataFrame()
@@ -539,10 +546,27 @@ async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8) -> pd.DataFr
         return out
 
     df = scores.copy()
+    if "pp" not in df.columns:
+        df["pp"] = pd.NA
+    cur_ver = current_pp_version()
     sem = asyncio.Semaphore(concurrency)
     cache: dict[tuple, float | None] = {}
+    new_writes: list[tuple[int, float | None, str | None]] = []
 
     async def _one(idx, row):
+        existing = row.get("pp", None)
+        existing_ver = row.get("pp_version", None) if "pp_version" in df.columns else None
+        # Reuse cached pp only if its version matches the current rosu-pp.
+        # If versions differ (or current is unknown), recompute.
+        if existing is not None and pd.notna(existing):
+            same_ver = (
+                cur_ver is not None
+                and existing_ver is not None
+                and pd.notna(existing_ver)
+                and str(existing_ver) == str(cur_ver)
+            )
+            if same_ver:
+                return idx, float(existing), False
         bid = int(row["beatmap_id"])
         mods = tuple(sorted(_row_mods(row)))
         acc = float(row.get("accuracy", 0.0) or 0.0)
@@ -552,7 +576,7 @@ async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8) -> pd.DataFr
         misses = int(row.get("nmiss", 0) or 0)
         key = (bid, mods, round(acc, 2), combo, misses)
         if key in cache:
-            return idx, cache[key]
+            return idx, cache[key], False
         async with sem:
             pp = await compute_pp(
                 bid,
@@ -562,10 +586,26 @@ async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8) -> pd.DataFr
                 misses=misses,
             )
         cache[key] = pp
-        return idx, pp
+        return idx, pp, True
 
     results = await asyncio.gather(*(_one(i, r) for i, r in df.iterrows()))
-    df["pp"] = pd.Series({i: pp for i, pp in results}, dtype="float64")
+    df["pp"] = pd.Series({i: pp for i, pp, _ in results}, dtype="float64")
+
+    if db is not None and "id" in df.columns:
+        for idx, pp, was_new in results:
+            if not was_new or pp is None:
+                continue
+            sid = df.at[idx, "id"]
+            if pd.isna(sid):
+                continue
+            new_writes.append((int(sid), float(pp), cur_ver))
+        if new_writes:
+            try:
+                db.update_pp_bulk(new_writes)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("augment_pp: failed to persist pp: %s", exc)
+
     return df
 
 
@@ -585,6 +625,7 @@ async def pp_leaderboard(
     *,
     include: ScorePredicate = include_all,
     aggregate: str = "sum",
+    db=None,
 ) -> pd.DataFrame:
     """Per-player pp leaderboard. Requires rosu-pp-py."""
     if scores.empty:
@@ -592,7 +633,7 @@ async def pp_leaderboard(
     filt = scores.loc[scores.apply(include, axis=1)].copy()
     if filt.empty:
         return _empty("pp")
-    aug = await augment_pp(filt)
+    aug = await augment_pp(filt, db=db)
     df = _prep_pp(aug)
     if df is None:
         return _empty("pp")
@@ -604,6 +645,7 @@ async def z_pp_leaderboard(
     *,
     include: ScorePredicate = include_all,
     aggregate: str = "sum",
+    db=None,
 ) -> pd.DataFrame:
     """Per-player Z-PP leaderboard. Z = (pp − map_mean_pp) / map_std_pp."""
     if scores.empty:
@@ -611,7 +653,7 @@ async def z_pp_leaderboard(
     filt = scores.loc[scores.apply(include, axis=1)].copy()
     if filt.empty:
         return _empty("z_pp")
-    aug = await augment_pp(filt)
+    aug = await augment_pp(filt, db=db)
     df = _prep_pp(aug)
     if df is None:
         return _empty("z_pp")

@@ -271,7 +271,8 @@ class WebServer:
             if method in PP_METHODS:
                 all_scores_for_lb = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
                 leaderboard = await leaderboard_async(all_scores_for_lb, method=method,
-                                                      include=predicate, aggregate=aggregate)
+                                                      include=predicate, aggregate=aggregate,
+                                                      db=server.db)
             else:
                 leaderboard = server.db.get_leaderboard(method=method, include=predicate, aggregate=aggregate,
                                                         pool_id=pool_id, round_name=round_name)
@@ -484,7 +485,7 @@ class WebServer:
             highest_zpp: list = []
             try:
                 from ..core.stats import augment_pp
-                aug = await augment_pp(pick_scores)
+                aug = await augment_pp(pick_scores, db=server.db)
                 if "pp" in aug.columns and aug["pp"].notna().any():
                     pp_df = aug.dropna(subset=["pp"]).copy()
                     pp_top = pp_df.nlargest(top_n, "pp")

@@ -18,6 +18,18 @@ logger = logging.getLogger(__name__)
 _warned_missing = False
 
 
+def current_pp_version() -> str | None:
+    """Return the installed rosu-pp-py version string, or None if not installed.
+
+    Used to tag stored pp values so a newer rosu-pp can invalidate stale entries.
+    """
+    try:
+        import importlib.metadata as md
+        return md.version("rosu-pp-py")
+    except Exception:
+        return None
+
+
 def _rosu():
     """Lazy-import rosu_pp_py. Returns module or None."""
     global _warned_missing

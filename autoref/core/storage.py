@@ -69,7 +69,34 @@ class MatchDatabase:
         for col, decl in (("pool_id", "TEXT"), ("round_name", "TEXT")):
             if col not in existing:
                 self._conn.execute(f"ALTER TABLE matches ADD COLUMN {col} {decl}")
+
+        existing_gs = {row[1] for row in self._conn.execute("PRAGMA table_info(game_scores)")}
+        for col, decl in (("pp", "REAL"), ("pp_version", "TEXT")):
+            if col not in existing_gs:
+                self._conn.execute(f"ALTER TABLE game_scores ADD COLUMN {col} {decl}")
         self._conn.commit()
+
+    # -------------------------------------------------------------- pp persist
+
+    def update_pp_bulk(self, updates: list[tuple[int, float | None, str | None]]) -> int:
+        """Persist computed pp values + the rosu-pp version that produced them.
+
+        Each tuple is (game_scores.id, pp, pp_version). Rows where pp is None
+        are skipped (failed compute → keep NULL so a future call can retry).
+        Returns the number of rows updated.
+        """
+        keepers = [
+            (float(pp), (str(ver) if ver is not None else None), int(sid))
+            for sid, pp, ver in updates if pp is not None
+        ]
+        if not keepers:
+            return 0
+        self._conn.executemany(
+            "UPDATE game_scores SET pp = ?, pp_version = ? WHERE id = ?",
+            keepers,
+        )
+        self._conn.commit()
+        return len(keepers)
 
     def close(self) -> None:
         self._conn.close()
