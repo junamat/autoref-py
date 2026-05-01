@@ -23,6 +23,10 @@ plots = [
     "matplotlib",
     "scipy",
 ]
+# pip install -e ".[pp]"    → local pp calculator (rosu-pp-py, Rust)
+pp = [
+    "rosu-pp-py",
+]
 # pip install -e ".[dev]"   → adds test + env-loading tooling
 dev = [
     "pytest",
@@ -31,5 +35,5 @@ dev = [
 ]
 # pip install -e ".[all]"   → everything
 all = [
-    "autoref-py[web,plots,dev]",
+    "autoref-py[web,plots,pp,dev]",
 ]

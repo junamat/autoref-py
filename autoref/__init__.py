@@ -24,7 +24,13 @@ except ImportError:
 
 # optional: beatmap cache (requires aiosu)
 try:
-    from .core.beatmap_cache import BeatmapCache
+    from .core.beatmap_cache import BeatmapCache, get_beatmap_cache
+except ImportError:
+    pass
+
+# optional: local pp calculator (requires rosu-pp-py)
+try:
+    from .core.pp_calc import compute_pp
 except ImportError:
     pass
 
