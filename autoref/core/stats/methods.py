@@ -299,8 +299,8 @@ def match_cost_bathbot_leaderboard(
            * (1 + 0.02 * max(0, m - 2))
             tb_bonus = (tb_score / avg_tb_score) if player played the tiebreaker map, else 0
 
-    n  — number of games in the match
-    n' — games this player participated in
+    n  — number of maps played in the match
+    n' — maps this player participated in
     m  — distinct mod combinations the player used in the match
 
     TB map identified via `matches.tb_beatmap_id` (snapshotted at match save).
@@ -338,9 +338,9 @@ def match_cost_bathbot_leaderboard(
             mod_bonus = 1.0 + 0.02 * max(0, m - 2)
             cost = base * participation * mod_bonus
             rows.append({
-                "user_id": user_id,
-                "username": pdf["username"].iloc[-1],
-                "beatmap_id": pdf["beatmap_id"].iloc[0],
+                "user_id":    user_id,
+                "username":   pdf["username"].iloc[-1],
+                "n_prime":    n_prime,
                 "mc_bathbot": cost,
             })
 
@@ -352,7 +352,7 @@ def match_cost_bathbot_leaderboard(
     agg_func = "mean" if aggregate == "mean" else "sum"
     out = (per_match.groupby("user_id")
                     .agg(username=("username", "last"),
-                         maps_played=("beatmap_id", "count"),  # = matches played
+                         maps_played=("n_prime", "sum"),
                          mc_bathbot=("mc_bathbot", agg_func))
                     .reset_index()
                     .sort_values("mc_bathbot", ascending=False)
