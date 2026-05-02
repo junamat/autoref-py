@@ -7,9 +7,9 @@ import bancho
 
 from .enums import Step, MapState, RefMode
 from .lobby import Lobby
-from .models import Match, PlayableMap, Pool, Timers, _normalize, _find_map, _find_map_by_input, _find_map_by_input_pick  # noqa: F401
+from .models import Match, PlayableMap, Pool, Timers, _normalize, _find_map, _find_map_by_input, _find_map_by_input_pick 
 from .storage import MatchDatabase
-from .commands import Command, COMMANDS  # re-exported for backwards compat
+from .commands import Command, COMMANDS, BUILTIN_HANDLERS  # re-exported for backwards compat
 
 logger = logging.getLogger(__name__)
 
@@ -310,162 +310,11 @@ class AutoRef(ABC):
 
     async def _dispatch_command(self, cmd: str, args: list[str], source: str) -> bool:
         """Execute a parsed ref command. Returns True if recognised."""
-
-        # ── help ─────────────────────────────────────────────────────────────
-        if cmd in ("help", "commands", "cmds", "h"):
-            trusted = source in self._trusted_sources()
-            if trusted:
-                for line in self._help_ref_lines():
-                    await self.lobby.reply(line, source)
-            else:
-                prefix = self.ref_prefix
-                for c in self._commands():
-                    if c.scope == "anyone":
-                        p = "" if c.noprefix else prefix
-                        await self.lobby.say(f"{p}{c.name}  — {c.desc}")
-            return True
-
-        # ── mode / flow ──────────────────────────────────────────────────────
-        if cmd == "mode" and args:
-            try:
-                await self._set_mode(RefMode(args[0].lower()))
-                await self.lobby.say(f"Mode: {self.mode.value}.")
-            except ValueError:
-                pass
-            return True
-
-        if cmd == "next":
-            if self._next_future is not None and not self._next_future.done():
-                self._next_future.set_result(args)
-            return True
-
-        if cmd == "dismiss":
-            self._pending_proposal = None
-            await self._push_state()
-            return True
-
-        # ── timeout (also routed here from CLI/web; channel path bypasses ref check) ──
-        if cmd in ("timeout", "to", "pause"):
-            duration = 120
-            if args:
-                try:
-                    duration = int(args[0])
-                except ValueError:
-                    pass
-            asyncio.ensure_future(self._do_timeout(duration))
-            return True
-
-        # ── informational ────────────────────────────────────────────────────
-        if cmd in ("scoreline", "score", "sc"):
-            await self.lobby.say(self._format_scoreline())
-            return True
-
-        if cmd in ("picks", "pk"):
-            await self.lobby.say(f"picks: {self._format_step_history('PICK')}")
-            return True
-
-        if cmd in ("bans", "bn"):
-            await self.lobby.say(f"bans: {self._format_step_history('BAN')}")
-            return True
-
-        if cmd in ("protects", "pro", "prot"):
-            await self.lobby.say(f"protects: {self._format_step_history('PROTECT')}")
-            return True
-
-        if cmd in ("status", "st"):
-            bo = self.match.ruleset.best_of
-            await self.lobby.say(
-                f"[status] BO{bo} | {self.mode.value} mode | {self._format_scoreline()}"
-            )
-            bans = self._format_step_history("BAN")
-            pros = self._format_step_history("PROTECT")
-            pks  = self._format_step_history("PICK")
-            if pros != "none":
-                await self.lobby.say(f"protects: {pros} | bans: {bans}")
-            else:
-                await self.lobby.say(f"bans: {bans}")
-            await self.lobby.say(f"picks: {pks}")
-            return True
-
-        # ── lobby control ────────────────────────────────────────────────────
-        if cmd in ("setmap", "sm", "map") and args:
-            try:
-                bid = int(args[0])
-                gm  = int(args[1]) if len(args) > 1 else self.match.ruleset.gamemode.value
-                await self.lobby.set_map(bid, gm)
-            except (ValueError, IndexError):
-                await self.lobby.say(f"Usage: {self.ref_prefix}setmap <beatmap_id> [gamemode]")
-            return True
-
-        if cmd in ("timer", "t", "ti") and args:
-            _named = {
-                "pick": self.timers.pick,
-                "ban": self.timers.ban,
-                "protect": self.timers.protect, "pro": self.timers.protect,
-                "ready": self.timers.ready_up,
-                "force": self.timers.force_start, "fs": self.timers.force_start,
-                "closing": self.timers.closing,
-            }
-            raw = args[0].lower()
-            seconds = _named.get(raw)
-            if seconds is None:
-                try:
-                    seconds = int(args[0])
-                except ValueError:
-                    await self.lobby.say(
-                        f"Usage: {self.ref_prefix}timer <seconds|pick|ban|protect|ready|force|closing>"
-                    )
-                    return True
-            asyncio.ensure_future(self.lobby.timer(seconds))
-            return True
-
-        if cmd in ("startmap", "start", "go"):
-            delay = self.timers.force_start
-            if args:
-                try:
-                    delay = int(args[0])
-                except ValueError:
-                    pass
-            asyncio.ensure_future(self.lobby.start(delay=delay))
-            return True
-
-        if cmd in ("abort", "ab"):
-            if self._map_in_progress:
-                await self.lobby.abort()
-                self._abort_event.set()
-            else:
-                await self.lobby.say("No map in progress.")
-            return True
-
-        if cmd in ("undo", "u"):
-            await self._undo_last_action()
-            return True
-
-        if cmd in ("close", "cl"):
-            force = args and args[0].lower() == "force"
-            if not force:
-                self._save_match()
-            self._close_event.set()
-            # Unblock any active wait so the loop reaches the close check.
-            self._mode_event.set()
-            self._timeout_event.set()
-            self._abort_event.set()
-            self._cancel_step()
-            return True
-
-        if cmd in ("invite", "inv"):
-            for team in self.match.teams:
-                for player in team.players:
-                    await self.lobby.invite(player.username)
-            await self.lobby.say("Invites sent.")
-            return True
-
-        if cmd in ("refresh", "rf"):
-            await self.lobby.fetch_settings()
-            await self._push_state()
-            return True
-
-        return False
+        handler = BUILTIN_HANDLERS.get(cmd)
+        if handler is None:
+            return False
+        await handler(self, args, source)
+        return True
 
     async def _handle_input(self, text: str, source: str) -> bool:
         """Input hook for CLI/web lines. CLI/web is always trusted (no refs check)."""
