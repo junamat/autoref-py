@@ -1,28 +1,16 @@
-"""Cross-match statistics over `game_scores` rows.
+"""Per-method leaderboard implementations + the METHODS registry.
 
-Pure pandas — fed by `MatchDatabase.get_all_scores()` (or any equivalent DataFrame).
-
-A "score predicate" decides which rows count toward the population for a given
-metric. Two stock predicates are provided; pass any callable(row_dict) -> bool.
+Each metric: ``<name>_leaderboard(scores, *, include, aggregate)`` →
+``DataFrame[user_id, username, maps_played, <metric>]`` sorted appropriately.
 """
 from __future__ import annotations
 
-from typing import Callable, Mapping
+import asyncio
+import json as _json
 
 import pandas as pd
 
-
-ScorePredicate = Callable[[Mapping], bool]
-
-
-def include_all(row: Mapping) -> bool:
-    """Default: keep every row."""
-    return True
-
-
-def exclude_failed(row: Mapping) -> bool:
-    """Drop rows where the player failed (passed == 0/False)."""
-    return bool(row.get("passed"))
+from .predicates import ScorePredicate, include_all
 
 
 # Registry: method key → (label, ascending_sort)
@@ -47,100 +35,6 @@ PP_METHODS: frozenset[str] = frozenset({"pp", "z_pp"})
 _BASE_COLUMNS = ["user_id", "username", "maps_played"]
 
 
-def leaderboard(
-    scores: pd.DataFrame,
-    *,
-    method: str = "zscore",
-    include: ScorePredicate = include_all,
-    aggregate: str = "sum",
-) -> pd.DataFrame:
-    """Unified dispatcher. Returns _BASE_COLUMNS + [metric_col] sorted appropriately.
-    
-    aggregate: "sum" or "mean" - how to aggregate per-map metrics across maps.
-    """
-    if method not in METHODS:
-        raise ValueError(f"unknown method {method!r}; choose from {list(METHODS)}")
-    if method in PP_METHODS:
-        raise ValueError(f"method {method!r} requires async; use leaderboard_async()")
-
-    fn = {
-        "zscore":        z_sum_leaderboard,
-        "avg_score":     avg_score_leaderboard,
-        "placements":    avg_placements_leaderboard,
-        "percentile":    percentile_leaderboard,
-        "zipf":          zipf_leaderboard,
-        "pct_diff":      pct_diff_leaderboard,
-        "mc_flashlight": match_cost_flashlight_leaderboard,
-        "mc_bathbot":    match_cost_bathbot_leaderboard,
-        "beta_dist":     beta_distribution_leaderboard,
-    }[method]
-    return fn(scores, include=include, aggregate=aggregate)
-
-
-async def leaderboard_async(
-    scores: pd.DataFrame,
-    *,
-    method: str = "zscore",
-    include: ScorePredicate = include_all,
-    aggregate: str = "sum",
-    db=None,
-) -> pd.DataFrame:
-    """Async dispatcher. Handles pp/z_pp methods; delegates others to sync path."""
-    if method == "pp":
-        return await pp_leaderboard(scores, include=include, aggregate=aggregate, db=db)
-    if method == "z_pp":
-        return await z_pp_leaderboard(scores, include=include, aggregate=aggregate, db=db)
-    return leaderboard(scores, method=method, include=include, aggregate=aggregate)
-
-
-# ── team-aggregation entry point ─────────────────────────────────────────────
-
-def aggregate_to_teams(scores: pd.DataFrame, include: ScorePredicate = include_all) -> pd.DataFrame:
-    """Collapse per-player scores into per-team-per-map scores.
-
-    Each output row has team_score = sum of player scores on that map for that
-    team in that match. Used as the input to team-level metrics: team metrics
-    must operate on summed team scores, not on per-player metrics.
-
-    The returned frame mimics the player-level schema so it can be passed back
-    through the existing `leaderboard()` machinery: `user_id` and `username`
-    are set to the team_name, and `score` is the team's summed score for that
-    (match, beatmap).
-    """
-    if scores is None or scores.empty:
-        return scores.iloc[0:0] if scores is not None else pd.DataFrame()
-    df = scores.loc[scores.apply(include, axis=1)].copy()
-    if df.empty or "team_name" not in df.columns:
-        return df.iloc[0:0]
-    df = df.dropna(subset=["team_name"])
-    if df.empty:
-        return df
-
-    grouped = (df.groupby(["match_id", "beatmap_id", "team_name"], as_index=False)
-                 .agg(score=("score", "sum"),
-                      passed=("passed", "max")))
-    grouped["user_id"] = grouped["team_name"]
-    grouped["username"] = grouped["team_name"]
-    grouped["accuracy"] = 1.0
-    grouped["mods"] = "[]"
-    return grouped
-
-
-def team_leaderboard(
-    scores: pd.DataFrame,
-    *,
-    method: str = "zscore",
-    include: ScorePredicate = include_all,
-    aggregate: str = "sum",
-) -> pd.DataFrame:
-    """Team-level leaderboard. Sums player scores per (match, beatmap, team)
-    first, then runs the chosen metric over the resulting team scores."""
-    team_df = aggregate_to_teams(scores, include=include)
-    if team_df.empty:
-        return leaderboard(team_df, method=method, include=include_all, aggregate=aggregate)
-    return leaderboard(team_df, method=method, include=include_all, aggregate=aggregate)
-
-
 # ── shared prep ──────────────────────────────────────────────────────────────
 
 def _prep(scores: pd.DataFrame, include: ScorePredicate) -> pd.DataFrame | None:
@@ -156,18 +50,18 @@ def _prep(scores: pd.DataFrame, include: ScorePredicate) -> pd.DataFrame | None:
 
 def _fill_missing_scores(df: pd.DataFrame) -> pd.DataFrame:
     """Fill missing (player, map) combinations with score=0.
-    
+
     Used by methods that need to count missing scores as 0 for individual players.
     """
     all_users = df["user_id"].unique()
     all_maps = df["beatmap_id"].unique()
     full_index = pd.MultiIndex.from_product([all_users, all_maps], names=["user_id", "beatmap_id"])
-    
+
     complete = pd.DataFrame(index=full_index).reset_index()
     df = complete.merge(df, on=["user_id", "beatmap_id"], how="left")
     df["score"] = df["score"].fillna(0)
     df["username"] = df.groupby("user_id")["username"].ffill().bfill()
-    
+
     return df
 
 
@@ -196,7 +90,7 @@ def z_sum_leaderboard(
     aggregate: str = "sum",
 ) -> pd.DataFrame:
     """Per-player Z-Sum. Z = (score − map_mean) / map_std; std=0 → Z=0.
-    
+
     Missing scores are excluded from calculation (not counted as 0).
     """
     df = _prep(scores, include)
@@ -218,7 +112,7 @@ def avg_score_leaderboard(
     aggregate: str = "sum",
 ) -> pd.DataFrame:
     """Mean score across all maps played.
-    
+
     Missing scores are counted as 0 for individual players.
     Note: aggregate parameter is ignored for avg_score (always computes mean).
     """
@@ -227,7 +121,7 @@ def avg_score_leaderboard(
         return _empty("avg_score")
 
     df = _fill_missing_scores(df)
-    
+
     out = (df.groupby("user_id")
              .agg(username=("username", "last"),
                   maps_played=("beatmap_id", "nunique"),
@@ -247,7 +141,7 @@ def avg_placements_leaderboard(
     aggregate: str = "sum",
 ) -> pd.DataFrame:
     """Sum of per-map ranks (1 = best). Lower is better.
-    
+
     Missing scores are excluded from calculation (not counted as 0).
     """
     df = _prep(scores, include)
@@ -270,7 +164,7 @@ def percentile_leaderboard(
     aggregate: str = "sum",
 ) -> pd.DataFrame:
     """Per-map percentiles derived from Z-scores via normal CDF, then aggregated.
-    
+
     Missing scores are excluded from calculation (not counted as 0).
     Formula: convert each Z-score to percentile, then sum or average.
     Returns values between 0 and 1.
@@ -280,15 +174,15 @@ def percentile_leaderboard(
         return _empty("percentile_sum")
 
     import math
-    
+
     # Calculate Z-score per map, then convert each to percentile
     map_stats = df.groupby("beatmap_id")["score"].agg(["mean", "std"])
     df = df.join(map_stats, on="beatmap_id")
     df["z_score"] = ((df["score"] - df["mean"]) / df["std"]).fillna(0.0)
-    
+
     # Convert each Z-score to percentile via normal CDF
     df["percentile_sum"] = df["z_score"].apply(lambda z: 0.5 * (1.0 + math.erf(z / math.sqrt(2))))
-    
+
     return _finish(df, "username", "percentile_sum", ascending=False, aggregate=aggregate)
 
 
@@ -302,7 +196,7 @@ def zipf_leaderboard(
     aggregate: str = "sum",
 ) -> pd.DataFrame:
     """Sum of 1/(rank + correction) weights per map. Higher is better.
-    
+
     correction = correction_factor * num_maps_in_pool
     Missing scores are excluded from calculation (not counted as 0).
     """
@@ -312,7 +206,7 @@ def zipf_leaderboard(
 
     num_maps = df["beatmap_id"].nunique()
     correction = correction_factor * num_maps
-    
+
     ranks = df.groupby("beatmap_id")["score"].rank(ascending=False, method="min")
     df["zipf_sum"] = 100.0 / (ranks + correction)
     return _finish(df, "username", "zipf_sum", ascending=False, aggregate=aggregate)
@@ -327,7 +221,7 @@ def pct_diff_leaderboard(
     aggregate: str = "sum",
 ) -> pd.DataFrame:
     """Sum of (score - min) / (max - min) per map. Higher is better.
-    
+
     Missing scores are excluded from calculation (not counted as 0).
     Assigns lowest score 0, highest score 1, others linearly in between.
     """
@@ -338,7 +232,7 @@ def pct_diff_leaderboard(
     # Calculate min and max per map
     map_stats = df.groupby("beatmap_id")["score"].agg(["min", "max"])
     df = df.join(map_stats, on="beatmap_id")
-    
+
     # (score - min) / (max - min), handle case where min == max
     df["pct_diff_sum"] = ((df["score"] - df["min"]) / (df["max"] - df["min"])).fillna(0.5) * 100
 
@@ -446,7 +340,7 @@ def match_cost_bathbot_leaderboard(
             rows.append({
                 "user_id": user_id,
                 "username": pdf["username"].iloc[-1],
-                "beatmap_id": pdf["beatmap_id"].iloc[0], 
+                "beatmap_id": pdf["beatmap_id"].iloc[0],
                 "mc_bathbot": cost,
             })
 
@@ -515,10 +409,6 @@ def beta_distribution_leaderboard(
 
 # ── PP / Z-PP ────────────────────────────────────────────────────────────────
 
-import asyncio
-import json as _json
-
-
 def _row_mods(row) -> list[str]:
     """Decode the JSON mods field on a score row to a list of acronyms."""
     raw = row.get("mods") if isinstance(row, dict) else row["mods"]
@@ -546,7 +436,7 @@ async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8, db=None) -> 
     persisted back to `game_scores.pp` (keyed by the row's `id` column),
     making subsequent calls a DB read instead of a recompute.
     """
-    from .pp_calc import compute_pp, current_pp_version
+    from ..pp_calc import compute_pp, current_pp_version
 
     if scores is None or scores.empty:
         out = scores.copy() if scores is not None else pd.DataFrame()
