@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS matches (
     protects_per_team TEXT NOT NULL DEFAULT '0',      -- JSON: int or list[int]
     winner_team       TEXT,
     pool_id           TEXT,
-    round_name        TEXT
+    round_name        TEXT,
+    tb_beatmap_id     INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS match_teams (
@@ -66,7 +67,7 @@ class MatchDatabase:
     def _migrate(self) -> None:
         """Add columns introduced after the original schema. Cheap idempotent ALTERs."""
         existing = {row[1] for row in self._conn.execute("PRAGMA table_info(matches)")}
-        for col, decl in (("pool_id", "TEXT"), ("round_name", "TEXT")):
+        for col, decl in (("pool_id", "TEXT"), ("round_name", "TEXT"), ("tb_beatmap_id", "INTEGER")):
             if col not in existing:
                 self._conn.execute(f"ALTER TABLE matches ADD COLUMN {col} {decl}")
 
@@ -112,11 +113,20 @@ class MatchDatabase:
         if winner_team_index is not None:
             winner_name = match.teams[winner_team_index].name
 
+        tb_beatmap_id = None
+        try:
+            for pm in match.pool.flatten():
+                if getattr(pm, "is_tiebreaker", False):
+                    tb_beatmap_id = int(pm.beatmap_id)
+                    break
+        except Exception:
+            tb_beatmap_id = None
+
         cursor = self._conn.execute(
             "INSERT INTO matches "
             "(ruleset_vs, gamemode, win_condition, best_of, bans_per_team, "
-            " protects_per_team, winner_team, pool_id, round_name) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " protects_per_team, winner_team, pool_id, round_name, tb_beatmap_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 match.ruleset.vs,
                 match.ruleset.gamemode.name_api,
@@ -127,6 +137,7 @@ class MatchDatabase:
                 winner_name,
                 getattr(match, "pool_id", None),
                 getattr(match, "round_name", None),
+                tb_beatmap_id,
             ),
         )
         match_id = cursor.lastrowid
@@ -311,10 +322,12 @@ class MatchDatabase:
         where = f"WHERE {clause}" if clause else ""
         return pd.read_sql(
             f"""
-            SELECT g.*, mt.team_name
+            SELECT g.*, mt.team_name, m.tb_beatmap_id
             FROM game_scores g
             LEFT JOIN match_teams mt
                 ON mt.match_id = g.match_id AND mt.team_index = g.team_index
+            LEFT JOIN matches m
+                ON m.match_id = g.match_id
             {where}
             """,
             self._conn, params=params)

@@ -25,7 +25,7 @@ plots = [
 ]
 # pip install -e ".[pp]"    → local pp calculator (rosu-pp-py, Rust)
 pp = [
-    "rosu-pp-py",
+    "rosu-pp-py>=4.0",
 ]
 # pip install -e ".[dev]"   → adds test + env-loading tooling
 dev = [

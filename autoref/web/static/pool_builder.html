@@ -325,6 +325,38 @@
   font-size: 11px;
 }
 
+#pb-stats-cfg-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+#pb-stats-cfg-overlay.hidden { display: none; }
+#pb-stats-cfg-box {
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#pb-stats-cfg-body { padding: 12px; overflow-y: auto; flex: 1; }
+.pb-cfg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px; font-size: 11px;
+}
+.pb-cfg-row select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--text);
+  min-width: 140px;
+}
+.pb-cfg-row select:focus { border-color: var(--blue); }
+
 #pb-separate-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.6);
@@ -401,6 +433,7 @@
       <button class="ghost-btn" id="pb-load-btn">📂 load</button>
       <button class="ghost-btn" id="pb-compose-btn">🔗 compose</button>
       <button class="ghost-btn" id="pb-separate-btn">✂ separate</button>
+      <button class="ghost-btn" id="pb-stats-cfg-btn">📊 stats defaults</button>
       <button class="join-btn" id="pb-save-btn">save pool</button>
       <button class="ghost-btn" id="theme-toggle" title="toggle light/dark">◑</button>
     </div>
@@ -481,6 +514,39 @@
         <div class="mono xs muted" style="margin-bottom:10px">Select pools to merge into current pool</div>
         <div id="pb-compose-list"></div>
         <button class="join-btn" id="pb-compose-merge" style="width:100%;margin-top:10px">merge selected</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pb-stats-cfg-overlay" class="hidden">
+    <div id="pb-stats-cfg-box">
+      <div class="panel-head">
+        stats defaults
+        <button class="ghost-btn xs" id="pb-stats-cfg-close">✕</button>
+      </div>
+      <div id="pb-stats-cfg-body">
+        <div class="mono xs muted" style="margin-bottom:10px">Defaults applied to /stats when this pool is selected. Crown shown next to qualifier method.</div>
+        <label class="pb-cfg-row"><span>qualifier method (👑)</span>
+          <select id="pb-cfg-qualifier-method"><option value="">— none —</option></select>
+        </label>
+        <label class="pb-cfg-row"><span>default method</span>
+          <select id="pb-cfg-method"><option value="">— none —</option></select>
+        </label>
+        <label class="pb-cfg-row"><span>count failed scores</span>
+          <select id="pb-cfg-count-failed">
+            <option value="">— none —</option>
+            <option value="true">yes</option>
+            <option value="false">no</option>
+          </select>
+        </label>
+        <label class="pb-cfg-row"><span>aggregate</span>
+          <select id="pb-cfg-aggregate">
+            <option value="">— none —</option>
+            <option value="sum">sum</option>
+            <option value="mean">mean</option>
+          </select>
+        </label>
+        <button class="join-btn" id="pb-stats-cfg-apply" style="width:100%;margin-top:10px">apply</button>
       </div>
     </div>
   </div>

@@ -400,15 +400,16 @@ def match_cost_bathbot_leaderboard(
 ) -> pd.DataFrame:
     """Bathbot match cost — computed per `match_id`, aggregated across matches.
 
-    Cost = (Σ(score / avg_score) + 0.5*n') / n'
+    Cost = (Σ(score / avg_score) + 0.5*n' + tb_bonus) / n'
            * 1.4 ^ (((n'-1)/(n-1)) ** 0.6)
            * (1 + 0.02 * max(0, m - 2))
+            tb_bonus = (tb_score / avg_tb_score) if player played the tiebreaker map, else 0
 
     n  — number of games in the match
     n' — games this player participated in
     m  — distinct mod combinations the player used in the match
 
-    Tiebreaker bonus is omitted (TB-map identification needs pool metadata).
+    TB map identified via `matches.tb_beatmap_id` (snapshotted at match save).
     """
     df = _prep(scores, include)
     if df is None or "match_id" not in df.columns:
@@ -422,13 +423,20 @@ def match_cost_bathbot_leaderboard(
         n = mdf["turn"].nunique()
         if n < 1:
             continue
+        tb_bid = mdf["tb_beatmap_id"].iloc[0] if "tb_beatmap_id" in mdf.columns else None
+        tb_played = tb_bid is not None and pd.notna(tb_bid)
         for user_id, pdf in mdf.groupby("user_id"):
             n_prime = pdf["turn"].nunique()
             if n_prime == 0:
                 continue
             ratio_sum = float(pdf["_ratio"].sum())
+            tb_bonus = 0
+            if tb_played:
+                tb_rows = pdf[pdf["beatmap_id"] == tb_bid]
+                if not tb_rows.empty:
+                    tb_bonus = float(tb_rows["_ratio"].iloc[0])
             m = pdf["mods"].nunique() if "mods" in pdf.columns else 1
-            base = (ratio_sum + 0.5 * n_prime) / n_prime
+            base = (ratio_sum + 0.5 * n_prime + tb_bonus) / n_prime
             if n > 1:
                 participation = 1.4 ** (((n_prime - 1) / (n - 1)) ** 0.6)
             else:
@@ -438,7 +446,7 @@ def match_cost_bathbot_leaderboard(
             rows.append({
                 "user_id": user_id,
                 "username": pdf["username"].iloc[-1],
-                "beatmap_id": pdf["beatmap_id"].iloc[0],  # placeholder for nunique downstream
+                "beatmap_id": pdf["beatmap_id"].iloc[0], 
                 "mc_bathbot": cost,
             })
 

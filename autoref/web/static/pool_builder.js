@@ -122,6 +122,8 @@ if (localStorage.getItem('theme') === 'light') document.body.classList.add('ligh
 // Tree: array of nodes. Each node: { id, type:'pool'|'modpool'|'map', name, open, mods, winCon, children?, code?, bid?, title?, diff?, len?, stars?, tb?, disallowed? }
 let tree = [];
 let selectedId = null;
+let currentStatsDefaults = {};
+let availableMethods = [];
 
 const WIN_CONDITIONS = ['score_v2', 'score', 'accuracy', 'combo'];
 const MOD_OPTIONS    = ['NM', 'HD', 'HR', 'DT', 'FL', 'EZ', 'FM', 'HDHR', 'HDDT'];
@@ -940,15 +942,16 @@ async function loadPoolList() {
         currentPoolId = pool.id;
         $('pb-pool-name').value = pool.name || '';
         tree = pool.tree || [];
+        currentStatsDefaults = pool.stats_defaults || {};
         const hydrated = await hydrateTreeFromCache(tree);
         renderTree();
         renderDetail();
         history.replaceState(null, '', `?id=${encodeURIComponent(pool.id)}`);
         $('pb-load-overlay').classList.add('hidden');
-        
+
         // Auto-save if hydration added data
         if (hydrated) {
-          const payload = { name: pool.name, tree, id: currentPoolId };
+          const payload = { name: pool.name, tree, id: currentPoolId, stats_defaults: currentStatsDefaults };
           await fetch('/api/pools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         }
       });
@@ -1201,13 +1204,14 @@ let currentPoolId = null;
     currentPoolId = pool.id;
     $('pb-pool-name').value = pool.name || '';
     tree = pool.tree || [];
+    currentStatsDefaults = pool.stats_defaults || {};
     const hydrated = await hydrateTreeFromCache(tree);
     renderTree();
     renderDetail();
-    
+
     // Auto-save if hydration added data
     if (hydrated) {
-      const payload = { name: pool.name, tree, id: currentPoolId };
+      const payload = { name: pool.name, tree, id: currentPoolId, stats_defaults: currentStatsDefaults };
       await fetch('/api/pools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     }
   } catch (_) {}
@@ -1288,7 +1292,7 @@ $('pb-save-btn').addEventListener('click', async () => {
   btn.textContent = 'saving…';
   btn.disabled = true;
   try {
-    const payload = { name, tree, ...(currentPoolId ? { id: currentPoolId } : {}) };
+    const payload = { name, tree, stats_defaults: currentStatsDefaults, ...(currentPoolId ? { id: currentPoolId } : {}) };
     const res  = await fetch('/api/pools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || res.status);
@@ -1301,6 +1305,60 @@ $('pb-save-btn').addEventListener('click', async () => {
     btn.textContent = 'save pool';
     btn.disabled = false;
   }
+});
+
+/* ── stats defaults modal ────────────────────────────────────── */
+async function ensureMethodsLoaded() {
+  if (availableMethods.length) return;
+  try {
+    const res = await fetch('/api/stats/filters');
+    if (!res.ok) return;
+    const data = await res.json();
+    availableMethods = data.methods || [];
+  } catch (_) {}
+}
+
+function populateMethodSelect(selectId, current) {
+  const sel = $(selectId);
+  const head = sel.querySelector('option[value=""]');
+  sel.innerHTML = '';
+  if (head) sel.appendChild(head);
+  for (const m of availableMethods) {
+    const opt = document.createElement('option');
+    opt.value = m.key;
+    opt.textContent = m.label;
+    if (m.key === current) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  if (!current) sel.value = '';
+}
+
+$('pb-stats-cfg-btn').addEventListener('click', async () => {
+  await ensureMethodsLoaded();
+  const d = currentStatsDefaults || {};
+  populateMethodSelect('pb-cfg-qualifier-method', d.qualifier_method || '');
+  populateMethodSelect('pb-cfg-method', d.method || '');
+  $('pb-cfg-count-failed').value = d.count_failed === undefined ? '' : String(d.count_failed);
+  $('pb-cfg-aggregate').value = d.aggregate || '';
+  $('pb-stats-cfg-overlay').classList.remove('hidden');
+});
+
+$('pb-stats-cfg-close').addEventListener('click', () => {
+  $('pb-stats-cfg-overlay').classList.add('hidden');
+});
+
+$('pb-stats-cfg-apply').addEventListener('click', () => {
+  const out = {};
+  const qm = $('pb-cfg-qualifier-method').value;
+  const m  = $('pb-cfg-method').value;
+  const cf = $('pb-cfg-count-failed').value;
+  const ag = $('pb-cfg-aggregate').value;
+  if (qm) out.qualifier_method = qm;
+  if (m)  out.method = m;
+  if (cf !== '') out.count_failed = cf === 'true';
+  if (ag) out.aggregate = ag;
+  currentStatsDefaults = out;
+  $('pb-stats-cfg-overlay').classList.add('hidden');
 });
 
 /* ── toolbar buttons ─────────────────────────────────────────── */

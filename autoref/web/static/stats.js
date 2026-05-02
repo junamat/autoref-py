@@ -34,7 +34,8 @@ tabs.forEach(tab => {
 /* ── state ───────────────────────────────────────────────────── */
 let currentMethod = 'zscore';
 let methodsReady  = false;
-let filterOptions = null;  // { pools:[{id,name}], rounds:[str], combos:[{pool_id,round_name}] }
+let filterOptions = null;  // { pools:[{id,name}], rounds:[str], combos:[{pool_id,round_name}], pool_defaults:{id:{...}} }
+let lastDefaultsPool = undefined;  // last pool_id we applied stats_defaults for; '' = none, undefined = never
 
 /* ── config toggles ──────────────────────────────────────────── */
 function activeVal(groupId) {
@@ -61,9 +62,13 @@ document.getElementById('stats-reload').addEventListener('click', load);
 
 document.getElementById('cfg-round').addEventListener('change', () => {
   refreshPoolOptions();
+  applyPoolDefaults();
   load();
 });
-document.getElementById('cfg-pool').addEventListener('change', load);
+document.getElementById('cfg-pool').addEventListener('change', () => {
+  applyPoolDefaults();
+  load();
+});
 
 /* ── pool/round filter ───────────────────────────────────────── */
 async function loadFilterOptions() {
@@ -121,10 +126,16 @@ function refreshPoolOptions() {
 }
 
 /* ── method toggle (populated from API) ─────────────────────── */
+function currentPoolDefaults() {
+  const pool = document.getElementById('cfg-pool')?.value || '';
+  return (filterOptions?.pool_defaults?.[pool]) || {};
+}
+
 function buildMethodToggle(methods) {
   const toggle = document.getElementById('cfg-calc');
+  const crown = currentPoolDefaults().qualifier_method;
   toggle.innerHTML = methods.map(m =>
-    `<div class="cfg-opt${m.key === currentMethod ? ' active' : ''}" data-val="${esc(m.key)}">${esc(m.label)}</div>`
+    `<div class="cfg-opt${m.key === currentMethod ? ' active' : ''}" data-val="${esc(m.key)}">${m.key === crown ? '👑 ' : ''}${esc(m.label)}</div>`
   ).join('');
   toggle.addEventListener('click', e => {
     const opt = e.target.closest('.cfg-opt');
@@ -134,6 +145,46 @@ function buildMethodToggle(methods) {
     currentMethod = opt.dataset.val;
     load();
   });
+}
+
+function rebuildCrown() {
+  if (!methodsReady || !filterOptions) return;
+  const toggle = document.getElementById('cfg-calc');
+  const crown = currentPoolDefaults().qualifier_method;
+  toggle.querySelectorAll('.cfg-opt').forEach(opt => {
+    const key = opt.dataset.val;
+    const label = opt.textContent.replace(/^👑\s*/, '');
+    opt.textContent = (key === crown ? '👑 ' : '') + label;
+  });
+}
+
+function applyPoolDefaults() {
+  const poolId = document.getElementById('cfg-pool')?.value || '';
+  if (poolId === lastDefaultsPool) return false;
+  lastDefaultsPool = poolId;
+  const d = currentPoolDefaults();
+  let changed = false;
+  if (d.method && d.method !== currentMethod) {
+    currentMethod = d.method;
+    changed = true;
+    if (methodsReady) {
+      document.querySelectorAll('#cfg-calc .cfg-opt').forEach(o => {
+        o.classList.toggle('active', o.dataset.val === currentMethod);
+      });
+    }
+  }
+  const setToggle = (groupId, val) => {
+    if (val === undefined || val === null) return;
+    const target = document.querySelector(`#${groupId} .cfg-opt[data-val="${val}"]`);
+    if (!target || target.classList.contains('active')) return;
+    document.querySelectorAll(`#${groupId} .cfg-opt`).forEach(o => o.classList.remove('active'));
+    target.classList.add('active');
+    changed = true;
+  };
+  if (d.count_failed !== undefined) setToggle('cfg-failed', String(d.count_failed));
+  if (d.aggregate) setToggle('cfg-aggregate', d.aggregate);
+  rebuildCrown();
+  return changed;
 }
 
 /* ── fetch + render ──────────────────────────────────────────── */
@@ -955,4 +1006,4 @@ async function loadTeamPerformances() {
 }
 
 /* ── boot ────────────────────────────────────────────────────── */
-loadFilterOptions().then(load);
+loadFilterOptions().then(() => { applyPoolDefaults(); load(); });
