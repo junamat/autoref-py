@@ -66,6 +66,8 @@ def make_bracket(*, best_of=1, bans=0, protects=0, schemes=None,
         timers=Timers(between_maps=0, closing=0),
     )
     ar.lobby = MagicMock()
+    from autoref.core.ref.announcer import Announcer
+    ar.announcer = Announcer(ar.lobby, ar.match, ar.timers)
     return ar
 
 

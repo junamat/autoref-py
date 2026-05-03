@@ -49,6 +49,8 @@ def make_qar(pool, runs=1):
     ar.lobby.start = AsyncMock()
     ar.lobby.wait_for_match_end = AsyncMock(return_value=MagicMock())
     ar.lobby.say = AsyncMock()
+    from autoref.core.ref.announcer import Announcer
+    ar.announcer = Announcer(ar.lobby, ar.match, ar.timers)
     return ar
 
 

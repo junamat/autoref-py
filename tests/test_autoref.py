@@ -4,8 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from autoref.core.base import (
-    AutoRef, COMMANDS, Command, _find_map, _find_map_by_input, _find_map_by_input_pick,
+from autoref.core.ref import AutoRef
+from autoref.core.ref.base import (
+    COMMANDS, Command, _find_map, _find_map_by_input, _find_map_by_input_pick,
 )
 from autoref.core.enums import MapState, RefMode, Step, WinCondition
 from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
@@ -72,6 +73,8 @@ def make_autoref(steps=None, match=None):
     ar.lobby.channel = MagicMock()
     ar.lobby.channel.on = MagicMock()
     ar.lobby.channel.remove_listener = MagicMock()
+    from autoref.core.ref.announcer import Announcer
+    ar.announcer = Announcer(ar.lobby, ar.match, ar.timers)
     return ar
 
 
@@ -369,6 +372,8 @@ async def test_run_calls_handle_other(mock_sleep):
         steps=[(1, Step.OTHER), (0, Step.FINISH)], mode=RefMode.AUTO,
     )
     ar.lobby = make_autoref().lobby
+    from autoref.core.ref.announcer import Announcer
+    ar.announcer = Announcer(ar.lobby, ar.match, ar.timers)
     await ar.run()
     assert called == [1]
 

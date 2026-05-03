@@ -13,7 +13,7 @@ from typing import Awaitable, Callable, TYPE_CHECKING
 from .enums import RefMode
 
 if TYPE_CHECKING:
-    from .base import AutoRef
+    from .ref.base import AutoRef
 
 
 @dataclass

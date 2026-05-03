@@ -11,7 +11,7 @@ from .core.stats import (
     pp_leaderboard, z_pp_leaderboard, augment_pp,
     include_all, exclude_failed, METHODS, PP_METHODS,
 )
-from .core.base import AutoRef
+from .core.ref import AutoRef
 
 # controllers — always available (depend only on core)
 from .controllers.bracket import BracketAutoRef, Phase

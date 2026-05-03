@@ -11,7 +11,8 @@ import logging
 import re
 from enum import Enum
 
-from ..core.base import AutoRef, _normalize, _find_map
+from ..core.ref import AutoRef
+from ..core.utils import normalize_name as _normalize, find_map as _find_map
 from ..core.enums import MapState, RefMode, Step
 from ..core.lobby import MatchResult, PlayerResult
 from ..core.models import OrderScheme
