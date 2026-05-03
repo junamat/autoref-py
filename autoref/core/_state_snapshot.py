@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .enums import MapState
-from .models import _normalize, _find_map
+from .utils import normalize_name as _normalize, find_map as _find_map
 
 if TYPE_CHECKING:
     from .base import AutoRef

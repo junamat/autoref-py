@@ -5,7 +5,7 @@ import pytest
 import bancho
 
 from autoref.controllers.bracket import BracketAutoRef, Phase
-from autoref.core.base import _find_map_by_input, _find_map_by_input_pick
+from autoref.core.utils import find_map_by_input as _find_map_by_input, find_map_by_input_pick as _find_map_by_input_pick
 from autoref.core.enums import MapState, RefMode, Step, WinCondition
 from autoref.core.lobby import MatchResult, PlayerResult
 from autoref.core.models import (

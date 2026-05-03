@@ -46,7 +46,7 @@ async def test_create_uses_make_lobby():
     lobby = Lobby(client)
     room_id = await lobby.create("Test Room")
 
-    client.make_lobby.assert_called_once_with("Test Room")
+    client.make_lobby.assert_called_once_with("Test Room", private=False)
     assert room_id == 99
     assert lobby._lobby is mock_bl
 

@@ -52,56 +52,7 @@ _MOD_INFERENCE: dict[str, str] = {
 }
 
 
-def _canonical_mods(mods) -> list[str]:
-    """Normalize mod input → sorted list of 2-char tokens, NF excluded.
 
-    Accepts: aiosu Mods instance, str like "HDHR" / "HD HR", iterable of tokens.
-    """
-    if mods is None:
-        return []
-    if isinstance(mods, str):
-        s = mods.replace(" ", "")
-        toks = [s[i:i + 2].upper() for i in range(0, len(s), 2) if s[i:i + 2]]
-    else:
-        toks = []
-        for m in mods:
-            if hasattr(m, "value") or hasattr(m, "name"):
-                toks.append(getattr(m, "short_name", None) or m.name if hasattr(m, "name") else str(m))
-            else:
-                toks.append(str(m))
-        toks = [t.upper() for t in toks if t]
-    return sorted(t for t in toks if t and t != "NF")
-
-
-def apply_score_multiplier(score: int | float, mods, multipliers: dict[str, float] | None) -> float:
-    """Apply mod multipliers to a raw score.
-
-    Resolution: exact-combo key (sorted concat e.g. "HDHR") wins; otherwise the
-    score is multiplied by each per-mod entry cumulatively. Missing mods → 1.0.
-    Returns the adjusted score (float — caller rounds/casts as needed).
-    """
-    if not multipliers or score is None:
-        return float(score) if score is not None else 0.0
-    toks = _canonical_mods(mods)
-    if not toks:
-        return float(score)
-    combo_key = "".join(toks)
-    if combo_key in multipliers:
-        return float(score) * float(multipliers[combo_key])
-    out = float(score)
-    for t in toks:
-        if t in multipliers:
-            out *= float(multipliers[t])
-    return out
-
-
-def _merge_multipliers(*dicts: "dict[str, float] | None") -> dict[str, float]:
-    """Merge multiplier dicts; later overrides earlier, per-key."""
-    out: dict[str, float] = {}
-    for d in dicts:
-        if d:
-            out.update(d)
-    return out
 
 
 class PlayableMap:
@@ -128,7 +79,8 @@ class PlayableMap:
     def effective_multipliers(self, ruleset_mults: dict[str, float] | None = None) -> dict[str, float]:
         """Resolve effective multiplier table by merging ruleset → pool chain → map.
         Most-specific wins (map > inner pool > outer pool > ruleset)."""
-        return _merge_multipliers(ruleset_mults, *self._pool_mult_chain, self.score_multipliers)
+        from .utils.math import merge_multipliers
+        return merge_multipliers(ruleset_mults, *self._pool_mult_chain, self.score_multipliers)
 
     def effective_mods(self, pool_mods=None):
         """Resolve extra mods with priority: explicit (or NO_MODS) > pool_mods > name inference.
@@ -327,46 +279,4 @@ class Match:
         self.match_status = pd.read_csv(path, parse_dates=["timestamp"])
 
 
-# ── pool query helpers ────────────────────────────────────────────────────────
 
-def _normalize(name: str) -> str:
-    return name.replace(" ", "_").casefold()
-
-
-def _find_map(match: "Match", beatmap_id: int) -> "PlayableMap | None":
-    stack = list(match.pool.maps)
-    while stack:
-        item = stack.pop()
-        if isinstance(item, Pool):
-            stack.extend(item.maps)
-        elif item.beatmap_id == beatmap_id:
-            return item
-    return None
-
-
-def _find_map_by_input(match: "Match", text: str) -> "PlayableMap | None":
-    """Find a map by name/code. Only returns PICKABLE maps (ban path)."""
-    needle = _normalize(text)
-    stack = list(match.pool.maps)
-    while stack:
-        item = stack.pop()
-        if isinstance(item, Pool):
-            stack.extend(item.maps)
-        elif item.name and _normalize(item.name) == needle:
-            if item.state == MapState.PICKABLE:
-                return item
-    return None
-
-
-def _find_map_by_input_pick(match: "Match", text: str) -> "PlayableMap | None":
-    """Like _find_map_by_input but also allows PROTECTED maps (pick/protect path)."""
-    needle = _normalize(text)
-    stack = list(match.pool.maps)
-    while stack:
-        item = stack.pop()
-        if isinstance(item, Pool):
-            stack.extend(item.maps)
-        elif item.name and _normalize(item.name) == needle:
-            if item.state in (MapState.PICKABLE, MapState.PROTECTED):
-                return item
-    return None

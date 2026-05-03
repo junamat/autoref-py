@@ -7,7 +7,7 @@ name = "autoref-py"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "bancho.py",   # IRC connection to Bancho
+    "bancho.py>=0.1.4",   # IRC connection to Bancho
     "pandas",      # match-state DataFrame
     "aiosu",       # osu! API v2 — mods/gamemode types used in core models
 ]

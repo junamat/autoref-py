@@ -109,25 +109,7 @@ class Lobby:
     # ---------------------------------------------------------- room lifecycle
 
     async def create(self, name: str, private: bool = False) -> int:
-        if private:
-            # BanchoClient.make_lobby doesn't support private; send manually
-            future: asyncio.Future = asyncio.get_event_loop().create_future()
-
-            def on_pm(msg: bancho.PrivateMessage) -> None:
-                if msg.user.username != "BanchoBot" or future.done():
-                    return
-                import re
-                m = re.match(r"Created the tournament match https://osu\.ppy\.sh/mp/(\d+)", msg.message)
-                if m:
-                    future.set_result(int(m.group(1)))
-
-            self._client.on("PM", on_pm)
-            await self._client.send_message("BanchoBot", f"!mp makeprivate {name}")
-            lobby_id = await future
-            self._client.remove_listener("PM", on_pm)
-            self._lobby = await self._client.join_lobby(lobby_id)
-        else:
-            self._lobby = await self._client.make_lobby(name)
+        self._lobby = await self._client.make_lobby(name, private=private)
 
         def _on_joined(d):
             self.players.add(d["player"].user.username)
@@ -237,67 +219,27 @@ class Lobby:
         await self._lobby.abort_timer()
 
     async def fetch_settings(self, timeout: float = 5.0) -> list[SlotInfo]:
-        """Send !mp settings and parse BanchoBot's response.
-
-        Returns a list of SlotInfo for occupied slots and updates self.slot_info.
-        The multi-line response ends when we've seen all expected player lines
-        or the timeout expires.
-        """
-        import re
-        loop = asyncio.get_event_loop()
-        future: asyncio.Future[list[SlotInfo]] = loop.create_future()
-
+        """Send !mp settings and wait for BanchoBot's response."""
+        from bancho.enums import BanchoLobbyPlayerStates, BanchoLobbyTeams
+        
+        players = await self._lobby.fetch_settings(timeout=timeout)
         slots: list[SlotInfo] = []
-        expected: int | None = None
-
-        # Slot line: "Slot N  Ready/Not Ready  https://osu.ppy.sh/u/ID  username       [options]"
-        _SLOT_RE = re.compile(
-            r'^Slot \d+\s+(Ready|Not Ready)\s+https://osu\.ppy\.sh/u/(\d+)\s+(.{15})\s*(?:\[(.+)\])?$'
-        )
-        _PLAYERS_RE = re.compile(r'^Players: (\d+)$')
-
-        def on_msg(msg) -> None:
-            if future.done():
-                return
-            if getattr(msg.user, 'username', None) != 'BanchoBot':
-                return
-            text = msg.message
-
-            m = _PLAYERS_RE.match(text)
-            if m:
-                nonlocal expected
-                expected = int(m.group(1))
-                if expected == 0:
-                    future.set_result([])
-                return
-
-            m = _SLOT_RE.match(text)
-            if m:
-                options = m.group(4) or ''
+        for p in players:
+            if p is not None:
                 team = None
-                if 'Blue' in options:
-                    team = 'Blue'
-                elif 'Red' in options:
-                    team = 'Red'
-                slots.append(SlotInfo(
-                    username=m.group(3).strip(),
-                    ready=m.group(1) == 'Ready',
-                    user_id=int(m.group(2)),
-                    team=team,
-                    is_host='Host' in options,
-                ))
-                if expected is not None and len(slots) >= expected:
-                    if not future.done():
-                        future.set_result(slots)
+                if p.team == BanchoLobbyTeams.Blue:
+                    team = "Blue"
+                elif p.team == BanchoLobbyTeams.Red:
+                    team = "Red"
 
-        self.channel.on('message', on_msg)
-        await self.say('!mp settings')
-        try:
-            self.slot_info = await asyncio.wait_for(future, timeout)
-        except asyncio.TimeoutError:
-            self.slot_info = slots  # use whatever we got
-        finally:
-            self.channel.remove_listener('message', on_msg)
+                slots.append(SlotInfo(
+                    username=p.user.username,
+                    ready=p.state == BanchoLobbyPlayerStates.Ready,
+                    user_id=getattr(p.user, "id", 0),
+                    team=team,
+                    is_host=p.is_host,
+                ))
+        self.slot_info = slots
         return self.slot_info
 
     async def say(self, msg: str) -> None:

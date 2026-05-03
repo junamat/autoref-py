@@ -7,7 +7,8 @@ import bancho
 
 from .enums import Step, MapState, RefMode
 from .lobby import Lobby
-from .models import Match, PlayableMap, Pool, Timers, _normalize, _find_map, _find_map_by_input, _find_map_by_input_pick 
+from .models import Match, PlayableMap, Pool, Timers
+from .utils import find_map as _find_map, find_map_by_input as _find_map_by_input, find_map_by_input_pick as _find_map_by_input_pick, normalize_name as _normalize
 from .storage import MatchDatabase
 from .commands import Command, COMMANDS, BUILTIN_HANDLERS  # re-exported for backwards compat
 

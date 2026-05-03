@@ -155,7 +155,7 @@ class MatchDatabase:
             actions.to_sql("match_actions", self._conn, if_exists="append", index=False)
 
         # Resolve effective per-mod multipliers for each beatmap in this match.
-        from .models import apply_score_multiplier
+        from .utils import apply_score_multiplier
         ruleset_mults = getattr(match.ruleset, "score_multipliers", None)
         mults_by_bid: dict[int, dict[str, float]] = {}
         try:
