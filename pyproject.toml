@@ -37,3 +37,6 @@ dev = [
 all = [
     "autoref-py[web,plots,pp,dev]",
 ]
+
+[tool.setuptools.packages.find]
+include = ["autoref*"]
