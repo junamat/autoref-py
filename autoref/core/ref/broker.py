@@ -51,8 +51,14 @@ class CommandBroker:
                     parts = text[len(ref.ref_prefix):].split()
                     if parts:
                         cmd = parts[0].lower()
-                        # timeout is usable by anyone, not just registered refs
-                        if cmd in ("timeout", "to", "pause"):
+                        cmd_obj = next(
+                            (c for c in ref._commands() if c.name == cmd or cmd in c.aliases),
+                            None,
+                        )
+                        anyone = cmd in ("timeout", "to", "pause") or (
+                            cmd_obj is not None and cmd_obj.scope == "anyone"
+                        )
+                        if anyone:
                             await ref._dispatch_command(cmd, parts[1:], msg.user.username)
                         elif ref._is_ref(msg.user.username):
                             await ref._dispatch_command(cmd, parts[1:], msg.user.username)
