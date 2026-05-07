@@ -41,8 +41,6 @@ class PlayRunner:
                 if ref._close_event.is_set():
                     return None
 
-                await asyncio.sleep(ref.timers.between_maps)
-
                 await ref.lobby.timer(ref.timers.ready_up)
                 ready_t = asyncio.create_task(ref.lobby.wait_for_all_ready())
                 timer_t = asyncio.create_task(ref.lobby.wait_for_timer())
@@ -85,6 +83,8 @@ class PlayRunner:
         ref.match.record_action(team_index, step, beatmap_id)
         turn = len(ref.match.match_status) - 1
         self.spawn_score_fetch(turn, beatmap_id)
+        if ref.timers.between_maps > 0 and not ref._close_event.is_set():
+            await asyncio.sleep(ref.timers.between_maps)
         return result
 
     def spawn_score_fetch(self, turn: int, beatmap_id: int) -> None:
