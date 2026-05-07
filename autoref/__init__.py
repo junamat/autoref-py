@@ -16,6 +16,7 @@ from .core.ref import AutoRef
 # controllers — always available (depend only on core)
 from .controllers.bracket import BracketAutoRef, Phase
 from .controllers.qualifiers import QualifiersAutoRef
+from .controllers.voted import VotedQualifiersAutoRef
 
 # factory — package-level glue for dict payloads (web/CLI/Discord)
 from .factory import build_autoref, flatten_pool_tree
