@@ -6,6 +6,11 @@ import pandas as pd
 
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS matches (
     match_id          INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_game_scores_match ON game_scores (match_id);
 
 class MatchDatabase:
     def __init__(self, path: str | Path = "matches.db"):
-        self._conn = sqlite3.connect(str(path))
+        self._conn = sqlite3.connect(str(path), check_same_thread=False)
         self._conn.executescript(_SCHEMA)
         self._migrate()
 

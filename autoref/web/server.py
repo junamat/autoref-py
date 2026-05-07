@@ -78,23 +78,20 @@ class WebInterface:
 class WebServer:
     """Shared FastAPI server. Register WebInterface instances before calling start()."""
 
-    def __init__(self, host: str = "0.0.0.0", port: int = 8080,
+    def __init__(self, host: str | None = None, port: int | None = None,
                  static_dir: str | Path | None = None,
-                 bancho_username: str | None = None,
-                 bancho_password: str | None = None,
                  db_path: str | Path | None = None):
         from ..core.storage import MatchDatabase
-        self.host = host
-        self.port = port
+        from ..core.config import load as load_config
         self.static_dir = Path(static_dir) if static_dir else _STATIC_DIR
         self._matches: dict[str, WebInterface] = {}
         self._pending: dict[str, dict] = {}   # match_id -> raw payload, not yet started
         self._landing_clients: set = set()
-        self._bancho_username = bancho_username or os.getenv("BANCHO_USERNAME", "")
-        self._bancho_password = bancho_password or os.getenv("BANCHO_PASSWORD", "")
         self._tasks: dict[str, asyncio.Task] = {}
-        # Single shared sqlite file for cross-match stats. Override path with $AUTOREF_DB.
         self.db = MatchDatabase(db_path or os.getenv("AUTOREF_DB", "matches.db"))
+        self.config = load_config(self.db)
+        self.host = host if host is not None else self.config.host
+        self.port = port if port is not None else self.config.port
 
     def register(self, iface: WebInterface) -> WebInterface:
         """Add a WebInterface to the registry. Returns the interface for chaining."""
@@ -143,10 +140,11 @@ class WebServer:
 
         ar, client = await build_autoref(
             payload,
-            bancho_username=self._bancho_username,
-            bancho_password=self._bancho_password,
+            bancho_username=self.config.bancho_username,
+            bancho_password=self.config.bancho_password,
             pool_loader=_pool_loader,
             db=self.db,
+            defaults=self.config,
         )
 
         iface = WebInterface(match_id=match_id)

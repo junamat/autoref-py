@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref — settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { overflow-y: auto; height: auto; min-height: 100vh; }
+  .settings-page { max-width: 640px; margin: 0 auto; padding: 2rem 1rem; }
+  .settings-topbar { display:flex; align-items:center; gap:1rem; margin-bottom:2rem; }
+  .settings-section { margin-bottom: 2rem; }
+  .settings-section h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem; color: var(--muted,#888); }
+  .settings-row { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.6rem; }
+  .settings-row label { flex:0 0 160px; font-size:0.85rem; color:var(--muted,#888); }
+  .settings-row input[type=text],
+  .settings-row input[type=number],
+  .settings-row input[type=password],
+  .settings-row select { flex:1; background:transparent; border:1px solid var(--border,#333); border-radius:4px; padding:0.35rem 0.5rem; font-family:inherit; font-size:0.85rem; color:inherit; }
+  .settings-actions { display:flex; align-items:center; gap:1rem; margin-top:1.5rem; }
+  .settings-save-btn { padding:0.45rem 1.2rem; font-family:inherit; font-size:0.85rem; cursor:pointer; border:1px solid var(--accent,#fff); background:transparent; color:inherit; border-radius:4px; }
+  .settings-save-btn:hover { background:var(--accent,#fff); color:var(--bg,#000); }
+  #settings-msg { font-size:0.8rem; }
+  .warn { color:#f0a; }
+  .ok   { color:#0f8; }
+  .err  { color:#f44; }
+</style>
+</head>
+<body>
+<div class="settings-page">
+  <div class="settings-topbar">
+    <a href="/" class="logo" style="text-decoration:none">autoref</a>
+    <span style="flex:1"></span>
+    <a href="/stats" class="ghost-btn" style="text-decoration:none">stats</a>
+    <a href="/pool-builder" class="ghost-btn" style="text-decoration:none">pool builder</a>
+    <a href="/settings" class="ghost-btn" style="text-decoration:none">settings</a>
+  </div>
+
+  <form id="settings-form" autocomplete="off">
+
+    <div class="settings-section">
+      <h2>server</h2>
+      <div class="settings-row">
+        <label for="s-host">host</label>
+        <input id="s-host" name="host" type="text">
+      </div>
+      <div class="settings-row">
+        <label for="s-port">port</label>
+        <input id="s-port" name="port" type="number" min="1" max="65535">
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>bancho credentials</h2>
+      <div class="settings-row">
+        <label for="s-bancho-user">username</label>
+        <input id="s-bancho-user" name="bancho_username" type="text">
+      </div>
+      <div class="settings-row">
+        <label for="s-bancho-pass">password</label>
+        <input id="s-bancho-pass" name="bancho_password" type="password" autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>osu! oauth</h2>
+      <div class="settings-row">
+        <label for="s-client-id">client id</label>
+        <input id="s-client-id" name="osu_client_id" type="text">
+      </div>
+      <div class="settings-row">
+        <label for="s-client-secret">client secret</label>
+        <input id="s-client-secret" name="osu_client_secret" type="password" autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>match defaults</h2>
+      <div class="settings-row">
+        <label for="s-mode">mode</label>
+        <select id="s-mode" name="default_mode">
+          <option value="off">off</option>
+          <option value="assisted">assisted</option>
+          <option value="auto">auto</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label for="s-prefix">ref prefix</label>
+        <input id="s-prefix" name="default_prefix" type="text" maxlength="1" style="width:3rem;flex:none">
+      </div>
+      <div class="settings-row">
+        <label for="s-refs">refs (comma-sep)</label>
+        <input id="s-refs" name="default_refs" type="text">
+      </div>
+      <div class="settings-row">
+        <label for="s-best-of">best of</label>
+        <input id="s-best-of" name="default_best_of" type="number" min="1">
+      </div>
+      <div class="settings-row">
+        <label for="s-team-mode">team mode</label>
+        <select id="s-team-mode" name="default_team_mode">
+          <option value="0">head-to-head (0)</option>
+          <option value="2">team vs (2)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>timers (seconds)</h2>
+      <div class="settings-row"><label for="s-t-pick">pick</label><input id="s-t-pick" name="timer_pick" type="number" min="0"></div>
+      <div class="settings-row"><label for="s-t-ban">ban</label><input id="s-t-ban" name="timer_ban" type="number" min="0"></div>
+      <div class="settings-row"><label for="s-t-protect">protect</label><input id="s-t-protect" name="timer_protect" type="number" min="0"></div>
+      <div class="settings-row"><label for="s-t-ready">ready up</label><input id="s-t-ready" name="timer_ready_up" type="number" min="0"></div>
+      <div class="settings-row"><label for="s-t-start">start map</label><input id="s-t-start" name="timer_start_map" type="number" min="0"></div>
+      <div class="settings-row"><label for="s-t-force">force start</label><input id="s-t-force" name="timer_force_start" type="number" min="0"></div>
+      <div class="settings-row"><label for="s-t-between">between maps</label><input id="s-t-between" name="timer_between_maps" type="number" min="0"></div>
+      <div class="settings-row"><label for="s-t-closing">closing</label><input id="s-t-closing" name="timer_closing" type="number" min="0"></div>
+    </div>
+
+    <div class="settings-actions">
+      <button type="submit" class="settings-save-btn">save</button>
+      <span id="settings-msg"></span>
+    </div>
+  </form>
+</div>
+<script src="/static/settings.js"></script>
+</body>
+</html>

@@ -36,13 +36,26 @@ pip install -e ".[web]"
 pip install -e ".[all]"
 ```
 
-Requires Python ≥ 3.11 and a `.env` file with:
+Requires Python ≥ 3.11.
+
+On **first boot**, the web server seeds its config from environment variables:
 ```
 BANCHO_USERNAME=...
 BANCHO_PASSWORD=...
 CLIENT_ID=...
 CLIENT_SECRET=...
 ```
+
+## Settings page
+
+Navigate to `/settings` to configure:
+- **Server** — host and port (changes require a restart)
+- **Bancho credentials** — IRC username and password
+- **osu! OAuth** — client ID and secret (used by Phase 2 login)
+- **Match defaults** — ref mode, prefix, refs list, best-of, team mode
+- **Timers** — all per-step timer durations in seconds
+
+Secret fields (`bancho_password`, `osu_client_secret`) show `••• set` when a value exists; submitting an empty field leaves the stored value unchanged.
 
 ---
 

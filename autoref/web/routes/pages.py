@@ -24,3 +24,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/match/{match_id}")
     async def match_view(match_id: str):
         return FileResponse(server.static_dir / "index.html")
+
+    @app.get("/settings")
+    async def settings_page():
+        return FileResponse(server.static_dir / "settings.html")

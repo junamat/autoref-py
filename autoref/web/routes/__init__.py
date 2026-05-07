@@ -7,9 +7,10 @@ if TYPE_CHECKING:
 
 
 def register_all(app: "FastAPI", server: "WebServer") -> None:
-    from . import pages, stats, pool, match, ws
+    from . import pages, stats, pool, match, ws, settings
     pages.register(app, server)
     stats.register(app, server)
     pool.register(app, server)
     match.register(app, server)
     ws.register(app, server)
+    settings.register(app, server)

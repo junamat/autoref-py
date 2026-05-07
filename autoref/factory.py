@@ -41,7 +41,7 @@ def flatten_pool_tree(nodes: list, parent_mods: str = "",
 
 
 async def build_autoref(payload: dict, bancho_username: str = "", bancho_password: str = "",
-                        pool_loader=None, db=None):
+                        pool_loader=None, db=None, defaults=None):
     """Build and return an (AutoRef, BanchoClient) pair from a web/CLI payload dict.
 
     payload keys:
@@ -67,10 +67,19 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
     from .controllers.bracket import BracketAutoRef
     from .controllers.qualifiers import QualifiersAutoRef
 
+    def _get(key, builtin, attr=None):
+        """payload > defaults > builtin."""
+        v = payload.get(key)
+        if v is not None and v != "":
+            return v
+        if defaults is not None and attr:
+            return getattr(defaults, attr, builtin)
+        return builtin
+
     match_type = payload.get("type", "bracket")
     room_name  = payload.get("room_name", "autoref match")
-    mode       = RefMode(payload.get("mode", "off"))
-    best_of    = int(payload.get("best_of", 1))
+    mode       = RefMode(_get("mode", "off", "default_mode"))
+    best_of    = int(_get("best_of", 1, "default_best_of"))
     bans       = int(payload.get("bans_per_team", 0))
     protects   = int(payload.get("protects_per_team", 0))
 
@@ -126,12 +135,27 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
         schemes=[OrderScheme("standard", ban_pattern="ABBA")] if match_type == "bracket" else None,
     )
 
+    from .core.models import Timers
+
     match = Match(
         ruleset, pool, lambda _: (0, Step.FINISH), *teams,
         pool_id=payload.get("pool_id"),
         round_name=(payload.get("round_name") or payload.get("round") or None),
     )
     client = bancho_lib.BanchoClient(username=bancho_username, password=bancho_password)
+
+    ref_prefix = _get("prefix", ">", "default_prefix")
+    refs_raw   = payload.get("refs") or (list(defaults.default_refs) if defaults else [])
+    timers = Timers(
+        pick=_get("timer_pick", 120, "timer_pick"),
+        ban=_get("timer_ban", 120, "timer_ban"),
+        protect=_get("timer_protect", 120, "timer_protect"),
+        ready_up=_get("timer_ready_up", 90, "timer_ready_up"),
+        start_map=_get("timer_start_map", 5, "timer_start_map"),
+        force_start=_get("timer_force_start", 10, "timer_force_start"),
+        between_maps=_get("timer_between_maps", 5, "timer_between_maps"),
+        closing=_get("timer_closing", 30, "timer_closing"),
+    )
 
     # API-side score enrichment. AutoRef.run() will aclose the fetcher when the match ends.
     fetcher: ScoreFetcher | None = None
@@ -140,11 +164,12 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
     except Exception:
         logger.exception("could not build ScoreFetcher; continuing without enrichment")
 
+    ar_kwargs = dict(client=client, match=match, room_name=room_name,
+                     mode=mode, score_fetcher=fetcher, db=db,
+                     timers=timers, ref_prefix=ref_prefix, refs=set(refs_raw) if refs_raw else None)
     if match_type == "qualifiers":
-        ar = QualifiersAutoRef(client=client, match=match, room_name=room_name,
-                               mode=mode, score_fetcher=fetcher, db=db)
+        ar = QualifiersAutoRef(**ar_kwargs)
     else:
-        ar = BracketAutoRef(client=client, match=match, room_name=room_name,
-                            mode=mode, score_fetcher=fetcher, db=db)
+        ar = BracketAutoRef(**ar_kwargs)
 
     return ar, client
