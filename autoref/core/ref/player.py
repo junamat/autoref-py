@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..enums import Step
 from ..lobby import MatchResult
+from ..result import Err
 from ..utils import find_map as _find_map
 from ..utils import normalize_name as _normalize
 
@@ -108,7 +109,7 @@ class PlayRunner:
         if fetcher is None:
             return
         result = await fetcher.fetch_for_game(lobby_id, beatmap_id)
-        if not result:
+        if isinstance(result, Err):
             logger.warning("score fetch failed for turn=%d map=%d: %s", turn, beatmap_id, result.reason)
             return
         scores = result.value

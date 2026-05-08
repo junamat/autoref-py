@@ -57,7 +57,7 @@ def build_state(ref: "AutoRef") -> StateSnapshot:
         ]:
             played_ids.add(int(bid))
 
-    maps = []
+    maps: list[MapEntry] = []
     for pm in ref.match.pool.flatten():
         if int(pm.beatmap_id) in played_ids:
             map_state = "played"
@@ -69,13 +69,13 @@ def build_state(ref: "AutoRef") -> StateSnapshot:
             map_state = "disallowed"
         else:
             map_state = "pickable"
-        maps.append({
-            "code": pm.name or str(pm.beatmap_id),
-            "state": map_state,
-            "tb": getattr(pm, "is_tiebreaker", False),
-        })
+        maps.append(MapEntry(
+            code=pm.name or str(pm.beatmap_id),
+            state=map_state,
+            tb=bool(getattr(pm, "is_tiebreaker", False)),
+        ))
 
-    events = []
+    events: list[EventEntry] = []
     for _, row in ref.match.match_status.iterrows():
         ti = int(row["team_index"])
         team_name = (
@@ -83,7 +83,7 @@ def build_state(ref: "AutoRef") -> StateSnapshot:
         )
         found = _find_map(ref.match, int(row["beatmap_id"]))
         map_code = found.name if found and found.name else str(row["beatmap_id"])
-        events.append({"step": str(row["step"]), "team": team_name, "map": map_code})
+        events.append(EventEntry(step=str(row["step"]), team=team_name, map=map_code))
 
     # Build a username→ready lookup from the latest !mp settings fetch
     ready_map: dict[str, bool] = {
@@ -91,15 +91,15 @@ def build_state(ref: "AutoRef") -> StateSnapshot:
     }
     present: set[str] = {_normalize(u) for u in ref.lobby.players}
 
-    teams = [
-        {"name": t.name, "players": [
-            {
-                "username": p.username,
-                "present": _normalize(p.username) in present,
-                "ready": ready_map.get(_normalize(p.username), False),
-            }
+    teams: list[TeamEntry] = [
+        TeamEntry(name=t.name, players=[
+            PlayerEntry(
+                username=p.username,
+                present=_normalize(p.username) in present,
+                ready=ready_map.get(_normalize(p.username), False),
+            )
             for p in t.players
-        ]}
+        ])
         for t in ref.match.teams
     ]
 

@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from ...core.beatmap_cache import get_beatmap_cache
+from ...core.result import Err
 from .._state import _POOL_STORE
 
 if TYPE_CHECKING:
@@ -41,7 +42,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
     async def get_beatmap(beatmap_id: str):
         """Fetch beatmap metadata from osu! API (cache-backed)."""
         result = await get_beatmap_cache().fetch_one(int(beatmap_id))
-        if not result:
+        if isinstance(result, Err):
             return JSONResponse({"error": result.reason}, status_code=404)
         meta = result.value
         # API response shape kept stable: web UI consumes `len`/`diff`.

@@ -97,7 +97,7 @@ async def compute_pp(
 
     cache = cache or get_beatmap_cache()
     osu_result = await cache.get_osu_path(int(beatmap_id))
-    if not osu_result:
+    if isinstance(osu_result, Err):
         return Err(f"osu path unavailable: {osu_result.reason}", osu_result.exc)
     osu_path = osu_result.value
 
