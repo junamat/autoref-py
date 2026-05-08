@@ -16,7 +16,6 @@ import bancho
 from autoref import Match, ModdedPool, OrderScheme, PlayableMap, Pool, Ruleset, Team, Timers
 from autoref import WinCondition, RefMode, Step
 from autoref import BracketAutoRef, MatchDatabase, ScoreFetcher
-from autoref import WebInterface, WebServer
 from autoref.client import make_client
 
 load_dotenv()
@@ -124,18 +123,12 @@ async def main():
         db=db,
     )
 
-    web = WebInterface()
-    web.attach(ar.lobby)
-    web.attach_autoref(ar)
-    server = WebServer()
-    server.register(web)
-
     print(f"Mode: {mode.value}  prefix: {prefix}  refs: {refs or '(any)'}")
     print(f"Red: {red_player}  Blue: {blue_player}")
     print("Connecting to Bancho...")
     await client.connect()
-    print("Connected. Starting Finals on http://localhost:8080 ...")
-    await asyncio.gather(server.start(), ar.run())
+    print("Connected. Starting Finals...")
+    await ar.run()
     print("Done.")
     await client.disconnect()
 

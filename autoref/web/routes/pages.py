@@ -28,3 +28,19 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/settings")
     async def settings_page():
         return FileResponse(server.static_dir / "settings.html")
+
+    @app.get("/login")
+    async def login_page():
+        return FileResponse(server.static_dir / "login.html")
+
+    @app.get("/setup")
+    async def setup_page():
+        return FileResponse(server.static_dir / "setup.html")
+
+    @app.get("/account")
+    async def account_page():
+        return FileResponse(server.static_dir / "account.html")
+
+    @app.get("/users")
+    async def users_page():
+        return FileResponse(server.static_dir / "users.html")

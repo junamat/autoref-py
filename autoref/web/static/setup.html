@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref — setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .setup-box { text-align:center; max-width:420px; }
+  h1 { font-size:1rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted,#888); margin-bottom:0.75rem; }
+  p { font-size:0.9rem; margin-bottom:1.5rem; }
+  .btn { padding:0.5rem 1.2rem; border:1px solid var(--accent,#fff); background:transparent; color:inherit; font-family:inherit; font-size:0.85rem; cursor:pointer; border-radius:4px; }
+  .btn:hover { background:var(--accent,#fff); color:var(--bg,#000); }
+  .btn:disabled { opacity:0.4; cursor:default; }
+  #msg { font-size:0.8rem; margin-top:1rem; color:#f44; }
+</style>
+</head>
+<body>
+<div class="setup-box">
+  <h1>first-run setup</h1>
+  <p id="desc">Loading…</p>
+  <button class="btn" id="btn" onclick="doSetup()">Create host account</button>
+  <div id="msg"></div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const osuUserId = params.get('osu_user_id');
+const osuUsername = params.get('osu_username');
+if (osuUsername) {
+  document.getElementById('desc').textContent =
+    'You are logged in as ' + osuUsername + '. Click to become the host.';
+} else {
+  document.getElementById('desc').textContent = 'No user info found. Go to /login first.';
+  document.getElementById('btn').disabled = true;
+}
+async function doSetup() {
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  const r = await fetch('/api/setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ osu_user_id: parseInt(osuUserId), osu_username: osuUsername }),
+  });
+  const d = await r.json();
+  if (r.ok) { location.href = '/'; }
+  else { document.getElementById('msg').textContent = d.detail || 'Error'; btn.disabled = false; }
+}
+</script>
+</body>
+</html>

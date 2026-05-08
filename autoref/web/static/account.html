@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref — account</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { overflow-y:auto; height:auto; min-height:100vh; }
+  .page { max-width:480px; margin:0 auto; padding:2rem 1rem; }
+  .topbar { display:flex; align-items:center; gap:1rem; margin-bottom:2rem; }
+  .topbar-right { margin-left:auto; font-size:0.8rem; color:var(--muted,#888); }
+  h2 { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted,#888); margin-bottom:1rem; }
+  .row { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.6rem; }
+  .row label { flex:0 0 140px; font-size:0.85rem; color:var(--muted,#888); }
+  .row input { flex:1; background:transparent; border:1px solid var(--border,#333); border-radius:4px; padding:0.35rem 0.5rem; font-family:inherit; font-size:0.85rem; color:inherit; }
+  .actions { display:flex; align-items:center; gap:1rem; margin-top:1.5rem; }
+  .btn { padding:0.45rem 1.2rem; font-family:inherit; font-size:0.85rem; cursor:pointer; border:1px solid var(--accent,#fff); background:transparent; color:inherit; border-radius:4px; }
+  .btn:hover { background:var(--accent,#fff); color:var(--bg,#000); }
+  #msg { font-size:0.8rem; }
+  .ok { color:#0f8; } .err { color:#f44; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <a href="/" style="text-decoration:none;color:inherit;">← autoref</a>
+    <span class="topbar-right" id="whoami"></span>
+  </div>
+  <h2>IRC credentials</h2>
+  <div class="row">
+    <label>IRC username</label>
+    <input id="irc_username" type="text" placeholder="osu! username">
+  </div>
+  <div class="row">
+    <label>IRC password</label>
+    <input id="irc_password" type="password" placeholder="unchanged" autocomplete="new-password">
+  </div>
+  <div class="actions">
+    <button class="btn" onclick="save()">Save</button>
+    <span id="msg"></span>
+  </div>
+</div>
+<script>
+fetch('/api/account').then(r => {
+  if (r.status === 401) { location.href = '/login'; return null; }
+  return r.json();
+}).then(d => {
+  if (!d) return;
+  document.getElementById('whoami').textContent = d.osu_username + ' (' + d.role + ')';
+  if (d.irc_username) document.getElementById('irc_username').value = d.irc_username;
+  if (d.irc_set) document.getElementById('irc_password').placeholder = '••• set';
+});
+async function save() {
+  const body = { irc_username: document.getElementById('irc_username').value };
+  const pw = document.getElementById('irc_password').value;
+  if (pw) body.irc_password = pw;
+  const r = await fetch('/api/account', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const d = await r.json();
+  const msg = document.getElementById('msg');
+  if (r.ok) { msg.className='ok'; msg.textContent='Saved.'; }
+  else { msg.className='err'; msg.textContent = d.detail || 'Error'; }
+}
+</script>
+</body>
+</html>

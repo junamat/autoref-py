@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref — login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .login-box { text-align:center; }
+  h1 { font-size:1.2rem; margin-bottom:1.5rem; color:var(--muted,#888); letter-spacing:0.05em; }
+  .login-btn { display:inline-block; padding:0.55rem 1.4rem; border:1px solid var(--accent,#fff); background:transparent; color:inherit; font-family:inherit; font-size:0.9rem; cursor:pointer; border-radius:4px; text-decoration:none; }
+  .login-btn:hover { background:var(--accent,#fff); color:var(--bg,#000); }
+  #error { color:#f44; font-size:0.8rem; margin-top:1rem; }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <h1>autoref</h1>
+  <a href="/api/auth/login" class="login-btn">Login with osu!</a>
+  <div id="error"></div>
+</div>
+<script>
+const p = new URLSearchParams(location.search);
+if (p.get('error')) document.getElementById('error').textContent = p.get('error');
+</script>
+</body>
+</html>

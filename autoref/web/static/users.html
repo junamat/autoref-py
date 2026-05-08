@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref — users</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { overflow-y:auto; height:auto; min-height:100vh; }
+  .page { max-width:640px; margin:0 auto; padding:2rem 1rem; }
+  .topbar { display:flex; align-items:center; gap:1rem; margin-bottom:2rem; }
+  h2 { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted,#888); margin-bottom:1rem; }
+  table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  th { text-align:left; color:var(--muted,#888); border-bottom:1px solid var(--border,#333); padding:0.4rem 0.5rem; font-weight:normal; }
+  td { padding:0.4rem 0.5rem; border-bottom:1px solid var(--border,#1a1a1a); }
+  .del-btn { background:transparent; border:1px solid #f44; color:#f44; border-radius:3px; font-family:inherit; font-size:0.75rem; padding:0.2rem 0.5rem; cursor:pointer; }
+  .del-btn:hover { background:#f44; color:#000; }
+  .add-row { display:flex; gap:0.5rem; margin-top:1.5rem; align-items:center; flex-wrap:wrap; }
+  .add-row input, .add-row select { background:transparent; border:1px solid var(--border,#333); border-radius:4px; padding:0.35rem 0.5rem; font-family:inherit; font-size:0.85rem; color:inherit; }
+  .add-row input { flex:1; min-width:160px; }
+  .add-btn { padding:0.35rem 0.8rem; font-family:inherit; font-size:0.85rem; cursor:pointer; border:1px solid var(--accent,#fff); background:transparent; color:inherit; border-radius:4px; }
+  .add-btn:hover { background:var(--accent,#fff); color:var(--bg,#000); }
+  #msg { font-size:0.8rem; margin-top:0.5rem; color:#f44; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <a href="/" style="text-decoration:none;color:inherit;">← autoref</a>
+    <span style="color:var(--muted,#888);font-size:0.85rem;">users</span>
+  </div>
+  <h2>registered users</h2>
+  <table>
+    <thead><tr><th>username</th><th>role</th><th>irc</th><th></th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="add-row">
+    <input id="new-username" type="text" placeholder="osu! username">
+    <select id="new-role">
+      <option value="ref">ref</option>
+      <option value="host">host</option>
+    </select>
+    <button class="add-btn" onclick="addUser()">Add</button>
+  </div>
+  <div id="msg"></div>
+</div>
+<script>
+function load() {
+  fetch('/api/users').then(r => {
+    if (r.status === 401) { location.href = '/login'; return null; }
+    if (r.status === 403) { document.getElementById('tbody').innerHTML = '<tr><td colspan="4" style="color:#888">host only</td></tr>'; return null; }
+    return r.json();
+  }).then(users => {
+    if (!users) return;
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>${u.osu_username}</td>
+        <td>${u.role}</td>
+        <td>${u.irc_username ? '✓' : '—'}</td>
+        <td><button class="del-btn" onclick="del(${u.id}, '${u.osu_username}')">delete</button></td>
+      </tr>
+    `).join('');
+  });
+}
+async function addUser() {
+  const username = document.getElementById('new-username').value.trim();
+  const role = document.getElementById('new-role').value;
+  if (!username) return;
+  const r = await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({osu_username:username, role}) });
+  const d = await r.json();
+  if (r.ok) { document.getElementById('new-username').value = ''; document.getElementById('msg').textContent = ''; load(); }
+  else { document.getElementById('msg').textContent = d.detail || 'Error'; }
+}
+async function del(id, name) {
+  if (!confirm('Delete ' + name + '?')) return;
+  await fetch('/api/users/' + id, {method:'DELETE'});
+  load();
+}
+load();
+</script>
+</body>
+</html>
