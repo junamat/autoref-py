@@ -1,5 +1,6 @@
 """QualifiersAutoRef: plays every map in pool order, no picks/bans, supports multiple runs."""
 import asyncio
+from typing import Any
 
 import bancho
 
@@ -35,7 +36,7 @@ class QualifiersAutoRef(AutoRef):
         if self.mode in (RefMode.ASSISTED, RefMode.OFF):
             # Ref confirms advance with >next (args ignored; pool order is fixed).
             self._next_future = asyncio.get_event_loop().create_future()
-            close_task = asyncio.ensure_future(self._close_event.wait())
+            close_task: asyncio.Task[Any] = asyncio.ensure_future(self._close_event.wait())
             try:
                 done, _ = await asyncio.wait(
                     {self._next_future, close_task},

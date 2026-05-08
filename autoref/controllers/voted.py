@@ -359,6 +359,7 @@ class VotedQualifiersAutoRef(AutoRef):
         self._grace_task = asyncio.create_task(self._grace_close_when_expired())
 
     async def _grace_close_when_expired(self) -> None:
+        assert self._grace_deadline is not None
         remaining = self._grace_deadline - asyncio.get_event_loop().time()
         try:
             await asyncio.sleep(max(0.0, remaining))

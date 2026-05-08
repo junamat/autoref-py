@@ -104,11 +104,13 @@ class BracketAutoRef(AutoRef):
     # ------------------------------------------------- sequence precomputation
 
     def _rank_to_team(self, rank: int) -> int:
+        assert self.ranking is not None
         return self.ranking[rank]
 
     def _compute_seq(self, first_rank: int, count_for, pattern: str = "ABAB") -> list[int]:
         """Round-robin team_indices starting at `first_rank`, each team contributing
         `count_for(team_index)` entries. ABBA swaps each pair in 2-team configs."""
+        assert self.ranking is not None
         n = len(self.ranking)
         rank_order = [(first_rank + i) % n for i in range(n)]
         # how many actions each rank owes
@@ -494,6 +496,7 @@ class BracketAutoRef(AutoRef):
         if len(self.schemes) == 1:
             self.scheme = self.schemes[0]
             return
+        assert self.ranking is not None
         winner = self.match.teams[self.ranking[0]].name
         options = " | ".join(f"{i}) {s.name}" for i, s in enumerate(self.schemes, start=1))
         await self.lobby.say(f"{winner}, choose a scheme with >order <n>: {options}")
@@ -506,6 +509,7 @@ class BracketAutoRef(AutoRef):
             await self._run_roll_phase()
         if self.scheme is None:
             await self._run_order_phase()
+        assert self.scheme is not None
         self.commit_scheme(self.scheme)
 
     def _get_state(self) -> dict:

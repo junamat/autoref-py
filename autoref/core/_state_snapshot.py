@@ -44,8 +44,8 @@ def build_state(ref: "AutoRef") -> dict:
         team_name = (
             ref.match.teams[ti].name if ti < len(ref.match.teams) else str(ti)
         )
-        pm = _find_map(ref.match, int(row["beatmap_id"]))
-        map_code = pm.name if pm and pm.name else str(row["beatmap_id"])
+        found = _find_map(ref.match, int(row["beatmap_id"]))
+        map_code = found.name if found and found.name else str(row["beatmap_id"])
         events.append({"step": str(row["step"]), "team": team_name, "map": map_code})
 
     # Build a username→ready lookup from the latest !mp settings fetch

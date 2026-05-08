@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 from ..commands import BUILTIN_HANDLERS, COMMANDS, Command  # re-exported for backwards compat
 from ..enums import MapState, RefMode, Step
-from ..lobby import Lobby
+from ..lobby import Lobby, MatchResult
 from ..models import Match, Timers
 from ..storage import MatchDatabase
 from ..utils import find_map as _find_map
@@ -461,8 +461,8 @@ class AutoRef(ABC):
                 await self.score_fetcher.aclose()
             await self.lobby.close()
 
-    async def play_map(self, beatmap_id: int, team_index: int, step: Step) -> None:
-        await self.player.play_map(beatmap_id, team_index, step)
+    async def play_map(self, beatmap_id: int, team_index: int, step: Step) -> MatchResult | None:
+        return await self.player.play_map(beatmap_id, team_index, step)
 
     def _spawn_score_fetch(self, turn: int, beatmap_id: int) -> None:
         self.player.spawn_score_fetch(turn, beatmap_id)

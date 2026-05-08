@@ -66,7 +66,7 @@ class PlayableMap:
         score_multipliers: dict[str, float] | None = None,
     ):
         self.beatmap_id = beatmap_id
-        self.beatmap = None
+        self.beatmap: aiosu.models.Beatmap | None = None
         self.mods = mods
         self.win_condition = win_condition
         self.name = name
@@ -75,6 +75,7 @@ class PlayableMap:
         self.state = MapState.PICKABLE
         # Set by Pool.flatten — list of pool multiplier dicts outer→inner.
         self._pool_mult_chain: list[dict[str, float]] = []
+        self._pool_mods: aiosu.models.mods.Mods | None = None
 
     def effective_multipliers(self, ruleset_mults: dict[str, float] | None = None) -> dict[str, float]:
         """Resolve effective multiplier table by merging ruleset → pool chain → map.
@@ -108,9 +109,9 @@ class PlayableMap:
     async def create(
         cls,
         beatmap_id: int,
-        mods: aiosu.models.mods.Mods = None,
+        mods: aiosu.models.mods.Mods | None = None,
         win_condition: WinCondition = WinCondition.INHERIT,
-        name: str = None,
+        name: str | None = None,
         is_tiebreaker: bool = False,
         client: "aiosu.v2.Client | None" = None,
     ) -> "PlayableMap":

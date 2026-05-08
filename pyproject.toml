@@ -73,17 +73,3 @@ check_untyped_defs = false
 [[tool.mypy.overrides]]
 module = ["bancho.*", "pandas.*", "aiosu.*", "rosu_pp_py.*", "uvicorn.*"]
 ignore_missing_imports = true
-
-# deferred until T56 (annotation pass)
-[[tool.mypy.overrides]]
-module = [
-    "autoref.core.lobby",
-    "autoref.core.models",
-    "autoref.core.config",
-    "autoref.controllers.bracket",
-    "autoref.controllers.voted",
-    "autoref.web.routes.stats",
-    "autoref.core._state_snapshot",
-    "autoref.core.ref.player",
-]
-ignore_errors = true

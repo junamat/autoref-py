@@ -1,7 +1,7 @@
 """Stats / leaderboard / plot API routes."""
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import pandas as pd
 from fastapi import FastAPI
@@ -197,8 +197,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 "diff":       abs(a_score - b_score),
             })
 
-        closest  = sorted(diffs, key=lambda d: d["diff"])[:top_n]
-        blowouts = sorted(diffs, key=lambda d: -d["diff"])[:top_n]
+        closest  = sorted(diffs, key=lambda d: cast(int, d["diff"]))[:top_n]
+        blowouts = sorted(diffs, key=lambda d: -cast(int, d["diff"]))[:top_n]
 
         # ── biggest carry performances ──
         map_stats = scores.groupby("beatmap_id")["score"].agg(["mean", "std"]).reset_index()
@@ -300,10 +300,11 @@ def register(app: FastAPI, server: "WebServer") -> None:
                              count_failed: bool = True, beatmap_id: int | None = None,
                              label: str | None = None,
                              pool_id: str | None = None, round_name: str | None = None):
+        _plots: Any = None
         try:
             from ... import plots as _plots
         except ImportError:
-            _plots = None
+            pass
         if _plots is None:
             return JSONResponse(
                 {"error": "plot rendering requires the [plots] extra (pip install -e '.[plots]')"},
@@ -311,6 +312,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
             )
         if format not in ("png", "hires", "svg"):
             return JSONResponse({"error": "format must be png|hires|svg"}, status_code=400)
+        fmt = cast(Literal["png", "hires", "svg"], format)
         if name not in _plots.PLOTS:
             return JSONResponse(
                 {"error": f"unknown plot {name!r}; choose from {list(_plots.PLOTS)}"},
@@ -326,18 +328,18 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 if label is None:
                     label = _build_map_code_lookup().get(int(beatmap_id))
                 payload = _plots.score_distribution(
-                    scores, int(beatmap_id), fmt=format, theme=theme,
+                    scores, int(beatmap_id), fmt=fmt, theme=theme,
                     exclude_failed=not count_failed, label=label,
                 )
             elif name == "pickban_heat":
                 payload = _plots.pickban_heat(
                     server.db.get_map_action_breakdown(pool_id=pool_id, round_name=round_name),
-                    fmt=format, theme=theme,
+                    fmt=fmt, theme=theme,
                     code_by_bid=_build_map_code_lookup(),
                 )
             elif name == "consistency_scatter":
                 payload = _plots.consistency_scatter(
-                    scores, fmt=format, theme=theme,
+                    scores, fmt=fmt, theme=theme,
                     exclude_failed=not count_failed,
                 )
             else:
@@ -475,7 +477,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                         "total_score": int(tgrp["score"].sum()),
                         "avg_z":       round(float(tgrp["z"].mean()), 3),
                     })
-                team_totals.sort(key=lambda t: -t["total_score"])
+                team_totals.sort(key=lambda t: -cast(int, t["total_score"]))
 
             maps_out.append({
                 "beatmap_id":  int(bid),
@@ -493,8 +495,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
             if row["step"] == "PICK"
         }
         maps_out.sort(key=lambda m: (
-            map_order.get(m["beatmap_id"], 99999),
-            -pick_counts.get(m["beatmap_id"], 0),
+            map_order.get(cast(int, m["beatmap_id"]), 99999),
+            -pick_counts.get(cast(int, m["beatmap_id"]), 0),
         ))
 
         return JSONResponse({"maps": maps_out, "has_teams": bool(has_teams)})

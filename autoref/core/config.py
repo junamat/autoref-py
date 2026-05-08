@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass, field, fields
+from typing import Any
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -80,7 +81,7 @@ def load(db: "MatchDatabase") -> Config:
     rows = db._conn.execute("SELECT key, value FROM settings").fetchall()
     if not rows:
         env_vals = _from_env()
-        cfg = Config(**{k: v for k, v in env_vals.items() if k in {f.name for f in fields(Config)}})
+        cfg = Config(**{k: v for k, v in env_vals.items() if k in {f.name for f in fields(Config)}})  # type: ignore[arg-type]
         save(db, cfg)
         return cfg
     data: dict[str, object] = {}
@@ -90,7 +91,7 @@ def load(db: "MatchDatabase") -> Config:
         except (json.JSONDecodeError, TypeError):
             data[key] = raw
     valid_fields = {f.name for f in fields(Config)}
-    return Config(**{k: v for k, v in data.items() if k in valid_fields})
+    return Config(**{k: v for k, v in data.items() if k in valid_fields})  # type: ignore[arg-type]
 
 
 def save(db: "MatchDatabase", cfg: Config) -> None:

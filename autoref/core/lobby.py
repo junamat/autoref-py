@@ -100,9 +100,14 @@ class Lobby:
         await self.say(text)
 
     @property
+    def _lb(self) -> bancho.BanchoLobby:
+        if self._lobby is None:
+            raise RuntimeError("lobby not initialised — call create() or attach() first")
+        return self._lobby
+
+    @property
     def channel(self) -> bancho.BanchoLobbyChannel:
-        if self._lobby is None: raise RuntimeError("lobby not initialised — call create() or attach() first")
-        return self._lobby.channel
+        return self._lb.channel
 
     @property
     def room_id(self) -> int | None:
@@ -113,15 +118,15 @@ class Lobby:
     async def create(self, name: str, private: bool = False) -> int:
         self._lobby = await self._client.make_lobby(name, private=private)
         self._register_handlers()
-        return self._lobby.id
+        return self._lb.id
 
     async def attach(self, lobby_id: int) -> int:
         """Attach to an existing Bancho lobby. Idempotent if already attached to same id."""
-        if self._lobby is not None and self._lobby.id == lobby_id:
+        if self._lobby is not None and self._lb.id == lobby_id:
             return lobby_id
         self._lobby = await self._client.join_lobby(lobby_id)
         self._register_handlers()
-        return self._lobby.id
+        return self._lb.id
 
     def _register_handlers(self) -> None:
         def _on_joined(d: Any) -> None:
@@ -134,14 +139,14 @@ class Lobby:
             for fn in self._presence_hooks:
                 asyncio.ensure_future(fn())
 
-        self._lobby.on("playerJoined", _on_joined)
-        self._lobby.on("playerLeft", _on_left)
-        self._lobby.on("matchStarted", self._on_match_started)
-        self._lobby.on("playerFinished", self._on_player_finished)
-        self._lobby.on("matchFinished", self._on_match_finished)
-        self._lobby.on("allPlayersReady", lambda: self._all_ready_event.set())
-        self._lobby.on("timerEnded", lambda: self._timer_end_event.set())
-        self._lobby.channel.on("message", self._on_channel_message)
+        self._lb.on("playerJoined", _on_joined)
+        self._lb.on("playerLeft", _on_left)
+        self._lb.on("matchStarted", self._on_match_started)
+        self._lb.on("playerFinished", self._on_player_finished)
+        self._lb.on("matchFinished", self._on_match_finished)
+        self._lb.on("allPlayersReady", lambda: self._all_ready_event.set())
+        self._lb.on("timerEnded", lambda: self._timer_end_event.set())
+        self._lb.channel.on("message", self._on_channel_message)
 
     def _on_channel_message(self, msg: Any) -> None:
         logger.info("[%s] %s", msg.user.username, msg.message)
@@ -163,12 +168,12 @@ class Lobby:
 
     async def close(self) -> None:
         logger.info("closing lobby")
-        await self._lobby.close_lobby()
+        await self._lb.close_lobby()
 
     # ----------------------------------------------------------- room settings
 
     async def set_map(self, beatmap_id: int, gamemode: int = 0) -> None:
-        await self._lobby.set_map(beatmap_id, bancho.BanchoGamemode(gamemode))
+        await self._lb.set_map(beatmap_id, bancho.BanchoGamemode(gamemode))
 
     async def set_mods(self, mods: str) -> None:
         # aiosu Mods.__str__ returns concatenated e.g. "HDNF" — insert spaces between known abbrevs
@@ -177,68 +182,68 @@ class Lobby:
         from bancho.lobby import _parse_mods
         spaced = re.sub(r'([A-Z]{2})', r'\1 ', mods).strip()
         parsed, freemod = _parse_mods(spaced)
-        await self._lobby.set_mods(parsed, freemod)
+        await self._lb.set_mods(parsed, freemod)
 
     async def set_room(self, team_mode: int, score_mode: int, size: int | None = None) -> None:
-        await self._lobby.set_settings(
+        await self._lb.set_settings(
             bancho.BanchoLobbyTeamModes(team_mode),
             bancho.BanchoLobbyWinConditions(score_mode),
             size,
         )
 
     async def set_title(self, name: str) -> None:
-        await self._lobby.set_name(name)
+        await self._lb.set_name(name)
 
     async def set_password(self, password: str = "") -> None:
         if password:
-            await self._lobby.set_password(password)
+            await self._lb.set_password(password)
         else:
-            await self._lobby.clear_password()
+            await self._lb.clear_password()
 
     # ------------------------------------------------------------ player mgmt
 
     async def invite(self, username: str) -> None:
-        await self._lobby.invite_player(username)
+        await self._lb.invite_player(username)
 
     async def kick(self, username: str) -> None:
-        await self._lobby.kick_player(username)
+        await self._lb.kick_player(username)
 
     async def move(self, username: str, slot: int) -> None:
-        await self._lobby.move_player(username, slot)
+        await self._lb.move_player(username, slot)
 
     async def set_team(self, username: str, colour: str) -> None:
         team = bancho.BanchoLobbyTeams.Red if colour.lower() == "red" else bancho.BanchoLobbyTeams.Blue
-        await self._lobby.change_team(username, team)
+        await self._lb.change_team(username, team)
 
     async def add_ref(self, username: str) -> None:
-        await self._lobby.add_ref(username)
+        await self._lb.add_ref(username)
 
     # -------------------------------------------------------------- match flow
 
     async def start(self, delay: int | None = None) -> None:
         self._all_ready_event.clear()
         self._match_finished_event.clear()
-        await self._lobby.start_match(delay)
+        await self._lb.start_match(delay)
 
     async def abort(self) -> None:
-        await self._lobby.abort_match()
+        await self._lb.abort_match()
 
     async def timer(self, seconds: int = 30) -> None:
         self._timer_end_event.clear()
-        await self._lobby.start_timer(seconds)
+        await self._lb.start_timer(seconds)
 
     async def abort_timer(self) -> None:
-        await self._lobby.abort_timer()
+        await self._lb.abort_timer()
 
     async def fetch_settings(self, timeout: float = 5.0) -> list[SlotInfo]:
         """Send !mp settings and wait for BanchoBot's response."""
         from bancho.enums import BanchoLobbyPlayerStates, BanchoLobbyTeams
 
-        players = await self._lobby.fetch_settings(timeout=timeout)
+        players = await self._lb.fetch_settings(timeout=timeout)
         slots: list[SlotInfo] = []
         for p in players:
             if p is not None:
-                team = None
+                team: Literal["Blue", "Red"] | None = None
                 if p.team == BanchoLobbyTeams.Blue:
                     team = "Blue"
                 elif p.team == BanchoLobbyTeams.Red:
@@ -256,18 +261,18 @@ class Lobby:
 
     async def say(self, msg: str) -> None:
         logger.info("[autoref] %s", msg)
-        await self._lobby.channel.send_message(msg)
+        await self._lb.channel.send_message(msg)
         for fn in self._message_hooks:
             await fn("autoref", msg, True)
-        for fn in self._output_sinks:
+        for sink in self._output_sinks:
             try:
-                await fn(msg)
+                await sink(msg)
             except Exception:
                 logger.exception("output sink error")
 
     # ------------------------------------------------------------ await events
 
-    async def wait_for_match_end(self) -> MatchResult:
+    async def wait_for_match_end(self) -> MatchResult | None:
         await self._match_finished_event.wait()
         return self.last_result
 

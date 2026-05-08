@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..enums import Step
+from ..lobby import MatchResult
 from ..utils import find_map as _find_map
 from ..utils import normalize_name as _normalize
 
@@ -19,7 +20,7 @@ class PlayRunner:
     def __init__(self, ref: "AutoRef"):
         self.ref = ref
 
-    async def play_map(self, beatmap_id: int, team_index: int, step: Step):
+    async def play_map(self, beatmap_id: int, team_index: int, step: Step) -> MatchResult | None:
         """Set the map, wait for ready, start, wait for result, record it."""
         ref = self.ref
         pm = _find_map(ref.match, beatmap_id)
@@ -61,8 +62,8 @@ class PlayRunner:
 
                 await ref.lobby.start(delay=ref.timers.start_map)
 
-                result_t = asyncio.create_task(ref.lobby.wait_for_match_end())
-                abort_t2 = asyncio.create_task(ref._abort_event.wait())
+                result_t: asyncio.Task[Any] = asyncio.create_task(ref.lobby.wait_for_match_end())
+                abort_t2: asyncio.Task[Any] = asyncio.create_task(ref._abort_event.wait())
                 done2, pending2 = await asyncio.wait(
                     {result_t, abort_t2}, return_when=asyncio.FIRST_COMPLETED
                 )
