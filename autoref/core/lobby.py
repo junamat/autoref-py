@@ -3,6 +3,7 @@ import asyncio
 import logging
 import sys
 from dataclasses import dataclass, field
+from typing import Literal
 
 import bancho
 
@@ -26,7 +27,7 @@ class SlotInfo:
     username: str
     ready: bool
     user_id: int
-    team: str | None   # "Blue", "Red", or None
+    team: Literal["Blue", "Red"] | None
     is_host: bool
 
 
@@ -169,9 +170,10 @@ class Lobby:
         await self._lobby.set_map(beatmap_id, bancho.BanchoGamemode(gamemode))
 
     async def set_mods(self, mods: str) -> None:
-        from bancho.lobby import _parse_mods
         # aiosu Mods.__str__ returns concatenated e.g. "HDNF" — insert spaces between known abbrevs
         import re
+
+        from bancho.lobby import _parse_mods
         spaced = re.sub(r'([A-Z]{2})', r'\1 ', mods).strip()
         parsed, freemod = _parse_mods(spaced)
         await self._lobby.set_mods(parsed, freemod)
@@ -230,7 +232,7 @@ class Lobby:
     async def fetch_settings(self, timeout: float = 5.0) -> list[SlotInfo]:
         """Send !mp settings and wait for BanchoBot's response."""
         from bancho.enums import BanchoLobbyPlayerStates, BanchoLobbyTeams
-        
+
         players = await self._lobby.fetch_settings(timeout=timeout)
         slots: list[SlotInfo] = []
         for p in players:

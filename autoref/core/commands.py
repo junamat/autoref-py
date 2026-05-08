@@ -7,8 +7,10 @@ The base `AutoRef._dispatch_command` looks up the command keyword in
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field as _field
-from typing import Awaitable, Callable, TYPE_CHECKING
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from dataclasses import field as _field
+from typing import TYPE_CHECKING, Literal
 
 from .enums import RefMode
 
@@ -22,8 +24,8 @@ class Command:
     aliases: list[str] = _field(default_factory=list)
     desc: str = ""
     usage: str = ""                        # argument hint, e.g. "<map>" or "[secs]"
-    section: str = "misc"                  # UI grouping
-    scope: str = "ref"                     # "ref" | "anyone"
+    section: Literal["flow", "mode", "timers", "lobby", "info", "override", "bracket", "misc"] = "misc"
+    scope: Literal["ref", "anyone"] = "ref"
     noprefix: bool = False                 # True for !panic-style commands
     bracket_only: bool = False             # hidden in qualifiers view
 
