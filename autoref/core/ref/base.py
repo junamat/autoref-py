@@ -107,9 +107,9 @@ class AutoRef(ABC):
         """Register an async callback(state_dict) called after each state change."""
         self._state_hooks.append(fn)
 
-    def _get_state(self) -> dict[str, Any]:
+    def _get_state(self) -> "StateSnapshot":
         """Build a serialisable state snapshot. Subclasses should call super() and extend."""
-        from .._state_snapshot import build_state
+        from .._state_snapshot import StateSnapshot, build_state
         return build_state(self)
 
     async def _push_state(self) -> None:

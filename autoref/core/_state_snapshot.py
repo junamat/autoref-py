@@ -1,8 +1,9 @@
 """Pure-fn builder for AutoRef state snapshots consumed by web/CLI hooks."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypedDict
 
+from .commands import CommandDict
 from .enums import MapState
 from .utils import find_map as _find_map
 from .utils import normalize_name as _normalize
@@ -11,7 +12,43 @@ if TYPE_CHECKING:
     from .ref.base import AutoRef
 
 
-def build_state(ref: "AutoRef") -> dict:
+class MapEntry(TypedDict):
+    code: str
+    state: str
+    tb: bool
+
+
+class EventEntry(TypedDict):
+    step: str
+    team: str
+    map: str
+
+
+class PlayerEntry(TypedDict):
+    username: str
+    present: bool
+    ready: bool
+
+
+class TeamEntry(TypedDict):
+    name: str
+    players: list[PlayerEntry]
+
+
+class StateSnapshot(TypedDict):
+    mode: str
+    team_names: list[str]
+    teams: list[TeamEntry]
+    best_of: int
+    maps: list[MapEntry]
+    events: list[EventEntry]
+    pending_proposal: dict[str, Any] | None
+    ref_name: str | None
+    room_id: int | None
+    commands: list[CommandDict]
+
+
+def build_state(ref: "AutoRef") -> StateSnapshot:
     """Build a serialisable state snapshot for the given AutoRef."""
     played_ids: set[int] = set()
     if not ref.match.match_status.empty:

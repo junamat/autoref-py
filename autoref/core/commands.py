@@ -10,12 +10,23 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from dataclasses import field as _field
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 from .enums import RefMode
 
 if TYPE_CHECKING:
     from .ref.base import AutoRef
+
+
+class CommandDict(TypedDict):
+    name: str
+    aliases: list[str]
+    label: str
+    desc: str
+    section: str
+    scope: str
+    noprefix: bool
+    bracket_only: bool
 
 
 @dataclass(slots=True)
@@ -29,7 +40,7 @@ class Command:
     noprefix: bool = False                 # True for !panic-style commands
     bracket_only: bool = False             # hidden in qualifiers view
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> CommandDict:
         prefix = "" if self.noprefix else ">"
         label = f"{prefix}{self.name}"
         if self.aliases:
