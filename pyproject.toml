@@ -31,6 +31,7 @@ pp = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pytest-cov",
     "python-dotenv",
     "httpx",
     "ruff",
@@ -46,6 +47,13 @@ include = ["autoref*"]
 
 [tool.setuptools.package-data]
 "autoref.core.db" = ["schema/*.sql", "queries/**/*.sql"]
+
+[tool.coverage.run]
+source = ["autoref"]
+omit = ["autoref/web/static/*"]
+
+[tool.coverage.report]
+fail_under = 55
 
 [tool.ruff]
 line-length = 120

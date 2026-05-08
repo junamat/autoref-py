@@ -17,4 +17,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: ruff check autoref/ tests/
       - run: mypy autoref/
-      - run: pytest tests/
+      - run: pytest tests/ --cov=autoref --cov-report=xml
+      - uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
