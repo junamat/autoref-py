@@ -32,6 +32,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "python-dotenv",
+    "httpx"
 ]
 # pip install -e ".[all]"   → everything
 all = [
