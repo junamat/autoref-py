@@ -64,10 +64,12 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.get("/api/settings")
     async def get_settings():
+        """Return current server configuration, redacting secret fields."""
         return JSONResponse(to_api(server.config))
 
     @app.put("/api/settings")
     async def put_settings(request: Request):
+        """Update server configuration and return requires_restart flag."""
         body: dict[str, Any] = await request.json()
 
         errors = _validate(body)

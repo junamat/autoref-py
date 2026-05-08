@@ -17,6 +17,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.get("/api/matches")
     async def api_matches():
+        """List all pending and running matches with status summary."""
         all_matches = (
             [server._pending_summary(mid, p) for mid, p in server._pending.items()] +
             [m.summary() for m in server._matches.values()]
@@ -25,6 +26,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.post("/api/matches")
     async def create_match(request: Request, user=Depends(require_login)):
+        """Create a pending match entry and return its assigned ID."""
         if not user.irc_username:
             return JSONResponse({"error": "missing_irc", "field": "irc_username"}, status_code=400)
         if not user.irc_password:
@@ -45,6 +47,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.post("/api/matches/{match_id}/start")
     async def start_match(match_id: str, user=Depends(require_login)):
+        """Promote a pending match to running by starting the Bancho lobby."""
         payload = server._pending.pop(match_id, None)
         if payload is None:
             return JSONResponse({"error": "not found or already started"}, status_code=404)
@@ -64,6 +67,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.delete("/api/matches/{match_id}")
     async def delete_match(match_id: str, user=Depends(require_login)):
+        """Cancel a pending match or close a running one."""
         if match_id in server._pending:
             del server._pending[match_id]
             server._notify_landing()
@@ -77,6 +81,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.post("/api/matches/{match_id}/resume")
     async def resume_match(match_id: str, request: Request, user=Depends(require_login)):
+        """Attach to an orphaned match lobby and resume it (owner or host only)."""
         row = server._pending_resume.get(match_id)
         if row is None:
             return JSONResponse({"error": "not found or not an orphan"}, status_code=404)
@@ -100,6 +105,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.delete("/api/matches/{match_id}/resume")
     async def discard_orphan(match_id: str, user=Depends(require_login)):
+        """Mark an orphaned match as crashed without resuming it (owner or host only)."""
         row = server._pending_resume.get(match_id)
         if row is None:
             return JSONResponse({"error": "not found or not an orphan"}, status_code=404)

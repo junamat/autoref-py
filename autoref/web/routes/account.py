@@ -12,6 +12,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.get("/api/account")
     async def get_account(user=Depends(require_login)):
+        """Return the current authenticated user's profile."""
         return JSONResponse({
             "id": user.id,
             "osu_user_id": user.osu_user_id,
@@ -23,6 +24,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.put("/api/account")
     async def put_account(request: Request, user=Depends(require_login)):
+        """Update the current user's IRC credentials."""
         body = await request.json()
         irc_username = body.get("irc_username")
         irc_password = body.get("irc_password")

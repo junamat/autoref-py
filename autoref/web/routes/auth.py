@@ -14,10 +14,12 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.get("/api/auth/login")
     async def login():
+        """Redirect to the osu! OAuth authorization URL."""
         return RedirectResponse(authorize_url(server.config))
 
     @app.get("/api/auth/callback")
     async def callback(request: Request, code: str):
+        """Exchange OAuth code, set session cookie, and redirect to landing (or setup)."""
         try:
             osu_user = await exchange_code(code, server.config)
         except Exception as exc:
@@ -42,6 +44,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.post("/api/auth/logout")
     async def logout(request: Request):
+        """Invalidate the current session cookie."""
         token = request.cookies.get("session")
         if token:
             server.db._conn.execute("DELETE FROM sessions WHERE token = ?", (token,))

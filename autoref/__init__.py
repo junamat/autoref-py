@@ -1,3 +1,13 @@
+"""autoref — osu! tournament auto-referee.
+
+Public API:
+    BracketAutoRef, QualifiersAutoRef, VotedQualifiersAutoRef — controller implementations.
+    AutoRef — abstract base controller.
+    build_autoref — factory for web/CLI/Discord callers.
+    MatchDatabase — SQLite persistence layer.
+    Match, Pool, ModdedPool, PlayableMap, Ruleset, Team, Timers, OrderScheme — domain models.
+    WinCondition, RefMode, Step, MapState — enums.
+"""
 # core — always available
 # controllers — always available (depend only on core)
 from .controllers.bracket import BracketAutoRef, Phase

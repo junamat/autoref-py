@@ -9,10 +9,20 @@ logger = logging.getLogger(__name__)
 
 def flatten_pool_tree(nodes: list, parent_mods: str = "",
                       parent_mults_chain: list | None = None) -> list:
-    """Flatten a pool-builder tree into the flat map-entry list build_autoref expects.
+    """Flatten a pool-builder tree into the flat map-entry list expected by build_autoref.
 
     Pre-resolves effective per-map score multipliers by walking the tree and
-    merging outer→inner→map dicts (most-specific wins per mod key)."""
+    merging outer→inner→map dicts (most-specific wins per mod key).
+
+    Args:
+        nodes: Pool-tree node dicts; each has type="map" or children=[...].
+        parent_mods: Mod string inherited from the parent pool node.
+        parent_mults_chain: Accumulated score_multiplier dicts from ancestor nodes.
+
+    Returns:
+        Flat list of map-entry dicts with keys: beatmap_id, name, mod_group, mods,
+        is_tiebreaker, score_multipliers.
+    """
     entries = []
     chain = list(parent_mults_chain or [])
     for node in nodes:
@@ -44,19 +54,19 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
                         pool_loader=None, db=None, defaults=None):
     """Build and return an (AutoRef, BanchoClient) pair from a web/CLI payload dict.
 
-    payload keys:
-        type            "bracket" | "qualifiers"
-        room_name       str
-        mode            "off" | "assisted" | "auto"
-        best_of         int
-        bans_per_team   int
-        protects_per_team int
-        teams           [{"name": str, "players": [str, ...]}, ...]
-        maps            [{"beatmap_id", "name", "mod_group", "mods", "is_tiebreaker"}, ...]
-        pool_id         str  (alternative to maps; loaded via pool_loader(id) -> saved pool dict)
-        round_name      str  (optional tournament round, e.g. "RO16", "QF", "Grand Finals")
+    Args:
+        payload: Match configuration. Keys: type ("bracket"|"qualifiers"), room_name,
+            mode ("off"|"assisted"|"auto"), best_of, bans_per_team, protects_per_team,
+            teams ([{"name", "players"}]), maps ([{"beatmap_id", "name", "mod_group",
+            "mods", "is_tiebreaker"}]), pool_id (alternative to maps), round_name.
+        bancho_username: IRC username for the Bancho client.
+        bancho_password: IRC password for the Bancho client.
+        pool_loader: Optional callable(pool_id) -> saved pool dict with "tree" key.
+        db: Optional MatchDatabase for match persistence.
+        defaults: Optional Config supplying fallbacks (payload > defaults > builtin).
 
-    pool_loader: optional callable(pool_id) -> saved pool dict (with "tree" key).
+    Returns:
+        Tuple of (AutoRef subclass instance, BanchoClient).
     """
     import aiosu
     import bancho as bancho_lib

@@ -13,6 +13,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.get("/api/users")
     async def list_users(user=Depends(require_role("host"))):
+        """List all registered users (host only)."""
         rows = server.db._conn.execute(
             "SELECT id, osu_user_id, osu_username, role, irc_username, created_at FROM users ORDER BY id"
         ).fetchall()
@@ -23,6 +24,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.post("/api/users")
     async def create_user(request: Request, user=Depends(require_role("host"))):
+        """Create a new user account by osu_username (host only)."""
         body = await request.json()
         osu_username = body.get("osu_username", "").strip()
         if not osu_username:
@@ -43,6 +45,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.patch("/api/users/{uid}")
     async def patch_user(uid: int, request: Request, current=Depends(require_login)):
+        """Update a user's IRC credentials or role (self or host only)."""
         if current.role != "host" and current.id != uid:
             raise HTTPException(status_code=403, detail="forbidden")
         body = await request.json()
@@ -62,6 +65,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.delete("/api/users/{uid}")
     async def delete_user(uid: int, user=Depends(require_role("host"))):
+        """Delete a user and all their sessions (host only)."""
         server.db._conn.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
         server.db._conn.execute("DELETE FROM users WHERE id = ?", (uid,))
         server.db._conn.commit()
