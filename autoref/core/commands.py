@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from .ref.base import AutoRef
 
 
-@dataclass
+@dataclass(slots=True)
 class Command:
     name: str                              # primary name without prefix, e.g. "undo"
     aliases: list[str] = _field(default_factory=list)

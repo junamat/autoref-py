@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from .config import Config
 
 
-@dataclass
+@dataclass(slots=True)
 class OsuUser:
     id: int
     username: str

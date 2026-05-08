@@ -41,7 +41,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
             return JSONResponse({"id": match_id, "status": "pending"}, status_code=201)
         except Exception as e:
             logger.exception("failed to create match")
-            return JSONResponse({"error": str(e)}, status_code=500)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
 
     @app.post("/api/matches/{match_id}/start")
     async def start_match(match_id: str, user=Depends(require_login)):
@@ -60,7 +60,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         except Exception as e:
             server._pending[match_id] = payload  # restore on failure
             logger.exception("failed to start match")
-            return JSONResponse({"error": str(e)}, status_code=500)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
 
     @app.delete("/api/matches/{match_id}")
     async def delete_match(match_id: str, user=Depends(require_login)):
@@ -96,7 +96,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         except Exception as e:
             logger.exception("failed to resume match %s", match_id)
             server._pending_resume[match_id] = row
-            return JSONResponse({"error": str(e)}, status_code=500)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
 
     @app.delete("/api/matches/{match_id}/resume")
     async def discard_orphan(match_id: str, user=Depends(require_login)):

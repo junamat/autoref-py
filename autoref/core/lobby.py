@@ -9,19 +9,19 @@ import bancho
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(slots=True)
 class PlayerResult:
     username: str
     score: int
     passed: bool
 
 
-@dataclass
+@dataclass(slots=True)
 class MatchResult:
     scores: list[PlayerResult] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class SlotInfo:
     username: str
     ready: bool
@@ -99,7 +99,7 @@ class Lobby:
 
     @property
     def channel(self) -> bancho.BanchoLobbyChannel:
-        assert self._lobby is not None
+        if self._lobby is None: raise RuntimeError("lobby not initialised — call create() or attach() first")
         return self._lobby.channel
 
     @property

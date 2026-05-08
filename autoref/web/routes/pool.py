@@ -27,8 +27,9 @@ def register(app: FastAPI, server: "WebServer") -> None:
             return JSONResponse({"id": pool_id}, status_code=201)
         except ValueError as e:
             return JSONResponse({"error": str(e)}, status_code=400)
-        except Exception as e:
-            return JSONResponse({"error": str(e)}, status_code=500)
+        except Exception:
+            logger.exception("failed to save pool")
+            return JSONResponse({"error": "internal_error"}, status_code=500)
 
     @app.delete("/api/pools/{pool_id}")
     async def delete_pool(pool_id: str):
@@ -41,9 +42,9 @@ def register(app: FastAPI, server: "WebServer") -> None:
         """Fetch beatmap metadata from osu! API (cache-backed)."""
         try:
             meta = await get_beatmap_cache().fetch_one(int(beatmap_id))
-        except Exception as e:
-            logger.exception(f"failed to fetch beatmap {beatmap_id}")
-            return JSONResponse({"error": str(e)}, status_code=500)
+        except Exception:
+            logger.exception("failed to fetch beatmap %s", beatmap_id)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
         if meta is None:
             return JSONResponse({"error": "not found"}, status_code=404)
         # API response shape kept stable: web UI consumes `len`/`diff`.
@@ -76,8 +77,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 "ar": round(attrs.approach_rate, 1) if attrs.approach_rate else None,
                 "od": round(attrs.overall_difficulty, 1) if attrs.overall_difficulty else None,
             })
-        except Exception as e:
-            logger.exception(f"failed to fetch beatmap attributes {beatmap_id} with mods {mods}")
-            return JSONResponse({"error": str(e)}, status_code=500)
+        except Exception:
+            logger.exception("failed to fetch beatmap attributes %s mods=%s", beatmap_id, mods)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
         finally:
             await client.aclose()

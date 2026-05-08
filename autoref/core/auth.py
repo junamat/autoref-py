@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 SESSION_LIFETIME = 30 * 24 * 3600
 
 
-@dataclass
+@dataclass(slots=True)
 class User:
     id: int
     osu_user_id: int | None

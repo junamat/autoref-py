@@ -9,7 +9,7 @@ import pandas as pd
 from .enums import WinCondition, MapState, Step
 
 
-@dataclass
+@dataclass(slots=True)
 class OrderScheme:
     """Declarative bracket-match order. Roles are roll ranks (0 = roll winner).
 
@@ -28,7 +28,7 @@ class OrderScheme:
     split_ban_after_pick: int | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class Timers:
     pick: int = 120        # seconds a team has to pick
     ban: int = 120         # seconds a team has to ban

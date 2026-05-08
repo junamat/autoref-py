@@ -34,7 +34,7 @@ _ENV_MAP: dict[str, tuple[str, type]] = {
 }
 
 
-@dataclass
+@dataclass(slots=True)
 class Config:
     host: str = "0.0.0.0"
     port: int = 8080

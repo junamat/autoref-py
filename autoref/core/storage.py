@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS live_matches (
 class MatchDatabase:
     def __init__(self, path: str | Path = "matches.db"):
         self._conn = sqlite3.connect(str(path), check_same_thread=False)
+        self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.executescript(_SCHEMA)
         self._migrate()
         _p = Path(str(path))

@@ -284,8 +284,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
                         "pp":         round(float(r["pp"]), 1),
                         "zpp":        round(float(r["zpp"]), 3),
                     })
-        except Exception as e:
-            logger.warning(f"pp augmentation failed: {e}")
+        except Exception:
+            logger.warning("pp augmentation failed", exc_info=True)
 
         return JSONResponse({
             "closest_maps":     closest,
@@ -344,7 +344,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 return JSONResponse({"error": f"unknown plot {name}"}, status_code=404)
         except Exception as e:
             logger.exception("plot %s failed", name)
-            return JSONResponse({"error": str(e)}, status_code=500)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
 
         media_type = "image/svg+xml" if format == "svg" else "image/png"
         ext = "svg" if format == "svg" else "png"
