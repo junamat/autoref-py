@@ -11,7 +11,11 @@ from autoref.core.ref.base import COMMANDS, Command
 from autoref.core.result import Ok
 from autoref.core.utils.pool import (
     find_map as _find_map,
+)
+from autoref.core.utils.pool import (
     find_map_by_input as _find_map_by_input,
+)
+from autoref.core.utils.pool import (
     find_map_by_input_pick as _find_map_by_input_pick,
 )
 

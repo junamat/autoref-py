@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
-from autoref.web.server import WebServer, _BACKOFF
+from autoref.web.server import _BACKOFF, WebServer
 
 
 def _make_ar_and_client(fail_count: int = 1):

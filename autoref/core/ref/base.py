@@ -10,6 +10,7 @@ import bancho
 import pandas as pd
 
 if TYPE_CHECKING:
+    from .._state_snapshot import StateSnapshot
     from ..score_fetcher import ScoreFetcher
 
 from ..commands import BUILTIN_HANDLERS, COMMANDS, Command  # re-exported for backwards compat
@@ -109,7 +110,7 @@ class AutoRef(ABC):
 
     def _get_state(self) -> "StateSnapshot":
         """Build a serialisable state snapshot. Subclasses should call super() and extend."""
-        from .._state_snapshot import StateSnapshot, build_state
+        from .._state_snapshot import build_state
         return build_state(self)
 
     async def _push_state(self) -> None:
