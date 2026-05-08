@@ -2,23 +2,29 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 import bancho
 import pandas as pd
 
-from ..enums import Step, MapState, RefMode
+if TYPE_CHECKING:
+    from ..score_fetcher import ScoreFetcher
+
+from ..commands import BUILTIN_HANDLERS, COMMANDS, Command  # re-exported for backwards compat
+from ..enums import MapState, RefMode, Step
 from ..lobby import Lobby
-from ..models import Match, PlayableMap, Pool, Timers
-from ..utils import find_map as _find_map, find_map_by_input as _find_map_by_input, find_map_by_input_pick as _find_map_by_input_pick, normalize_name as _normalize
+from ..models import Match, Timers
 from ..storage import MatchDatabase
-from .scorer import MatchScorer
-from .persister import MatchPersister
+from ..utils import find_map as _find_map
+from ..utils import normalize_name as _normalize
 from .announcer import Announcer
 from .broker import CommandBroker
-from .player import PlayRunner
 from .chooser import MapChooser
-from ..commands import Command, COMMANDS, BUILTIN_HANDLERS  # re-exported for backwards compat
+from .persister import MatchPersister
+from .player import PlayRunner
+from .scorer import MatchScorer
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +61,7 @@ class AutoRef(ABC):
         ref_prefix: str = ">",
         refs: set[str] | None = None,
         db: MatchDatabase | None = None,
-        score_fetcher=None,
+        score_fetcher: "ScoreFetcher | None" = None,
     ):
         self._client = client
         self.match = match
@@ -67,7 +73,7 @@ class AutoRef(ABC):
         self.announcer = Announcer(self.lobby, match, self.timers)
         self.db = db
         self.score_fetcher = score_fetcher
-        self._score_fetch_tasks: list[asyncio.Task] = []
+        self._score_fetch_tasks: list[asyncio.Task[None]] = []
 
         self.mode = mode
         self.ref_prefix = ref_prefix
@@ -81,13 +87,13 @@ class AutoRef(ABC):
         self._timeout_event = asyncio.Event()
         self._timeout_event.set()
 
-        self._next_future: asyncio.Future | None = None
-        self._step_cancel_future: asyncio.Future | None = None
+        self._next_future: asyncio.Future[list[str]] | None = None
+        self._step_cancel_future: asyncio.Future[Any] | None = None
         self._abort_event: asyncio.Event = asyncio.Event()
         self._map_in_progress: bool = False
         self._close_event: asyncio.Event = asyncio.Event()
-        self._state_hooks: list = []
-        self._pending_proposal: dict | None = None
+        self._state_hooks: list[Callable[[dict[str, Any]], Awaitable[None]]] = []
+        self._pending_proposal: dict[str, Any] | None = None
         self._bancho_lobby_id: int | None = None
         self.broker = CommandBroker(self)
         self.player = PlayRunner(self)
@@ -97,11 +103,11 @@ class AutoRef(ABC):
 
     # ------------------------------------------------------------ state hooks
 
-    def add_state_hook(self, fn) -> None:
+    def add_state_hook(self, fn: Callable[[dict[str, Any]], Awaitable[None]]) -> None:
         """Register an async callback(state_dict) called after each state change."""
         self._state_hooks.append(fn)
 
-    def _get_state(self) -> dict:
+    def _get_state(self) -> dict[str, Any]:
         """Build a serialisable state snapshot. Subclasses should call super() and extend."""
         from .._state_snapshot import build_state
         return build_state(self)
@@ -119,7 +125,7 @@ class AutoRef(ABC):
     # -------------------------------------------------- persistence serialisation
 
     @staticmethod
-    def _df_to_records(df: pd.DataFrame) -> list[dict]:
+    def _df_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
         """Serialize a DataFrame to JSON-safe records. Enum cells → .name; timestamps → ISO 8601."""
         records = []
         for _, row in df.iterrows():
@@ -136,10 +142,10 @@ class AutoRef(ABC):
         return records
 
     @staticmethod
-    def _records_to_df(records: list[dict]) -> pd.DataFrame:
+    def _records_to_df(records: list[dict[str, Any]]) -> pd.DataFrame:
         return pd.DataFrame(records) if records else pd.DataFrame()
 
-    def to_state_dict(self) -> dict:
+    def to_state_dict(self) -> dict[str, Any]:
         """Serialize persistent state. Subclasses call super() and extend."""
         return {
             "match_status": self._df_to_records(self.match.match_status),
@@ -148,7 +154,7 @@ class AutoRef(ABC):
             "bancho_lobby_id": self.lobby.room_id,
         }
 
-    def from_state_dict(self, d: dict) -> None:
+    def from_state_dict(self, d: dict[str, Any]) -> None:
         """Hydrate persistent state. Subclasses call super() first."""
         records = d.get("match_status", [])
         self.match.match_status = self._records_to_df(records)
@@ -233,7 +239,7 @@ class AutoRef(ABC):
     # ---------------------------------------------------------------- abstract
 
     @abstractmethod
-    def next_step(self, match_status) -> tuple[int, Step]:
+    def next_step(self, match_status: pd.DataFrame) -> tuple[int, Step]:
         """Return (team_index, Step) for the current match state."""
 
     async def handle_other(self, team_index: int) -> None:
@@ -359,6 +365,8 @@ class AutoRef(ABC):
         ruleset = self.match.ruleset
 
         if resume:
+            if self._bancho_lobby_id is None:
+                raise RuntimeError("cannot resume: bancho_lobby_id not set in state")
             await self.lobby.attach(self._bancho_lobby_id)
         else:
             await self.lobby.create(self.room_name)
@@ -376,7 +384,7 @@ class AutoRef(ABC):
                     await self.lobby.invite(player.username)
 
             # Auto-assign teams when players join
-            async def auto_assign_teams():
+            async def auto_assign_teams() -> None:
                 for team_idx, team in enumerate(self.match.teams):
                     team_color = "Blue" if team_idx == 0 else "Red"
                     for player in team.players:
@@ -453,8 +461,8 @@ class AutoRef(ABC):
                 await self.score_fetcher.aclose()
             await self.lobby.close()
 
-    async def play_map(self, beatmap_id: int, team_index: int, step: Step):
-        return await self.player.play_map(beatmap_id, team_index, step)
+    async def play_map(self, beatmap_id: int, team_index: int, step: Step) -> None:
+        await self.player.play_map(beatmap_id, team_index, step)
 
     def _spawn_score_fetch(self, turn: int, beatmap_id: int) -> None:
         self.player.spawn_score_fetch(turn, beatmap_id)

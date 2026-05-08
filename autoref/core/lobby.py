@@ -2,8 +2,9 @@
 import asyncio
 import logging
 import sys
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 import bancho
 
@@ -45,28 +46,28 @@ class Lobby:
         self.last_result: MatchResult | None = None
         self.players: set[str] = set()
         self.slot_info: list[SlotInfo] = []
-        self._message_hooks: list = []
-        self._input_hooks: list = []
-        self._output_sinks: list = []
-        self._reply_sinks: dict = {}
-        self._presence_hooks: list = []
+        self._message_hooks: list[Callable[[str, str, bool], Awaitable[None]]] = []
+        self._input_hooks: list[Callable[[str, str], Awaitable[bool]]] = []
+        self._output_sinks: list[Callable[[str], Awaitable[None]]] = []
+        self._reply_sinks: dict[str, Callable[[str], Awaitable[None]]] = {}
+        self._presence_hooks: list[Callable[[], Awaitable[None]]] = []
 
-    def add_message_hook(self, fn) -> None:
+    def add_message_hook(self, fn: Callable[[str, str, bool], Awaitable[None]]) -> None:
         self._message_hooks.append(fn)
 
-    def add_input_hook(self, fn) -> None:
+    def add_input_hook(self, fn: Callable[[str, str], Awaitable[bool]]) -> None:
         """Hook called for every CLI/web input line. Return True to consume, False to pass through to chat."""
         self._input_hooks.append(fn)
 
-    def add_presence_hook(self, fn) -> None:
+    def add_presence_hook(self, fn: Callable[[], Awaitable[None]]) -> None:
         """Register an async callable() called whenever a player joins or leaves."""
         self._presence_hooks.append(fn)
 
-    def add_output_sink(self, fn) -> None:
+    def add_output_sink(self, fn: Callable[[str], Awaitable[None]]) -> None:
         """Register an async callable(text: str) called for every message the bot sends."""
         self._output_sinks.append(fn)
 
-    def register_reply_sink(self, source: str, fn) -> None:
+    def register_reply_sink(self, source: str, fn: Callable[[str], Awaitable[None]]) -> None:
         """Register an async callable(text: str) as the reply channel for a named source.
 
         When AutoRef calls lobby.reply(text, source), the registered sink is used
@@ -123,12 +124,12 @@ class Lobby:
         return self._lobby.id
 
     def _register_handlers(self) -> None:
-        def _on_joined(d):
+        def _on_joined(d: Any) -> None:
             self.players.add(d["player"].user.username)
             for fn in self._presence_hooks:
                 asyncio.ensure_future(fn())
 
-        def _on_left(p):
+        def _on_left(p: Any) -> None:
             self.players.discard(p.user.username)
             for fn in self._presence_hooks:
                 asyncio.ensure_future(fn())
@@ -142,7 +143,7 @@ class Lobby:
         self._lobby.on("timerEnded", lambda: self._timer_end_event.set())
         self._lobby.channel.on("message", self._on_channel_message)
 
-    def _on_channel_message(self, msg) -> None:
+    def _on_channel_message(self, msg: Any) -> None:
         logger.info("[%s] %s", msg.user.username, msg.message)
         for fn in self._message_hooks:
             asyncio.ensure_future(fn(msg.user.username, msg.message, False))
@@ -157,7 +158,7 @@ class Lobby:
                 PlayerResult(score.player.user.username, score.score, score.passed)
             )
 
-    def _on_match_finished(self, scores: list) -> None:
+    def _on_match_finished(self, scores: list[Any]) -> None:
         self._match_finished_event.set()
 
     async def close(self) -> None:

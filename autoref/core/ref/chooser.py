@@ -2,15 +2,21 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import bancho
 
 from ..enums import MapState, RefMode, Step
 from ..utils import (
     find_map as _find_map,
+)
+from ..utils import (
     find_map_by_input as _find_map_by_input,
+)
+from ..utils import (
     find_map_by_input_pick as _find_map_by_input_pick,
+)
+from ..utils import (
     normalize_name as _normalize,
 )
 
@@ -87,7 +93,7 @@ class MapChooser:
         team_usernames = {_normalize(p.username) for p in ref.match.teams[team_index].players}
         for_ban = (step == Step.BAN)
 
-        def on_message(msg) -> None:
+        def on_message(msg: Any) -> None:
             if _normalize(getattr(msg.user, "username", "")) not in team_usernames:
                 return
             finder = _find_map_by_input if for_ban else _find_map_by_input_pick

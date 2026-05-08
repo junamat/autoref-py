@@ -5,7 +5,7 @@ Holds a reference to the owning AutoRef to invoke dispatch + panic flow.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..enums import RefMode
 
@@ -34,9 +34,9 @@ class CommandBroker:
     async def run_loop(self) -> None:
         """Background task: routes !panic and ref-prefix commands from the lobby channel."""
         ref = self.ref
-        queue: asyncio.Queue = asyncio.Queue()
+        queue: asyncio.Queue[Any] = asyncio.Queue()
 
-        def on_msg(msg) -> None:
+        def on_msg(msg: Any) -> None:
             asyncio.ensure_future(queue.put(msg))
 
         ref.lobby.channel.on("message", on_msg)

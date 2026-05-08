@@ -1,12 +1,12 @@
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from pathlib import Path
 import asyncio
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 
 import aiosu
 import pandas as pd
 
-from .enums import WinCondition, MapState, Step
+from .enums import MapState, Step, WinCondition
 
 
 @dataclass(slots=True)
@@ -59,9 +59,9 @@ class PlayableMap:
     def __init__(
         self,
         beatmap_id: int,
-        mods=None,
+        mods: aiosu.models.mods.Mods | None = None,
         win_condition: WinCondition = WinCondition.INHERIT,
-        name: str = None,
+        name: str | None = None,
         is_tiebreaker: bool = False,
         score_multipliers: dict[str, float] | None = None,
     ):
@@ -82,7 +82,7 @@ class PlayableMap:
         from .utils.math import merge_multipliers
         return merge_multipliers(ruleset_mults, *self._pool_mult_chain, self.score_multipliers)
 
-    def effective_mods(self, pool_mods=None):
+    def effective_mods(self, pool_mods: aiosu.models.mods.Mods | None = None):
         """Resolve extra mods with priority: explicit (or NO_MODS) > pool_mods > name inference.
 
         Returns None when no extra mods apply (e.g. NM maps).
