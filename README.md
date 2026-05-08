@@ -86,7 +86,6 @@ Secret fields (`bancho_password`, `osu_client_secret`) show `••• set` when
 - Cross-pool stats — needs an abstraction layer (mod-class / difficulty bucket / star-range) so scores from different pools can be normalised before aggregation
 - Safe multi-ref support — credential handling, sign-in flow
 - IO — Discord interface
-- CI stat badge
 - will to live (impossible)
 
 ---
