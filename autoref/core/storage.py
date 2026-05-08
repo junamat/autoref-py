@@ -1,5 +1,7 @@
 import json
+import os
 import sqlite3
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -60,6 +62,35 @@ CREATE TABLE IF NOT EXISTS game_scores (
     rank        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_game_scores_match ON game_scores (match_id);
+
+CREATE TABLE IF NOT EXISTS users (
+    id           INTEGER PRIMARY KEY,
+    osu_user_id  INTEGER UNIQUE,
+    osu_username TEXT NOT NULL,
+    role         TEXT CHECK(role IN ('host','ref')),
+    irc_username TEXT,
+    irc_password TEXT,
+    created_at   INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token      TEXT PRIMARY KEY,
+    user_id    INTEGER REFERENCES users(id),
+    expires_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS live_matches (
+    match_id        TEXT PRIMARY KEY,
+    owner_user_id   INTEGER REFERENCES users(id),
+    controller_type TEXT,
+    payload_json    TEXT,
+    state_json      TEXT,
+    bancho_lobby_id INTEGER,
+    status          TEXT CHECK(status IN ('pending','running','orphaned','finished','crashed')),
+    last_heartbeat  INTEGER,
+    created_at      INTEGER,
+    updated_at      INTEGER
+);
 """
 
 
@@ -68,6 +99,9 @@ class MatchDatabase:
         self._conn = sqlite3.connect(str(path), check_same_thread=False)
         self._conn.executescript(_SCHEMA)
         self._migrate()
+        _p = Path(str(path))
+        if _p.exists():
+            os.chmod(_p, 0o600)
 
     def _migrate(self) -> None:
         """Add columns introduced after the original schema. Cheap idempotent ALTERs."""
@@ -368,3 +402,54 @@ class MatchDatabase:
             """,
             self._conn,
         )
+
+    # --------------------------------------------------------- live_matches
+
+    def upsert_live_match(self, match_id: str, *, owner_user_id: int | None = None,
+                          controller_type: str | None = None,
+                          payload_json: str | None = None,
+                          state_json: str | None = None,
+                          bancho_lobby_id: int | None = None,
+                          status: str = "running") -> None:
+        now = int(time.time())
+        self._conn.execute(
+            """
+            INSERT INTO live_matches
+                (match_id, owner_user_id, controller_type, payload_json,
+                 state_json, bancho_lobby_id, status, last_heartbeat, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(match_id) DO UPDATE SET
+                state_json      = coalesce(excluded.state_json, state_json),
+                bancho_lobby_id = coalesce(excluded.bancho_lobby_id, bancho_lobby_id),
+                status          = excluded.status,
+                last_heartbeat  = excluded.last_heartbeat,
+                updated_at      = excluded.updated_at
+            """,
+            (match_id, owner_user_id, controller_type, payload_json,
+             state_json, bancho_lobby_id, status, now, now, now),
+        )
+        self._conn.commit()
+
+    def update_live_match_status(self, match_id: str, status: str) -> None:
+        now = int(time.time())
+        self._conn.execute(
+            "UPDATE live_matches SET status = ?, updated_at = ? WHERE match_id = ?",
+            (status, now, match_id),
+        )
+        self._conn.commit()
+
+    def get_orphaned_live_matches(self) -> list[dict]:
+        cols = [r[1] for r in self._conn.execute("PRAGMA table_info(live_matches)").fetchall()]
+        rows = self._conn.execute(
+            "SELECT * FROM live_matches WHERE status IN ('running', 'orphaned')"
+        ).fetchall()
+        return [dict(zip(cols, row)) for row in rows]
+
+    def prune_finished_live_matches(self, *, days: int = 7) -> int:
+        cutoff = int(time.time()) - days * 86400
+        cur = self._conn.execute(
+            "DELETE FROM live_matches WHERE status = 'finished' AND updated_at < ?",
+            (cutoff,),
+        )
+        self._conn.commit()
+        return cur.rowcount

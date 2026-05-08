@@ -72,6 +72,21 @@ class QualifiersAutoRef(AutoRef):
         name = pm.name or str(pm.beatmap_id)
         await self.lobby.say(f"Next map: {name}")
 
+    # ---------------------------------------------------------------- persistence
+
+    def to_state_dict(self) -> dict:
+        d = super().to_state_dict()
+        d.update({
+            "map_index": self._map_index,
+            "run_index": self._run_index,
+        })
+        return d
+
+    def from_state_dict(self, d: dict) -> None:
+        super().from_state_dict(d)
+        self._map_index = d.get("map_index", 0)
+        self._run_index = d.get("run_index", 0)
+
     # ---------------------------------------------------------------- state
 
     def _get_state(self) -> dict:

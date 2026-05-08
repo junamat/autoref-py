@@ -110,7 +110,18 @@ class Lobby:
 
     async def create(self, name: str, private: bool = False) -> int:
         self._lobby = await self._client.make_lobby(name, private=private)
+        self._register_handlers()
+        return self._lobby.id
 
+    async def attach(self, lobby_id: int) -> int:
+        """Attach to an existing Bancho lobby. Idempotent if already attached to same id."""
+        if self._lobby is not None and self._lobby.id == lobby_id:
+            return lobby_id
+        self._lobby = await self._client.join_lobby(lobby_id)
+        self._register_handlers()
+        return self._lobby.id
+
+    def _register_handlers(self) -> None:
         def _on_joined(d):
             self.players.add(d["player"].user.username)
             for fn in self._presence_hooks:
@@ -129,8 +140,6 @@ class Lobby:
         self._lobby.on("allPlayersReady", lambda: self._all_ready_event.set())
         self._lobby.on("timerEnded", lambda: self._timer_end_event.set())
         self._lobby.channel.on("message", self._on_channel_message)
-
-        return self._lobby.id
 
     def _on_channel_message(self, msg) -> None:
         logger.info("[%s] %s", msg.user.username, msg.message)

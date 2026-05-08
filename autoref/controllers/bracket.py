@@ -513,6 +513,45 @@ class BracketAutoRef(AutoRef):
         state["wins"] = list(self._wins)
         return state
 
+    def to_state_dict(self) -> dict:
+        d = super().to_state_dict()
+        scheme_idx = None
+        if self.scheme is not None:
+            try:
+                scheme_idx = self.schemes.index(self.scheme)
+            except ValueError:
+                pass
+        d.update({
+            "phase": self.phase.name,
+            "ranking": self.ranking,
+            "scheme_idx": scheme_idx,
+            "protect_cursor": self._protect_cursor,
+            "ban_cursor": self._ban_cursor,
+            "pick_count": self._pick_count,
+            "protect_seq": self._protect_seq,
+            "ban_seq": self._ban_seq,
+            "tb_triggered": self._tb_triggered,
+            "wins": list(self._wins),
+            "last_map_winner": self._last_map_winner,
+        })
+        return d
+
+    def from_state_dict(self, d: dict) -> None:
+        super().from_state_dict(d)
+        self.phase = Phase[d["phase"]]
+        self.ranking = d.get("ranking")
+        scheme_idx = d.get("scheme_idx")
+        if scheme_idx is not None and 0 <= scheme_idx < len(self.schemes):
+            self.scheme = self.schemes[scheme_idx]
+        self._protect_cursor = d.get("protect_cursor", 0)
+        self._ban_cursor = d.get("ban_cursor", 0)
+        self._pick_count = d.get("pick_count", 0)
+        self._protect_seq = d.get("protect_seq", [])
+        self._ban_seq = d.get("ban_seq", [])
+        self._tb_triggered = d.get("tb_triggered", False)
+        self._wins = d.get("wins", [0] * len(self.match.teams))
+        self._last_map_winner = d.get("last_map_winner")
+
     def _map_winner(self, result: MatchResult) -> int | None:
         """Team_index whose players' scores sum highest. None on tie/no scores.
 

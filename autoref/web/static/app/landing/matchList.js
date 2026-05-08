@@ -4,6 +4,73 @@ import { $, esc } from '/static/shared/util.js';
 import { showMatch } from '../router.js';
 
 export function renderMatchList(matches) {
+  const orphans = matches.filter(m => m.orphaned);
+  const active  = matches.filter(m => !m.orphaned);
+
+  _renderOrphans(orphans);
+  _renderActive(active);
+}
+
+function _renderOrphans(orphans) {
+  const section  = $('orphan-section');
+  const list     = $('orphan-list');
+  list.innerHTML = '';
+  if (!orphans.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  for (const data of orphans) {
+    const teams = (data.team_names || []).join(' vs ') || data.controller_type || 'match';
+    const ts    = data.orphaned_since
+      ? new Date(data.orphaned_since * 1000).toLocaleTimeString()
+      : '';
+    const card = document.createElement('div');
+    card.className = 'match-card mono';
+    card.style.borderColor = 'var(--orange,#e69500)';
+    card.innerHTML = `
+      <div class="match-card-accent" style="background:var(--orange,#e69500)"></div>
+      <div class="match-card-body">
+        <div class="match-card-status">
+          <span class="match-card-badge" style="background:var(--orange,#e69500);color:#000">ORPHAN</span>
+        </div>
+        <div class="match-card-info">
+          <div class="match-card-title">${esc(teams)}</div>
+          <div class="match-card-meta">lobby ${data.bancho_lobby_id ?? '?'} · last seen ${ts}</div>
+        </div>
+        <div class="match-card-actions" style="display:flex;gap:5px"></div>
+      </div>
+    `;
+    const actions = card.querySelector('.match-card-actions');
+
+    const resumeBtn = document.createElement('button');
+    resumeBtn.className = 'join-btn';
+    resumeBtn.textContent = '↩ resume';
+    resumeBtn.addEventListener('click', async () => {
+      resumeBtn.disabled = true;
+      resumeBtn.textContent = '…';
+      const res = await fetch(`/api/matches/${data.id}/resume`, { method: 'POST' });
+      const d = await res.json();
+      if (res.ok) showMatch(d.id);
+      else { alert('Error: ' + (d.error || res.status)); resumeBtn.disabled = false; resumeBtn.textContent = '↩ resume'; }
+    });
+    actions.appendChild(resumeBtn);
+
+    const discardBtn = document.createElement('button');
+    discardBtn.className = 'ghost-btn';
+    discardBtn.textContent = '✕ discard';
+    discardBtn.style.color = 'var(--red)';
+    discardBtn.style.borderColor = 'var(--red)';
+    discardBtn.addEventListener('click', async () => {
+      discardBtn.disabled = true;
+      const res = await fetch(`/api/matches/${data.id}/resume`, { method: 'DELETE' });
+      if (!res.ok) { alert('Error discarding'); discardBtn.disabled = false; }
+    });
+    actions.appendChild(discardBtn);
+
+    list.appendChild(card);
+  }
+}
+
+function _renderActive(matches) {
   const list = $('match-list');
   const noMsg = $('no-matches-msg');
 

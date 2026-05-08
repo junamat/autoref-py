@@ -382,6 +382,34 @@ class VotedQualifiersAutoRef(AutoRef):
         if self._quit_players:
             await self.lobby.say(f"Players quit: {', '.join(sorted(self._quit_players))}")
 
+    # -------------------------------------------------------------- persistence
+
+    def to_state_dict(self) -> dict:
+        d = super().to_state_dict()
+        d.update({
+            "play_counts": self._play_counts,
+            "run_index": self._run_index,
+            "maps_in_run": self._maps_in_run,
+            "active_players": sorted(self._active_players),
+            "quit_players": sorted(self._quit_players),
+            "seed": self._seed,
+            "vote_log": list(self._vote_log),
+            "current_picker": self._current_picker,
+        })
+        return d
+
+    def from_state_dict(self, d: dict) -> None:
+        super().from_state_dict(d)
+        self._play_counts = {int(k): v for k, v in d.get("play_counts", {}).items()}
+        self._run_index = d.get("run_index", 0)
+        self._maps_in_run = d.get("maps_in_run", 0)
+        self._active_players = set(d.get("active_players", []))
+        self._quit_players = set(d.get("quit_players", []))
+        self._seed = d.get("seed", self._seed)
+        self._rng = random.Random(self._seed)
+        self._vote_log = list(d.get("vote_log", []))
+        self._current_picker = d.get("current_picker")
+
     # -------------------------------------------------------------- state
 
     def _get_state(self) -> dict:

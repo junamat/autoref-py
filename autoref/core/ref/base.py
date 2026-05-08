@@ -2,8 +2,10 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from enum import Enum
 
 import bancho
+import pandas as pd
 
 from ..enums import Step, MapState, RefMode
 from ..lobby import Lobby
@@ -86,6 +88,7 @@ class AutoRef(ABC):
         self._close_event: asyncio.Event = asyncio.Event()
         self._state_hooks: list = []
         self._pending_proposal: dict | None = None
+        self._bancho_lobby_id: int | None = None
         self.broker = CommandBroker(self)
         self.player = PlayRunner(self)
         self.chooser = MapChooser(self)
@@ -112,6 +115,52 @@ class AutoRef(ABC):
                 await fn(state)
             except Exception:
                 pass
+
+    # -------------------------------------------------- persistence serialisation
+
+    @staticmethod
+    def _df_to_records(df: pd.DataFrame) -> list[dict]:
+        """Serialize a DataFrame to JSON-safe records. Enum cells → .name; timestamps → ISO 8601."""
+        records = []
+        for _, row in df.iterrows():
+            rec = {}
+            for k, v in row.items():
+                if isinstance(v, Enum):
+                    v = v.name
+                elif hasattr(v, "isoformat"):
+                    v = v.isoformat()
+                elif isinstance(v, float) and pd.isna(v):
+                    v = None
+                rec[k] = v
+            records.append(rec)
+        return records
+
+    @staticmethod
+    def _records_to_df(records: list[dict]) -> pd.DataFrame:
+        return pd.DataFrame(records) if records else pd.DataFrame()
+
+    def to_state_dict(self) -> dict:
+        """Serialize persistent state. Subclasses call super() and extend."""
+        return {
+            "match_status": self._df_to_records(self.match.match_status),
+            "mode": self.mode.value,
+            "close_event_set": self._close_event.is_set(),
+            "bancho_lobby_id": self.lobby.room_id,
+        }
+
+    def from_state_dict(self, d: dict) -> None:
+        """Hydrate persistent state. Subclasses call super() first."""
+        records = d.get("match_status", [])
+        self.match.match_status = self._records_to_df(records)
+        from ..enums import RefMode, Step
+        self.mode = RefMode(d["mode"])
+        if not self.match.match_status.empty and "step" in self.match.match_status.columns:
+            self.match.match_status["step"] = self.match.match_status["step"].apply(
+                lambda v: Step[v] if isinstance(v, str) else v
+            )
+        if d.get("close_event_set"):
+            self._close_event.set()
+        self._bancho_lobby_id = d.get("bancho_lobby_id")
 
     # ---------------------------------------------------------- informational helpers
 
@@ -306,40 +355,44 @@ class AutoRef(ABC):
         lobby is up but before entering the pick/ban/protect dispatch loop."""
         return None
 
-    async def run(self) -> None:
+    async def run(self, resume: bool = False) -> None:
         ruleset = self.match.ruleset
 
-        await self.lobby.create(self.room_name)
-        wc = ruleset.win_condition.value
-        await self.lobby.set_room(
-            team_mode=ruleset.team_mode,
-            score_mode=wc if 0 <= wc <= 3 else 3,
-            size=ruleset.vs * 2 if ruleset.team_mode == 2 else ruleset.vs,
-        )
-        if ruleset.enforced_mods:
-            await self.lobby.set_mods(str(ruleset.enforced_mods))
+        if resume:
+            await self.lobby.attach(self._bancho_lobby_id)
+        else:
+            await self.lobby.create(self.room_name)
+            wc = ruleset.win_condition.value
+            await self.lobby.set_room(
+                team_mode=ruleset.team_mode,
+                score_mode=wc if 0 <= wc <= 3 else 3,
+                size=ruleset.vs * 2 if ruleset.team_mode == 2 else ruleset.vs,
+            )
+            if ruleset.enforced_mods:
+                await self.lobby.set_mods(str(ruleset.enforced_mods))
 
-        for team in self.match.teams:
-            for player in team.players:
-                await self.lobby.invite(player.username)
-
-        # Auto-assign teams when players join
-        async def auto_assign_teams():
-            for team_idx, team in enumerate(self.match.teams):
-                team_color = "Blue" if team_idx == 0 else "Red"
+            for team in self.match.teams:
                 for player in team.players:
-                    if _normalize(player.username) in {_normalize(p) for p in self.lobby.players}:
-                        try:
-                            await self.lobby.set_team(player.username, team_color)
-                        except Exception:
-                            pass  # Player might not be in lobby yet
-        
-        self.lobby.add_presence_hook(auto_assign_teams)
+                    await self.lobby.invite(player.username)
+
+            # Auto-assign teams when players join
+            async def auto_assign_teams():
+                for team_idx, team in enumerate(self.match.teams):
+                    team_color = "Blue" if team_idx == 0 else "Red"
+                    for player in team.players:
+                        if _normalize(player.username) in {_normalize(p) for p in self.lobby.players}:
+                            try:
+                                await self.lobby.set_team(player.username, team_color)
+                            except Exception:
+                                pass
+
+            self.lobby.add_presence_hook(auto_assign_teams)
 
         broker_task = asyncio.create_task(self._run_command_broker())
         cli_task = asyncio.create_task(self.lobby.run_cli_input())
         try:
-            await self._pre_loop()
+            if not resume:
+                await self._pre_loop()
             await self._push_state()
             while True:
                 # Pause during an active timeout (any user can trigger >timeout).
