@@ -32,7 +32,9 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "python-dotenv",
-    "httpx"
+    "httpx",
+    "ruff",
+    "mypy",
 ]
 # pip install -e ".[all]"   → everything
 all = [
@@ -41,3 +43,47 @@ all = [
 
 [tool.setuptools.packages.find]
 include = ["autoref*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = [
+    "E501",   # line too long — enforced by formatter, not linter
+    "E701",   # multiple statements on one line (colon) — style choice
+    "E702",   # multiple statements on one line (semicolon) — style choice
+    "B008",   # function-call-in-default-argument — FastAPI Depends pattern
+    "B027",   # empty-method-without-abstract-decorator — intentional (handle_other)
+    "B905",   # zip-without-explicit-strict — not critical
+    "UP037",  # quoted-annotation — used for TYPE_CHECKING forward refs
+]
+
+[tool.ruff.lint.per-file-ignores]
+"autoref/__init__.py" = ["F401"]   # public re-export surface
+"tests/*"             = ["F401"]   # test helpers import for side-effects
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = false
+warn_return_any = false
+check_untyped_defs = false
+# untyped third-party stubs
+[[tool.mypy.overrides]]
+module = ["bancho.*", "pandas.*", "aiosu.*", "rosu_pp_py.*", "uvicorn.*"]
+ignore_missing_imports = true
+
+# deferred until T56 (annotation pass)
+[[tool.mypy.overrides]]
+module = [
+    "autoref.core.lobby",
+    "autoref.core.models",
+    "autoref.core.config",
+    "autoref.controllers.bracket",
+    "autoref.controllers.voted",
+    "autoref.web.routes.stats",
+    "autoref.core._state_snapshot",
+    "autoref.core.ref.player",
+]
+ignore_errors = true

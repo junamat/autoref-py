@@ -1,15 +1,15 @@
 """T45: to_state_dict / from_state_dict round-trip for all controllers."""
 from unittest.mock import AsyncMock, MagicMock
+
+import bancho
 import pandas as pd
 import pytest
-import bancho
 
-from autoref.core.enums import RefMode, Step, WinCondition
-from autoref.core.models import Match, OrderScheme, PlayableMap, Pool, Ruleset, Team, Timers
 from autoref.controllers.bracket import BracketAutoRef, Phase
 from autoref.controllers.qualifiers import QualifiersAutoRef
 from autoref.controllers.voted import VotedQualifiersAutoRef
-
+from autoref.core.enums import RefMode, Step, WinCondition
+from autoref.core.models import Match, OrderScheme, PlayableMap, Pool, Ruleset, Team, Timers
 
 # ------------------------------------------------------------------ helpers
 
@@ -98,7 +98,6 @@ def _make_voted():
 # ------------------------------------------------------------------ V30: DataFrame round-trip
 
 def test_df_to_records_enum_coercion():
-    import pandas as pd
     from autoref.core.ref.base import AutoRef
     df = pd.DataFrame([{"step": Step.PICK, "beatmap_id": 1, "turn": 0, "team_index": 0,
                         "timestamp": "2024-01-01T00:00:00"}])
@@ -108,7 +107,6 @@ def test_df_to_records_enum_coercion():
 
 def test_df_round_trip_cell_exact():
     from autoref.core.ref.base import AutoRef
-    import pandas as pd
     df = pd.DataFrame([
         {"step": "PICK", "beatmap_id": 5, "turn": 1, "team_index": 0, "timestamp": "2024-01-01T00:00:00"},
         {"step": "BAN",  "beatmap_id": 3, "turn": 0, "team_index": 1, "timestamp": "2024-01-01T00:00:01"},
@@ -146,7 +144,6 @@ def test_bracket_state_round_trip():
 
 
 def test_bracket_match_status_preserved():
-    import pandas as pd
     ar = _make_bracket()
     ar.match.match_status = pd.DataFrame([
         {"step": "PICK", "beatmap_id": 1, "turn": 0, "team_index": 0, "timestamp": "2024-01-01"},

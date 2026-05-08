@@ -1,9 +1,10 @@
 """Tests for autoref/core/config.py"""
 import json
+
 import pytest
 
-from autoref.core.storage import MatchDatabase
 from autoref.core.config import Config, load, save, to_api
+from autoref.core.storage import MatchDatabase
 
 
 @pytest.fixture
@@ -21,7 +22,7 @@ def test_save_values_are_json_decodable(db):
     cfg = Config(bancho_username="testuser", port=9090)
     save(db, cfg)
     rows = db._conn.execute("SELECT key, value FROM settings").fetchall()
-    for key, raw in rows:
+    for _key, raw in rows:
         json.loads(raw)  # must not raise
 
 

@@ -3,11 +3,10 @@ import asyncio
 import json
 import logging
 import os
-import time
 import uuid
 from pathlib import Path
 
-from ._state import _STATIC_DIR, _POOL_STORE
+from ._state import _POOL_STORE, _STATIC_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +86,8 @@ class WebServer:
     def __init__(self, host: str | None = None, port: int | None = None,
                  static_dir: str | Path | None = None,
                  db_path: str | Path | None = None):
-        from ..core.storage import MatchDatabase
         from ..core.config import load as load_config
+        from ..core.storage import MatchDatabase
         self.static_dir = Path(static_dir) if static_dir else _STATIC_DIR
         self._matches: dict[str, WebInterface] = {}
         self._pending: dict[str, dict] = {}       # match_id -> raw payload, not yet started
@@ -97,7 +96,7 @@ class WebServer:
         self._tasks: dict[str, asyncio.Task] = {}
         self._snapshot_tasks: dict[str, asyncio.Task] = {}
         self._match_metadata: dict[str, dict] = {}  # match_id -> {owner_user_id, controller_type, payload_json}
-        self.db = MatchDatabase(db_path or os.getenv("AUTOREF_DB", "matches.db"))
+        self.db = MatchDatabase(db_path if db_path is not None else os.getenv("AUTOREF_DB", "matches.db"))
         self.config = load_config(self.db)
         self.host = host if host is not None else self.config.host
         self.port = port if port is not None else self.config.port
@@ -238,7 +237,7 @@ class WebServer:
                     await ar.run(resume=resume)
                     self.db.update_live_match_status(mid, "finished")
                     break
-                except Exception as exc:
+                except Exception:
                     logger.exception("match %s disconnected/crashed (attempt %d)", mid, attempt)
                     self.db.update_live_match_status(mid, "orphaned")
                     self._pending_resume[mid] = self.db.get_orphaned_live_matches()
@@ -342,12 +341,12 @@ class WebServer:
         return iface
 
     async def start(self) -> None:
+        import uvicorn
         from fastapi import FastAPI
         from fastapi.staticfiles import StaticFiles
-        import uvicorn
 
-        from .routes import register_all
         from ._gate import SetupGateMiddleware
+        from .routes import register_all
 
         # T38: load orphaned matches into pending-resume list (NOT auto-resumed)
         for row in self.db.get_orphaned_live_matches():

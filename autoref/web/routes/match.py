@@ -39,7 +39,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
             }
             server._notify_landing()
             return JSONResponse({"id": match_id, "status": "pending"}, status_code=201)
-        except Exception as e:
+        except Exception:
             logger.exception("failed to create match")
             return JSONResponse({"error": "internal_error"}, status_code=500)
 
@@ -57,7 +57,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 bancho_password=bancho_password,
             )
             return JSONResponse({"id": iface.match_id, "status": "running"})
-        except Exception as e:
+        except Exception:
             server._pending[match_id] = payload  # restore on failure
             logger.exception("failed to start match")
             return JSONResponse({"error": "internal_error"}, status_code=500)
@@ -93,7 +93,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 bancho_password=user.irc_password,
             )
             return JSONResponse({"id": iface.match_id, "status": "running"})
-        except Exception as e:
+        except Exception:
             logger.exception("failed to resume match %s", match_id)
             server._pending_resume[match_id] = row
             return JSONResponse({"error": "internal_error"}, status_code=500)

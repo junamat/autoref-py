@@ -20,7 +20,6 @@ from .methods import (
 )
 from .predicates import ScorePredicate, include_all
 
-
 _SYNC_DISPATCH = {
     "zscore":        z_sum_leaderboard,
     "avg_score":     avg_score_leaderboard,

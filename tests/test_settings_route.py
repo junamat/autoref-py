@@ -3,8 +3,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from autoref.core.config import Config
+from autoref.core.config import load as load_config
+from autoref.core.config import save as save_config
 from autoref.core.storage import MatchDatabase
-from autoref.core.config import Config, load as load_config, save as save_config
 from autoref.web.routes.settings import register
 
 

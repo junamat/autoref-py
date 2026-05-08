@@ -58,14 +58,15 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
 
     pool_loader: optional callable(pool_id) -> saved pool dict (with "tree" key).
     """
-    import bancho as bancho_lib
     import aiosu
-    from .core.models import Match, Pool, PlayableMap, ModdedPool, Ruleset, Team, OrderScheme
-    from .core.enums import WinCondition, RefMode, Step
-    from .core.score_fetcher import ScoreFetcher
+    import bancho as bancho_lib
+
     from .client import make_client
     from .controllers.bracket import BracketAutoRef
     from .controllers.qualifiers import QualifiersAutoRef
+    from .core.enums import RefMode, Step, WinCondition
+    from .core.models import Match, ModdedPool, OrderScheme, PlayableMap, Pool, Ruleset, Team
+    from .core.score_fetcher import ScoreFetcher
 
     def _get(key, builtin, attr=None):
         """payload > defaults > builtin."""
@@ -96,7 +97,7 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
     for e in map_entries:
         groups.setdefault(e.get("mod_group", "NM"), []).append(e)
 
-    pool_children = []
+    pool_children: list[Pool] = []
     for group_name, entries in groups.items():
         mods_str = entries[0].get("mods", "") if entries else ""
         maps = [PlayableMap(
@@ -106,7 +107,7 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
             score_multipliers=e.get("score_multipliers"),
         ) for i, e in enumerate(entries)]
         if mods_str and mods_str.lower() not in ("", "nm", "nomod"):
-            mods_val = "Freemod" if mods_str.lower() == "freemod" else aiosu.models.mods.Mods(mods_str)
+            mods_val = aiosu.models.mods.Mods([]) if mods_str.lower() == "freemod" else aiosu.models.mods.Mods(mods_str)
             pool_children.append(ModdedPool(group_name, mods_val, *maps))
         else:
             pool_children.append(Pool(group_name, *maps))
@@ -167,6 +168,7 @@ async def build_autoref(payload: dict, bancho_username: str = "", bancho_passwor
     ar_kwargs = dict(client=client, match=match, room_name=room_name,
                      mode=mode, score_fetcher=fetcher, db=db,
                      timers=timers, ref_prefix=ref_prefix, refs=set(refs_raw) if refs_raw else None)
+    ar: QualifiersAutoRef | BracketAutoRef
     if match_type == "qualifiers":
         ar = QualifiersAutoRef(**ar_kwargs)
     else:

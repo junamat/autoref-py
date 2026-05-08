@@ -7,13 +7,13 @@ import random
 
 import bancho
 
-from ..core.ref import AutoRef
 from ..core.beatmap_cache import BeatmapCache, get_beatmap_cache
 from ..core.commands import Command
 from ..core.enums import MapState, Step
 from ..core.models import Match, PlayableMap, Timers
-from ..core.utils import normalize_name as _normalize, find_map as _find_map
-
+from ..core.ref import AutoRef
+from ..core.utils import find_map as _find_map
+from ..core.utils import normalize_name as _normalize
 
 _FORTUNES = [
     "the dice favor {map} today.",

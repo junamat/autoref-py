@@ -19,11 +19,11 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/stats")
     async def api_stats(method: str = "zscore", count_failed: bool = True, aggregate: str = "sum",
                         pool_id: str | None = None, round_name: str | None = None):
-        from ...core.stats import include_all, exclude_failed, METHODS, PP_METHODS, leaderboard_async
+        from ...core.stats import METHODS, PP_METHODS, exclude_failed, include_all, leaderboard_async
         if method not in METHODS:
             return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
         if aggregate not in ("sum", "mean"):
-            return JSONResponse({"error": f"aggregate must be 'sum' or 'mean'"}, status_code=400)
+            return JSONResponse({"error": "aggregate must be 'sum' or 'mean'"}, status_code=400)
         predicate = include_all if count_failed else exclude_failed
         if method in PP_METHODS:
             all_scores_for_lb = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
@@ -132,7 +132,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                                 pool_id: str | None = None,
                                 round_name: str | None = None,
                                 top_n: int = 20):
-        from ...core.stats import include_all, exclude_failed
+        from ...core.stats import exclude_failed, include_all
         predicate = include_all if count_failed else exclude_failed
 
         scores  = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
@@ -342,7 +342,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 )
             else:
                 return JSONResponse({"error": f"unknown plot {name}"}, status_code=404)
-        except Exception as e:
+        except Exception:
             logger.exception("plot %s failed", name)
             return JSONResponse({"error": "internal_error"}, status_code=500)
 
@@ -424,7 +424,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 total_score, avg_z}]}
           has_teams: bool — True when team_index data is present
         """
-        from ...core.stats import include_all, exclude_failed, z_sum_leaderboard
+        from ...core.stats import exclude_failed, include_all
         predicate = include_all if count_failed else exclude_failed
         scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
         code_by_bid = _build_map_code_lookup()
@@ -512,7 +512,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
           map_order: [beatmap_id, ...]  — ordered by pool position / pick count
           has_data: bool
         """
-        from ...core.stats import include_all, exclude_failed, METHODS, PP_METHODS, team_leaderboard
+        from ...core.stats import METHODS, PP_METHODS, exclude_failed, include_all, team_leaderboard
         if method not in METHODS:
             return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
         if method in PP_METHODS:
@@ -614,7 +614,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
           teams: [{team_name, matches_played, wins, avg_z, avg_score,
                    maps_played, win_rate}]
         """
-        from ...core.stats import include_all, exclude_failed
+        from ...core.stats import exclude_failed, include_all
         predicate = include_all if count_failed else exclude_failed
         scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
 

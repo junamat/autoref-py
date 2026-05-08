@@ -1,5 +1,6 @@
 from .mods import canonical_mods
 
+
 def apply_score_multiplier(score: int | float, mods, multipliers: dict[str, float] | None) -> float:
     """Apply mod multipliers to a raw score.
 

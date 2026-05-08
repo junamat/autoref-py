@@ -9,8 +9,8 @@ if TYPE_CHECKING:
 
 
 def register(app: FastAPI, server: "WebServer") -> None:
-    from ...core.oauth import authorize_url, exchange_code
     from ...core.auth import new_session
+    from ...core.oauth import authorize_url, exchange_code
 
     @app.get("/api/auth/login")
     async def login():
@@ -20,8 +20,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
     async def callback(request: Request, code: str):
         try:
             osu_user = await exchange_code(code, server.config)
-        except Exception:
-            raise HTTPException(status_code=400, detail="OAuth exchange failed")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="OAuth exchange failed") from exc
 
         count = server.db._conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         if count == 0:

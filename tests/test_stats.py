@@ -5,17 +5,23 @@ import pandas as pd
 import pytest
 
 from autoref.core.stats import (
-    exclude_failed, include_all, z_sum_leaderboard,
-    leaderboard, avg_score_leaderboard, avg_placements_leaderboard,
-    percentile_leaderboard, zipf_leaderboard, pct_diff_leaderboard,
     METHODS,
+    avg_placements_leaderboard,
+    avg_score_leaderboard,
+    exclude_failed,
+    include_all,
+    leaderboard,
+    pct_diff_leaderboard,
+    percentile_leaderboard,
+    z_sum_leaderboard,
+    zipf_leaderboard,
 )
 
 
 def _scores(rows):
     """Build a game_scores-shaped DataFrame from a list of dicts.
     Missing fields default to neutral values."""
-    cols = {"user_id", "username", "score", "passed", "beatmap_id"}
+    cols = {"user_id", "username", "score", "passed", "beatmap_id"}  # noqa: F841
     out = []
     for r in rows:
         full = {"passed": True, "username": str(r.get("user_id"))}
@@ -97,12 +103,12 @@ def test_missing_score_counts_as_zero():
         {"user_id": 1, "score": 200, "beatmap_id": 20},
         # user 2 has no score on map 20
     ])
-    
+
     # Z-Sum: missing scores excluded, so user 2 only has 1 map
     z_out = z_sum_leaderboard(df).set_index("user_id")
     assert z_out.loc[1, "maps_played"] == 2
     assert z_out.loc[2, "maps_played"] == 1
-    
+
     # avg_score: missing scores counted as 0, so both have 2 maps
     avg_out = avg_score_leaderboard(df).set_index("user_id")
     assert avg_out.loc[1, "maps_played"] == 2

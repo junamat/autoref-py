@@ -4,13 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from autoref.core.ref import AutoRef
-from autoref.core.ref.base import (
-    COMMANDS, Command, _find_map, _find_map_by_input, _find_map_by_input_pick,
-)
 from autoref.core.enums import MapState, RefMode, Step, WinCondition
 from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
-
+from autoref.core.ref import AutoRef
+from autoref.core.ref.base import COMMANDS, Command
+from autoref.core.utils.pool import (
+    find_map as _find_map,
+    find_map_by_input as _find_map_by_input,
+    find_map_by_input_pick as _find_map_by_input_pick,
+)
 
 # ------------------------------------------------------------------ helpers
 
@@ -172,6 +174,7 @@ def test_pick_rejects_non_playable(state):
 @pytest.mark.asyncio
 async def test_await_map_choice_resolves_on_team_message():
     import bancho
+
     from autoref.core.utils import find_map_by_input_pick as _find_map_by_input_pick
 
     pm = PlayableMap(5, name="NM1")
@@ -211,7 +214,7 @@ async def test_await_map_choice_ignores_wrong_team():
     captured_handler = {}
     ar.lobby.channel.on = lambda event, fn: captured_handler.update({event: fn})
 
-    resolved = []
+    resolved = []  # noqa: F841
 
     async def drive():
         await asyncio.sleep(0)

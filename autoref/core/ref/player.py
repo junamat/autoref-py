@@ -6,7 +6,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..enums import Step
-from ..utils import find_map as _find_map, normalize_name as _normalize
+from ..utils import find_map as _find_map
+from ..utils import normalize_name as _normalize
 
 if TYPE_CHECKING:
     from .base import AutoRef

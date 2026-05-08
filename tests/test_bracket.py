@@ -1,17 +1,23 @@
 """Tests for BracketAutoRef state machine."""
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 import bancho
+import pytest
 
 from autoref.controllers.bracket import BracketAutoRef, Phase
-from autoref.core.utils import find_map_by_input as _find_map_by_input, find_map_by_input_pick as _find_map_by_input_pick
 from autoref.core.enums import MapState, RefMode, Step, WinCondition
 from autoref.core.lobby import MatchResult, PlayerResult
 from autoref.core.models import (
-    Match, OrderScheme, PlayableMap, Pool, Ruleset, Team, Timers,
+    Match,
+    OrderScheme,
+    PlayableMap,
+    Pool,
+    Ruleset,
+    Team,
+    Timers,
 )
-
+from autoref.core.utils import find_map_by_input as _find_map_by_input
+from autoref.core.utils import find_map_by_input_pick as _find_map_by_input_pick
 
 # ---------------------------------------------------------------- helpers
 
@@ -139,7 +145,7 @@ def test_next_step_protect_then_ban_then_pick():
 def test_map_winner_counts_all_scores():
     """Test that _map_winner correctly determines winner from player scores."""
     ar = make_bracket(teams=("Blue", "Red"))
-    
+
     # Create a match result with scores from both teams
     # Teams are created with usernames "blue1" and "red1" by make_bracket
     result = MatchResult()
@@ -147,7 +153,7 @@ def test_map_winner_counts_all_scores():
         PlayerResult("red1", 310288, True),    # Red team (team 1)
         PlayerResult("blue1", 472183, True),   # Blue team (team 0)
     ]
-    
+
     # Blue team (team 0) should win with higher score
     winner = ar._map_winner(result)
     assert winner == 0  # Blue team index
@@ -156,13 +162,13 @@ def test_map_winner_counts_all_scores():
 def test_map_winner_counts_failed_scores():
     """Test that failed scores are excluded from team total."""
     ar = make_bracket(teams=("Blue", "Red"))
-    
+
     result = MatchResult()
     result.scores = [
         PlayerResult("blue1", 100000, False),  # Blue team, failed - excluded
         PlayerResult("red1", 50000, True),     # Red team, passed
     ]
-    
+
     # Red team should win because blue failed
     winner = ar._map_winner(result)
     assert winner == 1
@@ -170,13 +176,13 @@ def test_map_winner_counts_failed_scores():
 def test_map_winner_when_both_fail():
     """Test that failed scores are excluded from team total."""
     ar = make_bracket(teams=("Blue", "Red"))
-    
+
     result = MatchResult()
     result.scores = [
         PlayerResult("blue1", 100000, False),  # Blue team, failed
         PlayerResult("red1", 50000, False),     # Red team, failed
     ]
-    
+
     # Blue should win because both failed and
     winner = ar._map_winner(result)
     assert winner == 0
@@ -185,13 +191,13 @@ def test_map_winner_when_both_fail():
 def test_map_winner_returns_none_on_tie():
     """Test that ties return None."""
     ar = make_bracket(teams=("Blue", "Red"))
-    
+
     result = MatchResult()
     result.scores = [
         PlayerResult("blue1", 100000, True),
         PlayerResult("red1", 100000, True),
     ]
-    
+
     winner = ar._map_winner(result)
     assert winner is None
 
@@ -199,7 +205,7 @@ def test_map_winner_returns_none_on_tie():
 def test_map_winner_returns_none_on_empty_result():
     """Test that empty or None results return None."""
     ar = make_bracket()
-    
+
     assert ar._map_winner(None) is None
     assert ar._map_winner(MatchResult()) is None
     ar = make_bracket(best_of=1, bans=1, protects=1)
@@ -719,11 +725,11 @@ async def test_pick_timeout_passes_to_other_team():
     ar.timers.pick = 0.05  # Short timeout
     ar.lobby.say = AsyncMock()
     ar.mode = RefMode.AUTO
-    
+
     # Track which team was asked to pick
     pick_calls = []
-    original_await = ar._await_map_choice
-    
+    original_await = ar._await_map_choice  # noqa: F841
+
     async def mock_await_choice(team_idx, for_ban=False):
         pick_calls.append(team_idx)
         if len(pick_calls) == 1:
@@ -733,12 +739,12 @@ async def test_pick_timeout_passes_to_other_team():
         else:
             # Second call (team 1) - pick immediately
             return 123456  # Some beatmap_id
-    
+
     ar._await_map_choice = mock_await_choice
-    
+
     # Team 0 should pick
     result = await ar.await_pick(0)
-    
+
     # Verify timeout message was sent
     assert any("ran out of time" in str(call) for call in ar.lobby.say.call_args_list)
     # Verify team 1 was asked to pick after timeout

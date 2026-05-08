@@ -9,7 +9,7 @@ Public API:
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from .beatmap_cache import BeatmapCache, get_beatmap_cache
 

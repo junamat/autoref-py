@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastapi import Request
+
     from .storage import MatchDatabase
 
 SESSION_LIFETIME = 30 * 24 * 3600

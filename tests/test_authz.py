@@ -1,6 +1,6 @@
 """T28: role gating — host-only routes, self-edit, ref restrictions."""
 import pytest
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from autoref.core.auth import new_session

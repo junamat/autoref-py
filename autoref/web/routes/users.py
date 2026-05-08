@@ -37,8 +37,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 (osu_username, role, now),
             )
             server.db._conn.commit()
-        except Exception:
-            raise HTTPException(status_code=409, detail="conflict")
+        except Exception as exc:
+            raise HTTPException(status_code=409, detail="conflict") from exc
         return JSONResponse({"id": cursor.lastrowid, "osu_username": osu_username, "role": role}, status_code=201)
 
     @app.patch("/api/users/{uid}")

@@ -3,8 +3,12 @@ import os
 import sqlite3
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
+
+if TYPE_CHECKING:
+    from .models import Match
 
 
 _SCHEMA = """
@@ -181,6 +185,7 @@ class MatchDatabase:
             ),
         )
         match_id = cursor.lastrowid
+        assert match_id is not None
 
         for i, team in enumerate(match.teams):
             self._conn.execute(
@@ -379,7 +384,7 @@ class MatchDatabase:
         """Cross-match leaderboard. `method` selects the calculation strategy;
         `include` is a row predicate (defaults to include_all);
         `aggregate` is "sum" or "mean" for per-map metric aggregation."""
-        from .stats import leaderboard, include_all
+        from .stats import include_all, leaderboard
         return leaderboard(self.get_all_scores(pool_id=pool_id, round_name=round_name),
                            method=method,
                            include=include or include_all,

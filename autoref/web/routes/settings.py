@@ -55,8 +55,10 @@ def _validate(body: dict) -> list[str]:
 
 
 def register(app: FastAPI, server: "WebServer") -> None:
-    from ...core.config import save as save_config, to_api, _SECRET_FIELDS
     from dataclasses import fields as dc_fields
+
+    from ...core.config import _SECRET_FIELDS, to_api
+    from ...core.config import save as save_config
 
     _config_field_names = {f.name for f in dc_fields(server.config.__class__)}
 

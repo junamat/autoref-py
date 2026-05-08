@@ -1,5 +1,6 @@
-from autoref.core.models import Match, Pool, PlayableMap
 from autoref.core.enums import MapState
+from autoref.core.models import Match, PlayableMap, Pool
+
 
 def normalize_name(name: str) -> str:
     return name.replace(" ", "_").casefold()

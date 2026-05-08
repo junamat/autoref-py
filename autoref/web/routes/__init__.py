@@ -3,11 +3,12 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+
     from ..server import WebServer
 
 
 def register_all(app: "FastAPI", server: "WebServer") -> None:
-    from . import pages, stats, pool, match, ws, settings, auth, setup, users, account
+    from . import account, auth, match, pages, pool, settings, setup, stats, users, ws
     pages.register(app, server)
     stats.register(app, server)
     pool.register(app, server)

@@ -29,6 +29,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
             (int(osu_user_id), osu_username, now),
         )
         user_id = cursor.lastrowid
+        assert user_id is not None
         server.db._conn.commit()
 
         token = new_session(user_id, server.db)

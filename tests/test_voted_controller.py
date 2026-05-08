@@ -2,13 +2,12 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import bancho
+import pytest
 
-from autoref.core.enums import RefMode, Step, WinCondition, MapState
-from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 from autoref.controllers.voted import VotedQualifiersAutoRef
-
+from autoref.core.enums import MapState, RefMode, Step, WinCondition
+from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 
 # ------------------------------------------------------------------ helpers
 
@@ -716,7 +715,7 @@ async def test_reseed_changes_rng_output():
     pool = Pool("p", PlayableMap(1, name="NM1"), PlayableMap(2, name="NM2"))
     ar = make_var(pool, players=("p1",), seed=42)
 
-    before = ar._rng.choice([1, 2, 3, 4, 5])
+    before = ar._rng.choice([1, 2, 3, 4, 5])  # noqa: F841
     await ar._dispatch_command("reseed", ["999"], "ref")
     after = ar._rng.choice([1, 2, 3, 4, 5])
 
@@ -773,7 +772,7 @@ async def test_history_log_records_entries():
 
     ar.lobby.channel.emit("p1", "NM1")
     timer_event.set()
-    result = await task
+    result = await task  # noqa: F841
 
     assert len(ar._vote_log) == 1
     entry = ar._vote_log[0]

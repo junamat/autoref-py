@@ -1,1 +1,2 @@
-from .server import WebInterface, WebServer
+from .server import WebInterface as WebInterface
+from .server import WebServer as WebServer

@@ -1,4 +1,5 @@
 from os import getenv
+
 import aiosu
 
 _DOTENV_LOADED = False

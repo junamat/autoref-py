@@ -1,8 +1,9 @@
 """T46: Lobby.attach registers same event handlers as create. Idempotent if called twice."""
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, call
-import pytest
+
 import bancho
+import pytest
 
 from autoref.core.lobby import Lobby
 

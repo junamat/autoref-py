@@ -2,9 +2,9 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import bancho
 import pytest
 
-import bancho
 from autoref.core.lobby import Lobby, MatchResult, PlayerResult
 
 

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from .._state import _POOL_STORE
 from ...core.beatmap_cache import get_beatmap_cache
+from .._state import _POOL_STORE
 
 if TYPE_CHECKING:
     from ..server import WebServer
@@ -65,8 +65,9 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/beatmap/{beatmap_id}/attributes")
     async def get_beatmap_attributes(beatmap_id: str, mods: str = ""):
         """Fetch beatmap difficulty attributes with mods from osu! API."""
-        from ...client import make_client
         from aiosu.models import Mods
+
+        from ...client import make_client
         client = make_client()
         try:
             mods_obj = Mods(mods) if mods else None

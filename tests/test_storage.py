@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from autoref.core.enums import Step, WinCondition
-from autoref.core.models import Match, Pool, PlayableMap, Ruleset, Team
+from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team
 from autoref.core.storage import MatchDatabase
 
 

@@ -11,11 +11,12 @@ import logging
 import re
 from enum import Enum
 
-from ..core.ref import AutoRef
-from ..core.utils import normalize_name as _normalize, find_map as _find_map
 from ..core.enums import MapState, RefMode, Step
-from ..core.lobby import MatchResult, PlayerResult
+from ..core.lobby import MatchResult
 from ..core.models import OrderScheme
+from ..core.ref import AutoRef
+from ..core.utils import find_map as _find_map
+from ..core.utils import normalize_name as _normalize
 
 logger = logging.getLogger(__name__)
 
@@ -231,14 +232,14 @@ class BracketAutoRef(AutoRef):
             return await self._await_map_assisted(team_index, Step.PICK)
         if self.mode == RefMode.OFF:
             return await self._await_map_from_ref(for_ban=False)
-        
+
         # AUTO mode with timeout
         try:
             return await asyncio.wait_for(
                 self._await_map_choice(team_index, for_ban=False),
                 timeout=self.timers.pick
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             other_team = 1 - team_index
             await self.lobby.say(
                 f"{self.match.teams[team_index].name} ran out of time. "
@@ -470,7 +471,7 @@ class BracketAutoRef(AutoRef):
         try:
             try:
                 await asyncio.wait_for(self._roll_done.wait(), self.roll_timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if self._rolls:
                     ranked = sorted(self._rolls.keys(), key=lambda i: -self._rolls[i])
                     missing = [i for i in range(len(self.match.teams)) if i not in self._rolls]

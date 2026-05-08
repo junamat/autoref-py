@@ -1,4 +1,3 @@
-from aiosu.models.mods import Mods
 
 def canonical_mods(mods) -> list[str]:
     """Normalize mod input → sorted list of 2-char tokens, NF excluded.

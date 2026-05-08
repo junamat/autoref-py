@@ -12,7 +12,6 @@ import pandas as pd
 
 from .predicates import ScorePredicate, include_all
 
-
 # Registry: method key → (label, ascending_sort)
 METHODS: dict[str, tuple[str, bool]] = {
     "zscore":      ("Z-Score",                  False),
@@ -313,7 +312,7 @@ def match_cost_bathbot_leaderboard(
     df = df.assign(_ratio=df["score"] / avg_per_game.replace(0, pd.NA)).dropna(subset=["_ratio"])
 
     rows = []
-    for match_id, mdf in df.groupby("match_id"):
+    for _match_id, mdf in df.groupby("match_id"):
         n = mdf["turn"].nunique()
         if n < 1:
             continue
@@ -324,7 +323,7 @@ def match_cost_bathbot_leaderboard(
             if n_prime == 0:
                 continue
             ratio_sum = float(pdf["_ratio"].sum())
-            tb_bonus = 0
+            tb_bonus: float = 0.0
             if tb_played:
                 tb_rows = pdf[pdf["beatmap_id"] == tb_bid]
                 if not tb_rows.empty:

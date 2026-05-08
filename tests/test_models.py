@@ -138,8 +138,9 @@ def test_effective_mods_inferred_dt():
 
 
 def test_effective_mods_no_mods_sentinel():
-    from autoref.core.models import NO_MODS
     import aiosu
+
+    from autoref.core.models import NO_MODS
     pool_mods = aiosu.models.mods.Mods("HD")
     pool = ModdedPool("HD", pool_mods, PlayableMap(1, mods=NO_MODS))
     flat = pool.flatten()
@@ -211,6 +212,7 @@ def test_order_scheme_defaults():
 
 def test_ruleset_accepts_schemes():
     import aiosu
+
     from autoref.core.models import OrderScheme
     schemes = [OrderScheme("a"), OrderScheme("b", pick_first=1)]
     r = Ruleset(vs=1, gamemode=aiosu.models.Gamemode.STANDARD, schemes=schemes)
