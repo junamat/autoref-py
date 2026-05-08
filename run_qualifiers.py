@@ -5,21 +5,31 @@ Requires .env with BANCHO_USERNAME, BANCHO_PASSWORD, CLIENT_ID, CLIENT_SECRET
 """
 import asyncio
 import logging
-from dotenv import load_dotenv
 from os import getenv
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-
+import aiosu
 import bancho
+from dotenv import load_dotenv
 
-from autoref import Match, ModdedPool, PlayableMap, Pool, Ruleset, Team, Timers
-from autoref import WinCondition, RefMode, Step
-from autoref import MatchDatabase, QualifiersAutoRef, ScoreFetcher
+from autoref import (
+    Match,
+    MatchDatabase,
+    ModdedPool,
+    PlayableMap,
+    Pool,
+    QualifiersAutoRef,
+    RefMode,
+    Ruleset,
+    ScoreFetcher,
+    Step,
+    Team,
+    Timers,
+    WinCondition,
+)
 from autoref.client import make_client
 
 load_dotenv()
-
-import aiosu
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 POOL = Pool("Qualifiers",
     Pool("NM",

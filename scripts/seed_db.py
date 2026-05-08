@@ -120,7 +120,7 @@ def seed_4wc(db_path: str) -> None:
                 (match_id, turn, 0, "PICK", int(beatmap_id)),
             )
 
-        for turn, (beatmap_id, map_group) in enumerate(group.groupby("beatmap_id", sort=False)):
+        for turn, (_beatmap_id, map_group) in enumerate(group.groupby("beatmap_id", sort=False)):
             for _, row in map_group.iterrows():
                 mods = [row["mods"]] if pd.notna(row.get("mods")) and row["mods"] not in ("NM", "") else []
                 conn.execute(
@@ -523,7 +523,7 @@ def seed_di_quals(db_path: str) -> None:
                 (match_id, turn, 0, "PICK", int(beatmap_id)),
             )
 
-        for turn, (beatmap_id, map_group) in enumerate(group.groupby("beatmap_id", sort=False)):
+        for turn, (_beatmap_id, map_group) in enumerate(group.groupby("beatmap_id", sort=False)):
             for _, row in map_group.iterrows():
                 mods_field = (row.get("mods") or "").strip().upper()
                 mods = [mods_field] if mods_field and mods_field != "NM" else []

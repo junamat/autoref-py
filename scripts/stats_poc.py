@@ -13,8 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from autoref.core.stats import z_sum_leaderboard, exclude_failed
-
+from autoref.core.stats import exclude_failed, z_sum_leaderboard
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 
