@@ -107,13 +107,11 @@ class PlayRunner:
         fetcher = ref.score_fetcher
         if fetcher is None:
             return
-        try:
-            scores = await fetcher.fetch_for_game(lobby_id, beatmap_id)
-        except Exception:
-            logger.exception("score fetch failed for turn=%d map=%d", turn, beatmap_id)
+        result = await fetcher.fetch_for_game(lobby_id, beatmap_id)
+        if not result:
+            logger.warning("score fetch failed for turn=%d map=%d: %s", turn, beatmap_id, result.reason)
             return
-        if not scores:
-            return
+        scores = result.value
         # Annotate user_id -> team_index via roster .id; fall back to normalized username.
         id_to_team: dict[int, tuple[str, int]] = {}
         name_to_team: dict[str, tuple[str, int]] = {}

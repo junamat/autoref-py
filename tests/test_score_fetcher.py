@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from autoref.core.result import Err, Ok
 from autoref.core.score_fetcher import ScoreFetcher
 
 
@@ -39,11 +40,11 @@ async def test_fetch_returns_enriched_scores(monkeypatch):
         _mock_game(1, 42, [_mock_score(100, 800_000, mods=("HD",))]),
     )))
     f = ScoreFetcher(client, initial_delay=0, max_delay=0, timeout=10)
-    scores = await f.fetch_for_game(123, 42)
-    assert scores is not None
-    assert scores[0]["user_id"] == 100
-    assert scores[0]["score"] == 800_000
-    assert scores[0]["mods"] == ["HD"]
+    result = await f.fetch_for_game(123, 42)
+    assert isinstance(result, Ok)
+    assert result.value[0]["user_id"] == 100
+    assert result.value[0]["score"] == 800_000
+    assert result.value[0]["mods"] == ["HD"]
 
 
 @pytest.mark.asyncio
@@ -56,8 +57,8 @@ async def test_fetch_skips_unfinished_game(monkeypatch):
         _resp(_mock_game(1, 42, [_mock_score(100, 1)], end_time="now")),
     ]))
     f = ScoreFetcher(client, initial_delay=0, max_delay=0, timeout=10)
-    scores = await f.fetch_for_game(123, 42)
-    assert scores is not None
+    result = await f.fetch_for_game(123, 42)
+    assert isinstance(result, Ok)
     assert client.get_multiplayer_match.await_count == 2
 
 
@@ -69,8 +70,9 @@ async def test_fetch_filters_by_beatmap_id(monkeypatch):
         _mock_game(2, 9, [_mock_score(100, 2)]),
     )))
     f = ScoreFetcher(client, initial_delay=0, max_delay=0, timeout=10)
-    scores = await f.fetch_for_game(123, 9)
-    assert scores[0]["score"] == 2
+    result = await f.fetch_for_game(123, 9)
+    assert isinstance(result, Ok)
+    assert result.value[0]["score"] == 2
 
 
 @pytest.mark.asyncio
@@ -82,9 +84,9 @@ async def test_fetch_skips_already_seen_game(monkeypatch):
     client = SimpleNamespace(get_multiplayer_match=AsyncMock(return_value=resp))
     f = ScoreFetcher(client, initial_delay=0, max_delay=0, timeout=0.05)
     first = await f.fetch_for_game(123, 42)
-    assert first is not None
+    assert isinstance(first, Ok)
     second = await f.fetch_for_game(123, 42)
-    assert second is None
+    assert isinstance(second, Err)
 
 
 @pytest.mark.asyncio
@@ -92,7 +94,7 @@ async def test_fetch_timeout_returns_none(monkeypatch):
     monkeypatch.setattr(asyncio, "sleep", AsyncMock())
     client = SimpleNamespace(get_multiplayer_match=AsyncMock(return_value=_resp()))
     f = ScoreFetcher(client, initial_delay=0, max_delay=0, timeout=0.05)
-    assert await f.fetch_for_game(123, 42) is None
+    assert isinstance(await f.fetch_for_game(123, 42), Err)
 
 
 @pytest.mark.asyncio
@@ -120,5 +122,5 @@ async def test_fetch_swallows_api_errors_and_retries(monkeypatch):
         _resp(_mock_game(1, 42, [_mock_score(100, 1)])),
     ]))
     f = ScoreFetcher(client, initial_delay=0, max_delay=0, timeout=10)
-    scores = await f.fetch_for_game(123, 42)
-    assert scores is not None
+    result = await f.fetch_for_game(123, 42)
+    assert isinstance(result, Ok)

@@ -10,6 +10,8 @@ import os
 import time
 from pathlib import Path
 
+from .result import Err, Ok
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CACHE_FILE = Path.home() / ".cache" / "autoref" / "beatmaps.json"
@@ -88,7 +90,7 @@ class BeatmapCache:
         return self._data.get(int(beatmap_id))
 
     async def fetch_one(self, beatmap_id: int, client=None,
-                        force: bool = False) -> dict | None:
+                        force: bool = False) -> Ok[dict] | Err:
         """Return cached metadata for `beatmap_id`, fetching once on miss.
 
         Set `force=True` to bypass the cache and re-fetch from the API.
@@ -97,9 +99,9 @@ class BeatmapCache:
         if not force:
             cached = self._data.get(bid)
             if cached is not None:
-                return cached
+                return Ok(cached)
             if bid in self._failed_meta:
-                return None
+                return Err(f"bid {bid} previously failed")
 
         if client is not None:
             try:
@@ -107,7 +109,7 @@ class BeatmapCache:
             except Exception as exc:
                 logger.warning("beatmap cache: failed to fetch %d: %s", bid, exc)
                 self._failed_meta.add(bid)
-                return None
+                return Err(f"api error for bid {bid}", exc)
         else:
             from ..client import make_client
             async with make_client() as c:
@@ -116,16 +118,16 @@ class BeatmapCache:
                 except Exception as exc:
                     logger.warning("beatmap cache: failed to fetch %d: %s", bid, exc)
                     self._failed_meta.add(bid)
-                    return None
+                    return Err(f"api error for bid {bid}", exc)
 
         meta = _extract_meta(beatmap)
         async with self._lock:
             self._data[bid] = meta
             self._failed_meta.discard(bid)
             self._save()
-        return meta
+        return Ok(meta)
 
-    async def refresh(self, beatmap_id: int, client=None) -> dict | None:
+    async def refresh(self, beatmap_id: int, client=None) -> Ok[dict] | Err:
         """Re-fetch a single beatmap, overwriting any cached entry."""
         return await self.fetch_one(beatmap_id, client=client, force=True)
 
@@ -171,10 +173,10 @@ class BeatmapCache:
         else:
             self._failed_osu.discard(int(beatmap_id))
 
-    async def get_osu_path(self, beatmap_id: int) -> Path | None:
+    async def get_osu_path(self, beatmap_id: int) -> Ok[Path] | Err:
         """Return path to the cached `.osu` file, downloading once on miss.
 
-        Returns None on download failure. Subsequent calls for the same bid
+        Returns Err on download failure. Subsequent calls for the same bid
         within the same process short-circuit via the in-memory negative
         cache so a single bad map doesn't trigger N network calls per stats
         recompute. Restart the process (or call `clear_osu_unavailable()`)
@@ -182,23 +184,23 @@ class BeatmapCache:
         """
         bid = int(beatmap_id)
         if bid in self._failed_osu:
-            return None
+            return Err(f"osu file for bid {bid} previously failed")
         path = self.osu_path(bid)
         if path.exists() and path.stat().st_size > 0:
-            return path
+            return Ok(path)
 
         lock = self._osu_locks.setdefault(bid, asyncio.Lock())
         async with lock:
             if bid in self._failed_osu:
-                return None
+                return Err(f"osu file for bid {bid} previously failed")
             if path.exists() and path.stat().st_size > 0:
-                return path
+                return Ok(path)
             try:
                 import aiohttp
             except ImportError:
                 logger.error("beatmap cache: aiohttp not installed; cannot fetch .osu")
                 self._failed_osu.add(bid)
-                return None
+                return Err("aiohttp not installed")
             url = _OSU_FILE_URL.format(bid=bid)
             try:
                 async with aiohttp.ClientSession() as session:
@@ -206,17 +208,17 @@ class BeatmapCache:
                         if resp.status != 200:
                             logger.warning("beatmap cache: %s returned HTTP %d", url, resp.status)
                             self._failed_osu.add(bid)
-                            return None
+                            return Err(f"HTTP {resp.status} fetching osu file for bid {bid}")
                         body = await resp.read()
             except Exception as exc:
                 logger.warning("beatmap cache: failed to download %s: %s", url, exc)
                 self._failed_osu.add(bid)
-                return None
+                return Err(f"download failed for bid {bid}", exc)
 
             if not body:
                 logger.warning("beatmap cache: empty .osu body for %d (marked unavailable)", bid)
                 self._failed_osu.add(bid)
-                return None
+                return Err(f"empty osu body for bid {bid}")
 
             try:
                 self._osu_dir.mkdir(parents=True, exist_ok=True)
@@ -226,8 +228,8 @@ class BeatmapCache:
             except Exception as exc:
                 logger.warning("beatmap cache: failed to write %s: %s", path, exc)
                 self._failed_osu.add(bid)
-                return None
-            return path
+                return Err(f"write failed for bid {bid}", exc)
+            return Ok(path)
 
     async def prefetch(self, beatmap_ids: list[int], client=None) -> None:
         """Fetch metadata for any IDs not already cached. Safe to call concurrently.

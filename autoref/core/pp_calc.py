@@ -12,6 +12,7 @@ import logging
 from collections.abc import Iterable
 
 from .beatmap_cache import BeatmapCache, get_beatmap_cache
+from .result import Err, Ok
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ async def compute_pp(
     misses: int = 0,
     mode: int = 0,
     cache: BeatmapCache | None = None,
-) -> float | None:
+) -> Ok[float] | Err:
     """Compute pp for a single play.
 
     Args:
@@ -87,17 +88,18 @@ async def compute_pp(
         cache: optional shared BeatmapCache; defaults to module singleton.
 
     Returns:
-        pp as float, or None if rosu-pp-py is missing or the .osu file
+        Ok(pp) as float, or Err if rosu-pp-py is missing or the .osu file
         couldn't be fetched / parsed.
     """
     r = _rosu()
     if r is None:
-        return None
+        return Err("rosu-pp-py not installed")
 
     cache = cache or get_beatmap_cache()
-    osu_path = await cache.get_osu_path(int(beatmap_id))
-    if osu_path is None:
-        return None
+    osu_result = await cache.get_osu_path(int(beatmap_id))
+    if not osu_result:
+        return Err(f"osu path unavailable: {osu_result.reason}", osu_result.exc)
+    osu_path = osu_result.value
 
     try:
         beatmap = r.Beatmap(path=str(osu_path))
@@ -112,8 +114,8 @@ async def compute_pp(
             kwargs["combo"] = int(max_combo)
         perf = r.Performance(**kwargs)
         result = perf.calculate(beatmap)
-        return float(result.pp)
+        return Ok(float(result.pp))
     except Exception as exc:
         logger.warning("pp_calc: failed for bid=%d mods=%s: %s",
                        beatmap_id, mods, exc)
-        return None
+        return Err(f"rosu-pp compute failed for bid {beatmap_id}", exc)

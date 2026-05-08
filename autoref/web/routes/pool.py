@@ -40,13 +40,10 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/beatmap/{beatmap_id}")
     async def get_beatmap(beatmap_id: str):
         """Fetch beatmap metadata from osu! API (cache-backed)."""
-        try:
-            meta = await get_beatmap_cache().fetch_one(int(beatmap_id))
-        except Exception:
-            logger.exception("failed to fetch beatmap %s", beatmap_id)
-            return JSONResponse({"error": "internal_error"}, status_code=500)
-        if meta is None:
-            return JSONResponse({"error": "not found"}, status_code=404)
+        result = await get_beatmap_cache().fetch_one(int(beatmap_id))
+        if not result:
+            return JSONResponse({"error": result.reason}, status_code=404)
+        meta = result.value
         # API response shape kept stable: web UI consumes `len`/`diff`.
         return JSONResponse({
             "id":            meta.get("id"),

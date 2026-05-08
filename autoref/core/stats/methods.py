@@ -475,13 +475,14 @@ async def augment_pp(scores: pd.DataFrame, *, concurrency: int = 8, db=None) -> 
         if key in cache:
             return idx, cache[key], False
         async with sem:
-            pp = await compute_pp(
+            pp_result = await compute_pp(
                 bid,
                 mods=list(mods),
                 accuracy=acc,
                 max_combo=combo or None,
                 misses=misses,
             )
+        pp = pp_result.value if pp_result else None
         cache[key] = pp
         return idx, pp, True
 

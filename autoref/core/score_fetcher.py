@@ -8,6 +8,8 @@ import asyncio
 import logging
 from typing import Any
 
+from .result import Err, Ok
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,9 +54,9 @@ class ScoreFetcher:
 
     async def fetch_for_game(
         self, lobby_id: int, beatmap_id: int
-    ) -> list[dict] | None:
+    ) -> Ok[list[dict]] | Err:
         """Return enriched scores for the most recent game on `beatmap_id` after
-        `_last_game_id`. None on timeout or unrecoverable error."""
+        `_last_game_id`. Err on timeout or unrecoverable error."""
         loop = asyncio.get_event_loop()
         deadline = loop.time() + self._timeout
         delay = self._initial_delay
@@ -84,7 +86,7 @@ class ScoreFetcher:
                         or int(game.id) <= self._last_game_id):
                     continue
                 self._last_game_id = int(game.id)
-                return [_score_to_dict(s, users) for s in game.scores]
+                return Ok([_score_to_dict(s, users) for s in game.scores])
 
             delay = min(delay * 2, self._max_delay)
 
@@ -92,7 +94,7 @@ class ScoreFetcher:
             "ScoreFetcher: timed out waiting for game on map %d in lobby %d",
             beatmap_id, lobby_id,
         )
-        return None
+        return Err(f"timeout waiting for game bid={beatmap_id} lobby={lobby_id}")
 
     async def aclose(self) -> None:
         """Close the underlying api client if it supports it. Idempotent."""

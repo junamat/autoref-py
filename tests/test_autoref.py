@@ -8,6 +8,7 @@ from autoref.core.enums import MapState, RefMode, Step, WinCondition
 from autoref.core.models import Match, PlayableMap, Pool, Ruleset, Team, Timers
 from autoref.core.ref import AutoRef
 from autoref.core.ref.base import COMMANDS, Command
+from autoref.core.result import Ok
 from autoref.core.utils.pool import (
     find_map as _find_map,
     find_map_by_input as _find_map_by_input,
@@ -493,10 +494,10 @@ def test_commands_registry_bracket_only_filtered():
 @pytest.mark.asyncio
 async def test_play_map_spawns_score_fetch_and_stores_results():
     fetcher = MagicMock()
-    fetcher.fetch_for_game = AsyncMock(return_value=[
+    fetcher.fetch_for_game = AsyncMock(return_value=Ok([
         {"user_id": 11, "score": 900_000, "accuracy": 0.95, "max_combo": 400,
          "mods": ["HD"], "passed": True, "perfect": False, "rank": "S"},
-    ])
+    ]))
 
     match = make_match()
     p = MagicMock(); p.id = 11; p.username = "redA"
