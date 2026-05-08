@@ -44,6 +44,9 @@ all = [
 [tool.setuptools.packages.find]
 include = ["autoref*"]
 
+[tool.setuptools.package-data]
+"autoref.core.db" = ["schema/*.sql", "queries/**/*.sql"]
+
 [tool.ruff]
 line-length = 120
 
