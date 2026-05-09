@@ -1,6 +1,10 @@
 # autoref-py
 
 ![tests](https://github.com/junamat/autoref-py/actions/workflows/tests.yml/badge.svg)
+[![codecov](https://codecov.io/gh/junamat/autoref-py/graph/badge.svg)](https://codecov.io/gh/junamat/autoref-py)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+![python](https://img.shields.io/badge/python-3.11%2B-blue)
 
 IRC-based osu! tournament auto-referee. Handles pick/ban/protect sequences, qualifiers pools, and timers — with an optional web dashboard.
 
