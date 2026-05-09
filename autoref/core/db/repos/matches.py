@@ -61,3 +61,22 @@ class MatchRepo:
         pools  = sorted({p for p, _ in rows if p})
         rounds = sorted({r for _, r in rows if r})
         return {"combos": combos, "pools": pools, "rounds": rounds}
+
+    def context(self, *, pool_id: str | None = None,
+                round_name: str | None = None) -> dict:
+        from .base import match_filter
+        clause_mt, params_mt = match_filter(pool_id, round_name, alias="mt")
+        where_mt = f" AND{clause_mt}" if clause_mt else ""
+        has_teams: bool = self._conn.execute(
+            f"SELECT COUNT(*) FROM match_teams mt WHERE 1=1{where_mt}", params_mt
+        ).fetchone()[0] > 0
+
+        clause_ma, params_ma = match_filter(pool_id, round_name, alias="ma")
+        where_ma = f" AND{clause_ma}" if clause_ma else ""
+        has_bracket: bool = self._conn.execute(
+            f"SELECT COUNT(*) FROM match_actions ma"
+            f" WHERE ma.step IN ('BAN','PROTECT'){where_ma}",
+            params_ma,
+        ).fetchone()[0] > 0
+
+        return {"has_teams": has_teams, "has_bracket": has_bracket}

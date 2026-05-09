@@ -109,6 +109,16 @@ class MatchDatabase:
         """Return distinct pool_id and round_name values for UI filter dropdowns."""
         return self.matches.filter_options()
 
+    def context(self, *, pool_id: str | None = None,
+                round_name: str | None = None) -> dict:
+        """Return match-type context flags for the given filter scope.
+
+        Returns:
+            has_teams: True if any match_teams rows exist in scope.
+            has_bracket: True if any BAN/PROTECT actions exist in scope.
+        """
+        return self.matches.context(pool_id=pool_id, round_name=round_name)
+
     def get_pick_actions(self, *, pool_id: str | None = None,
                          round_name: str | None = None) -> pd.DataFrame:
         """Return all pick actions, optionally filtered by pool or round."""

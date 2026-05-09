@@ -27,7 +27,7 @@ export async function loadTeamPerformances() {
   }
 
   const section = document.getElementById('team-performances-section');
-  if (section) section.hidden = false;
+  if (section && state.context?.has_teams !== false) section.hidden = false;
 
   const tbody = data.teams.map((t, i) => {
     const rankClass = i < 3 ? `rank-${i+1}` : '';

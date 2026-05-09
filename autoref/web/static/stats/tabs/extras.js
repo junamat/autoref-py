@@ -10,12 +10,19 @@ export async function loadExtras() {
   const countFailed = activeVal('cfg-failed') !== 'false';
   const params = new URLSearchParams({ count_failed: countFailed, ...currentFilterParams() });
 
+  const hasBracket = state.context?.has_bracket !== false;
+  const closestSec = document.getElementById('extras-closest-section');
+  const blowoutsSec = document.getElementById('extras-blowouts-section');
+  if (closestSec) closestSec.hidden = !hasBracket;
+  if (blowoutsSec) blowoutsSec.hidden = !hasBracket;
+
   const closest = document.getElementById('extras-closest-wrap');
   const blowouts = document.getElementById('extras-blowouts-wrap');
   const carries = document.getElementById('extras-carries-wrap');
   const ppWrap = document.getElementById('extras-pp-wrap');
   const zppWrap = document.getElementById('extras-zpp-wrap');
-  const wraps = [closest, blowouts, carries, ppWrap, zppWrap];
+  const wraps = [carries, ppWrap, zppWrap];
+  if (hasBracket) { wraps.push(closest, blowouts); }
   wraps.forEach(w => { if (w) w.innerHTML = '<div class="empty-msg">loading…</div>'; });
 
   let data;

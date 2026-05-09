@@ -9,6 +9,7 @@ export const state = {
   standingsLoaded: false,
   resultsLoaded: false,
   teamPerfLoaded: false,
+  context: null,
 };
 
 export function invalidateTabs() {

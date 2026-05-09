@@ -1,7 +1,7 @@
 'use strict';
 
 import { state } from '/static/stats/state.js';
-import { loadFilterOptions, refreshPoolOptions } from '/static/stats/filters.js';
+import { loadFilterOptions, loadContext, refreshPoolOptions } from '/static/stats/filters.js';
 import { applyPoolDefaults } from '/static/stats/methods.js';
 import { load } from '/static/stats/tabs/performances.js';
 import { loadExtras } from '/static/stats/tabs/extras.js';
@@ -50,12 +50,14 @@ document.getElementById('stats-reload').addEventListener('click', load);
 document.getElementById('cfg-round').addEventListener('change', () => {
   refreshPoolOptions();
   applyPoolDefaults();
+  loadContext();
   load();
 });
 document.getElementById('cfg-pool').addEventListener('change', () => {
   applyPoolDefaults();
+  loadContext();
   load();
 });
 
 /* ── boot ────────────────────────────────────────────────────── */
-loadFilterOptions().then(() => { applyPoolDefaults(); load(); });
+loadFilterOptions().then(() => { applyPoolDefaults(); loadContext(); load(); });

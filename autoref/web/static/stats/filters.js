@@ -1,7 +1,7 @@
 'use strict';
 
 import { esc } from '/static/shared/util.js';
-import { state } from './state.js';
+import { state, invalidateTabs } from './state.js';
 
 export function currentFilterParams() {
   const round = document.getElementById('cfg-round')?.value || '';
@@ -38,6 +38,29 @@ export async function loadFilterOptions() {
     poolSel.hidden = false;
     poolLbl.hidden = false;
   }
+}
+
+export async function loadContext() {
+  const params = new URLSearchParams(currentFilterParams());
+  try {
+    const res = await fetch(`/api/stats/context?${params.toString()}`);
+    if (!res.ok) return;
+    state.context = await res.json();
+  } catch { return; }
+  applyContext(state.context);
+  invalidateTabs();
+}
+
+export function applyContext(ctx) {
+  if (!ctx) return;
+  const teamStandingsSec = document.getElementById('team-standings-section');
+  const teamPerfSec = document.getElementById('team-performances-section');
+  if (teamStandingsSec) teamStandingsSec.hidden = !ctx.has_teams;
+  if (teamPerfSec) teamPerfSec.hidden = !ctx.has_teams;
+  const closestSec = document.getElementById('extras-closest-section');
+  const blowoutsSec = document.getElementById('extras-blowouts-section');
+  if (closestSec) closestSec.hidden = !ctx.has_bracket;
+  if (blowoutsSec) blowoutsSec.hidden = !ctx.has_bracket;
 }
 
 export function refreshPoolOptions() {

@@ -61,7 +61,7 @@ export async function loadStandings() {
   if (wrap) wrap.innerHTML = `<div class="standings-grid">${cards}</div>`;
 
   const teamSection = document.getElementById('team-standings-section');
-  if (data.has_teams && teamSection) {
+  if (data.has_teams && teamSection && state.context?.has_teams !== false) {
     teamSection.hidden = false;
     const teamCards = data.maps.map(m => {
       const title = m.name
