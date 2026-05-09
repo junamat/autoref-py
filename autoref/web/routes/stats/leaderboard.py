@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 import logging
 from typing import TYPE_CHECKING
 
-import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from ...serializers.stats import build_mappool_row, enrich_leaderboard_rows
 from ._common import _build_map_code_lookup, _build_map_order_lookup, predicate_for
 
 if TYPE_CHECKING:
@@ -69,52 +68,16 @@ def register(app: FastAPI, server: "WebServer") -> None:
         code_by_bid = _build_map_code_lookup()
         order_by_bid = _build_map_order_lookup()
         mappool = [
-            {
-                "beatmap_id":  bid,
-                "name":        code_by_bid.get(bid),
-                "pool_order":  order_by_bid.get(bid, 99999),
-                "picks":    counts.get("PICK", 0),
-                "bans":     counts.get("BAN", 0),
-                "protects": counts.get("PROTECT", 0),
-                "protects_picked": split_by_bid.get(bid, {}).get("picks_while_protected", 0),
-                "protects_unused": split_by_bid.get(bid, {}).get("protect_only", 0),
-                "avg_score":     avg_by_map.get(bid),
-                "avg_acc":       acc_by_map.get(bid),
-            }
+            build_mappool_row(bid, counts, split_by_bid, avg_by_map, acc_by_map, code_by_bid, order_by_bid)
             for bid, counts in pool_rows.items()
         ]
 
         _, ascending = METHODS[method]
         metric_col = leaderboard.columns[-1]
 
-        leaderboard_rows = leaderboard.to_dict(orient="records")
-        if not all_scores.empty and leaderboard_rows:
-            filt = all_scores.loc[all_scores.apply(predicate, axis=1)]
-            if not filt.empty:
-                per_player = (
-                    filt.groupby("user_id")
-                        .agg(avg_score=("score", "mean"),
-                             avg_acc=("accuracy", "mean"))
-                        .to_dict(orient="index")
-                )
-                best_idx = filt.groupby("user_id")["score"].idxmax()
-                best_rows = filt.loc[best_idx].set_index("user_id")
-                for r in leaderboard_rows:
-                    uid = r["user_id"]
-                    agg = per_player.get(uid, {})
-                    r["avg_score"] = round(agg.get("avg_score", 0))
-                    r["avg_acc"] = round(agg.get("avg_acc", 0), 4)
-                    if uid in best_rows.index:
-                        b = best_rows.loc[uid]
-                        bid = int(b["beatmap_id"])
-                        r["best"] = {
-                            "beatmap_id": bid,
-                            "name":       code_by_bid.get(bid),
-                            "score":      int(b["score"]),
-                            "accuracy":   round(float(b["accuracy"]), 4),
-                            "rank":       (b["rank"] if pd.notna(b["rank"]) else None),
-                            "mods":       (json.loads(b["mods"]) if pd.notna(b["mods"]) and b["mods"] else []),
-                        }
+        leaderboard_rows = enrich_leaderboard_rows(
+            leaderboard.to_dict(orient="records"), all_scores, predicate, code_by_bid
+        )
 
         total_maps = len(mappool)
         return JSONResponse({

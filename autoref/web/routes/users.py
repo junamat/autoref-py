@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from ..serializers.user import user_row_to_response
+
 if TYPE_CHECKING:
     from ..server import WebServer
 
@@ -17,10 +19,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         rows = server.db._conn.execute(
             "SELECT id, osu_user_id, osu_username, role, irc_username, created_at FROM users ORDER BY id"
         ).fetchall()
-        return JSONResponse([{
-            "id": r[0], "osu_user_id": r[1], "osu_username": r[2],
-            "role": r[3], "irc_username": r[4], "created_at": r[5],
-        } for r in rows])
+        return JSONResponse([user_row_to_response(r) for r in rows])
 
     @app.post("/api/users")
     async def create_user(request: Request, user=Depends(require_role("host"))):
@@ -41,7 +40,11 @@ def register(app: FastAPI, server: "WebServer") -> None:
             server.db._conn.commit()
         except Exception as exc:
             raise HTTPException(status_code=409, detail="conflict") from exc
-        return JSONResponse({"id": cursor.lastrowid, "osu_username": osu_username, "role": role}, status_code=201)
+        created_row = server.db._conn.execute(
+            "SELECT id, osu_user_id, osu_username, role, irc_username, created_at FROM users WHERE id = ?",
+            (cursor.lastrowid,),
+        ).fetchone()
+        return JSONResponse(user_row_to_response(created_row), status_code=201)
 
     @app.patch("/api/users/{uid}")
     async def patch_user(uid: int, request: Request, current=Depends(require_login)):

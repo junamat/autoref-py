@@ -5,8 +5,13 @@ import logging
 import os
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ._state import _POOL_STORE, _STATIC_DIR
+from .serializers.match import active_to_summary, orphan_to_summary, pending_to_summary
+
+if TYPE_CHECKING:
+    from .schemas.match import MatchSummary
 
 logger = logging.getLogger(__name__)
 
@@ -63,21 +68,9 @@ class WebInterface:
                 dead.add(client)
         self._clients -= dead
 
-    def summary(self) -> dict:
+    def summary(self) -> "MatchSummary":
         """Compact summary for /api/matches."""
-        s = self._last_state or {}
-        return {
-            "id":          self.match_id,
-            "active":      True,
-            "qualifier":   s.get("qualifier", False),
-            "mode":        s.get("mode", "off"),
-            "team_names":  s.get("team_names", []),
-            "best_of":     s.get("best_of"),
-            "ref_name":    s.get("ref_name"),
-            "maps_played": s.get("maps_played"),
-            "total_maps":  s.get("total_maps"),
-            "phase":       s.get("phase"),
-        }
+        return active_to_summary(self)
 
 
 class WebServer:
@@ -129,31 +122,11 @@ class WebServer:
                 dead.add(client)
         self._landing_clients -= dead
 
-    def _pending_summary(self, match_id: str, payload: dict) -> dict:
-        teams = payload.get("teams", [])
-        return {
-            "id":         match_id,
-            "status":     "pending",
-            "qualifier":  payload.get("type") == "qualifiers",
-            "mode":       payload.get("mode", "off"),
-            "team_names": [t["name"] for t in teams],
-            "best_of":    payload.get("best_of"),
-        }
+    def _pending_summary(self, match_id: str, payload: dict) -> "MatchSummary":
+        return pending_to_summary(match_id, payload)
 
-    def _orphan_summary(self, row: dict) -> dict:
-        payload = json.loads(row.get("payload_json") or "{}")
-        teams = payload.get("teams", [])
-        return {
-            "id":             row["match_id"],
-            "status":         row.get("status", "orphaned"),
-            "orphaned":       True,
-            "qualifier":      payload.get("type") == "qualifiers",
-            "controller_type": row.get("controller_type"),
-            "team_names":     [t["name"] for t in teams],
-            "best_of":        payload.get("best_of"),
-            "bancho_lobby_id": row.get("bancho_lobby_id"),
-            "orphaned_since": row.get("updated_at"),
-        }
+    def _orphan_summary(self, row: dict) -> "MatchSummary":
+        return orphan_to_summary(row)
 
     # --------------------------------------------------------- snapshot writer (T37)
 

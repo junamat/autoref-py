@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from ...core.beatmap_cache import get_beatmap_cache
 from ...core.result import Err
 from .._state import _POOL_STORE
+from ..serializers.beatmap import beatmap_to_response
+from ..serializers.pool import pool_to_detail
 
 if TYPE_CHECKING:
     from ..server import WebServer
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/pools")
     async def list_pools():
-        return JSONResponse(_POOL_STORE.list())
+        return JSONResponse([pool_to_detail(p) for p in _POOL_STORE.list()])
 
     @app.post("/api/pools")
     async def save_pool(request: Request):
@@ -44,21 +46,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         result = await get_beatmap_cache().fetch_one(int(beatmap_id))
         if isinstance(result, Err):
             return JSONResponse({"error": result.reason}, status_code=404)
-        meta = result.value
-        # API response shape kept stable: web UI consumes `len`/`diff`.
-        return JSONResponse({
-            "id":            meta.get("id"),
-            "beatmapset_id": meta.get("beatmapset_id"),
-            "title":         meta.get("title", ""),
-            "artist":        meta.get("artist", ""),
-            "diff":          meta.get("version", ""),
-            "len":           meta.get("total_length", 0),
-            "stars":         meta.get("stars", 0.0),
-            "ar":            meta.get("ar", 0.0),
-            "od":            meta.get("od", 0.0),
-            "cs":            meta.get("cs", 0.0),
-            "hp":            meta.get("hp", 0.0),
-        })
+        return JSONResponse(beatmap_to_response(result.value))
 
     @app.get("/api/beatmap/{beatmap_id}/attributes")
     async def get_beatmap_attributes(beatmap_id: str, mods: str = ""):

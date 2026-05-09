@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from ..serializers.user import user_to_account_response
+
 if TYPE_CHECKING:
     from ..server import WebServer
 
@@ -13,14 +15,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/account")
     async def get_account(user=Depends(require_login)):
         """Return the current authenticated user's profile."""
-        return JSONResponse({
-            "id": user.id,
-            "osu_user_id": user.osu_user_id,
-            "osu_username": user.osu_username,
-            "role": user.role,
-            "irc_username": user.irc_username,
-            "irc_set": bool(user.irc_username and user.irc_password),
-        })
+        return JSONResponse(user_to_account_response(user))
 
     @app.put("/api/account")
     async def put_account(request: Request, user=Depends(require_login)):
