@@ -144,7 +144,14 @@ async def z_pp_leaderboard(
     aggregate: str = "sum",
     db=None,
 ) -> pd.DataFrame:
-    """Per-player Z-PP leaderboard. Z = (pp − map_mean_pp) / map_std_pp."""
+    """Per-player Z-PP leaderboard.
+
+    Formula:
+      1. Keep best pp per (player, map).
+      2. z_pp = (player_pp − map_mean_pp) / map_std_pp  (sample std, ddof=1;
+         std=0 or NaN → z_pp=0).
+      3. Aggregate z_pp across maps per player (sum or mean).
+    """
     if scores.empty:
         return _empty("z_pp")
     filt = scores.loc[scores.apply(include, axis=1)].copy()
