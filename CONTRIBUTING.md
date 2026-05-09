@@ -21,13 +21,29 @@ Tests are fully offline — no Bancho or osu! API connection required.
 ## Project layout
 
 ```
-autoref/core/        # AutoRef ABC, data models, lobby, storage, stats, pool_store
-autoref/controllers/ # BracketAutoRef, QualifiersAutoRef
-autoref/web/         # FastAPI server + vanilla JS frontend
-autoref/factory.py   # build_autoref(payload) — package-level glue for web/CLI/Discord
+autoref/core/
+  models/            # per-class domain models (Match, Pool, PlayableMap, Team, …)
+  db/                # SQLite layer: migrations, schema SQL, per-table repos
+  ref/               # AutoRef ABC + lobby helpers (announcer, broker, persister, …)
+  stats/
+    leaderboards/    # one module per leaderboard algorithm + DISPATCH dict
+  config.py          # Config dataclass, load/save, env-seed
+  auth.py            # User dataclass, session helpers
+  oauth.py           # osu! OAuth authorize_url + exchange_code
+  pool_store.py      # disk-backed pool registry (~/.cache/autoref/pools.json)
+autoref/controllers/ # BracketAutoRef, QualifiersAutoRef, VotedQualifiersAutoRef
+autoref/web/
+  routes/
+    stats/           # per-endpoint modules (leaderboard, extras, plots, …)
+  schemas/           # TypedDict response shapes (BeatmapResponse, MatchSummary, …)
+  serializers/       # pure domain→DTO mapping fns (no I/O)
+  static/            # vanilla JS frontend
+  server.py          # WebServer + WebInterface
+autoref/plots/       # per-plot modules (consistency, score_dist, …)
+autoref/factory.py   # build_autoref(payload) — package-level glue
 autoref/client.py    # osu! API v2 client factory (no import-time side effects)
 scripts/             # dev utilities (seed_db.py, stats_poc.py)
-tests/               # pytest suite
+tests/               # pytest suite (fully offline)
 ```
 
 ## Architecture rules
@@ -38,6 +54,8 @@ tests/               # pytest suite
 - `factory.py` lives at the package root since it is consumed by both web and any future CLI/Discord glue. It depends on `core/`, `controllers/`, `client`.
 - New match types go in `controllers/` as a subclass of `AutoRef`.
 - New commands belong in `core/commands.py` (`COMMANDS` list) — that's the single source of truth for the web UI and `>help`.
+- API response shapes belong in `web/schemas/` as TypedDicts. Route handlers must not construct inline response dicts for shapes shared by 2+ routes or that expose domain model fields (primitive one-offs like `{"ok": True}` are exempt).
+- Domain→DTO mapping belongs in `web/serializers/` as pure functions (no I/O, no side effects). Route handlers call one serializer per response.
 
 ## Commits
 
