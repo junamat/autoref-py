@@ -17,6 +17,8 @@ def _redirect_uri(config: "Config") -> str:
 
 
 def authorize_url(config: "Config") -> str:
+    if not config.osu_client_id:
+        raise ValueError("osu_client_id not configured")
     from aiosu.models.scopes import Scopes
     from aiosu.utils.auth import generate_url
     return generate_url(

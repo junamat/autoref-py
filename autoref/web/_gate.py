@@ -3,6 +3,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 _ALLOWED_PATHS = {
     "/setup",
+    "/login",
     "/api/setup",
     "/api/auth/login",
     "/api/auth/callback",

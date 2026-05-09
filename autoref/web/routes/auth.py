@@ -15,11 +15,17 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/auth/login")
     async def login():
         """Redirect to the osu! OAuth authorization URL."""
-        return RedirectResponse(authorize_url(server.config))
+        try:
+            url = authorize_url(server.config)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="osu_client_id not configured")
+        return RedirectResponse(url)
 
     @app.get("/api/auth/callback")
-    async def callback(request: Request, code: str):
+    async def callback(request: Request, code: str | None = None, error: str | None = None):
         """Exchange OAuth code, set session cookie, and redirect to landing (or setup)."""
+        if error or not code:
+            return RedirectResponse(f"/login?error={error or 'missing_code'}")
         try:
             osu_user = await exchange_code(code, server.config)
         except Exception as exc:

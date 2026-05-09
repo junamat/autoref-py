@@ -2,6 +2,12 @@
 import asyncio
 import signal
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from autoref.web import WebServer
 
 
