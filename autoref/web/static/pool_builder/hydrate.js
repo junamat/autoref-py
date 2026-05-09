@@ -1,8 +1,13 @@
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
 export async function hydrateTreeFromCache(nodes, parentMods = '') {
   const promises = [];
   let didFetch = false;
-  
+
   for (const node of nodes) {
+    if (!node.id) node.id = uid();
     const isPool = node.type === 'pool' || node.type === 'modpool';
     
     if (node.type === 'map' && node.bid) {
