@@ -81,12 +81,37 @@
   border-left: 3px solid transparent;
   cursor: pointer;
   user-select: none;
+  position: relative;
 }
 .pb-tree-row:hover { background: var(--head); }
 .pb-tree-row.selected {
   background: var(--blue-dim, #1e3a5f);
   border-left-color: var(--blue);
 }
+.pb-tree-row.dragging { opacity: 0.4; }
+.pb-tree-row.drop-before { box-shadow: inset 0 2px 0 0 var(--blue); }
+.pb-tree-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--blue); }
+.pb-tree-row.drop-inside {
+  background: rgba(59,130,246,0.15);
+  outline: 1px dashed var(--blue);
+  outline-offset: -1px;
+}
+.pb-tree-row .drag-handle:active { cursor: grabbing; }
+.pb-tree-row .row-del {
+  display: none;
+  margin-left: auto;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--red);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pb-tree-row:hover .row-del,
+.pb-tree-row.selected .row-del { display: inline-block; }
+.pb-tree-end-drop { height: 8px; }
+.pb-tree-end-drop.drop-after { box-shadow: inset 0 -2px 0 0 var(--blue); }
 .pb-tree-row .drag-handle { color: var(--border); font-size: 9px; cursor: grab; flex-shrink: 0; }
 .pb-tree-row .expand-icon { font-size: 9px; flex-shrink: 0; }
 .pb-tree-row .node-name {

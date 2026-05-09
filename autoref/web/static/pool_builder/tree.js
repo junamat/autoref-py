@@ -23,8 +23,45 @@ export function findParent(nodes, id, parent = null) {
 export function getEffectiveMods(node, stateTree) {
   if (node.type !== 'map') return node.mods || '';
   if (node.mods && node.mods !== 'inherit' && node.mods !== '') return node.mods;
-  const parent = findParent(stateTree, node.id);
-  return parent?.mods || '';
+  let cur = node;
+  while (true) {
+    const p = findParent(stateTree, cur.id);
+    if (!p) return '';
+    if (p.mods && p.mods !== 'inherit' && p.mods !== '') return p.mods;
+    cur = p;
+  }
+}
+
+export function isDescendant(ancestor, candidateId) {
+  for (const c of ancestor.children || []) {
+    if (c.id === candidateId) return true;
+    if (isDescendant(c, candidateId)) return true;
+  }
+  return false;
+}
+
+export function findParentArray(tree, id, arr = tree) {
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i].id === id) return { arr, index: i };
+    if (arr[i].children) {
+      const r = findParentArray(tree, id, arr[i].children);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
+export function insertNodeAt(tree, target, node, position) {
+  if (position === 'inside') {
+    target.children = target.children || [];
+    target.children.push(node);
+    target.open = true;
+    return;
+  }
+  const loc = findParentArray(tree, target.id);
+  if (!loc) return;
+  const idx = position === 'before' ? loc.index : loc.index + 1;
+  loc.arr.splice(idx, 0, node);
 }
 
 export function removeNode(nodes, id) {

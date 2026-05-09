@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { uid } from './utils.js';
-import { findNode, removeNode, totalMaps } from './tree.js';
+import { findNode, removeNode, totalMaps, isDescendant, insertNodeAt } from './tree.js';
 import { rerender } from './render/index.js';
 
 export function addTopLevelPool() {
@@ -46,6 +46,19 @@ export function addTopLevelMap() {
     state.tree.push(pool);
     addMapToPool(pool.id);
   }
+}
+
+export function moveNodeBy(draggedId, targetId, position) {
+  if (draggedId === targetId) return;
+  const dragged = findNode(state.tree, draggedId);
+  const target  = findNode(state.tree, targetId);
+  if (!dragged || !target) return;
+  if (position === 'inside' && isDescendant(dragged, targetId)) return;
+  if (target.type === 'map' && position === 'inside') position = 'after';
+  removeNode(state.tree, draggedId);
+  insertNodeAt(state.tree, target, dragged, position);
+  state.selectedId = draggedId;
+  rerender();
 }
 
 export function showMoveDialog(node) {

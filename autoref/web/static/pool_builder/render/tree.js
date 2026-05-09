@@ -1,9 +1,9 @@
 import { $, esc } from '/static/shared/util.js';
 import { state } from '../state.js';
 import { fmtTime } from '../utils.js';
-import { totalMaps, totalLen } from '../tree.js';
+import { totalMaps, totalLen, removeNode, findNode, isDescendant } from '../tree.js';
 import { rerender } from './index.js';
-import { addMapToPool } from '../ops.js';
+import { addMapToPool, moveNodeBy } from '../ops.js';
 
 export function updateStats() {
   $('pb-stat-maps').textContent = totalMaps(state.tree);
@@ -14,7 +14,102 @@ export function renderTree() {
   const container = $('pb-tree');
   container.innerHTML = '';
   renderNodes(state.tree, container, 0);
+  if (state.tree.length) {
+    const endStrip = document.createElement('div');
+    endStrip.className = 'pb-tree-end-drop';
+    wireEndDrop(endStrip);
+    container.appendChild(endStrip);
+  }
   updateStats();
+}
+
+function clearDropClasses(row) {
+  row.classList.remove('drop-before', 'drop-inside', 'drop-after');
+}
+
+function clearAllDropClasses() {
+  for (const r of document.querySelectorAll('.pb-tree-row, .pb-tree-end-drop')) {
+    r.classList.remove('drop-before', 'drop-inside', 'drop-after', 'dragging');
+    delete r.dataset.dropPos;
+  }
+}
+
+function computeDropPos(e, row, node, draggedId) {
+  const rect = row.getBoundingClientRect();
+  const offset = e.clientY - rect.top;
+  const h = rect.height || 1;
+  let pos;
+  if (node.type === 'map') {
+    pos = offset < h / 2 ? 'before' : 'after';
+  } else {
+    if      (offset < h / 3)     pos = 'before';
+    else if (offset < 2 * h / 3) pos = 'inside';
+    else                          pos = 'after';
+  }
+  if (pos === 'inside' && draggedId) {
+    const dragged = findNode(state.tree, draggedId);
+    if (dragged && isDescendant(dragged, node.id)) {
+      pos = offset < h / 2 ? 'before' : 'after';
+    }
+  }
+  return pos;
+}
+
+function wireDrag(row, node) {
+  row.draggable = true;
+
+  row.addEventListener('dragstart', e => {
+    e.stopPropagation();
+    e.dataTransfer.setData('text/plain', node.id);
+    e.dataTransfer.effectAllowed = 'move';
+    row.classList.add('dragging');
+  });
+
+  row.addEventListener('dragend', () => {
+    clearAllDropClasses();
+  });
+
+  row.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const draggingRow = document.querySelector('.pb-tree-row.dragging');
+    const draggedId = draggingRow ? draggingRow.dataset.id : null;
+    const pos = computeDropPos(e, row, node, draggedId);
+    clearDropClasses(row);
+    row.classList.add(`drop-${pos}`);
+    row.dataset.dropPos = pos;
+  });
+
+  row.addEventListener('dragleave', e => {
+    if (e.target === row) clearDropClasses(row);
+  });
+
+  row.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    const pos = row.dataset.dropPos || 'after';
+    clearAllDropClasses();
+    if (draggedId) moveNodeBy(draggedId, node.id, pos);
+  });
+}
+
+function wireEndDrop(strip) {
+  strip.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    strip.classList.add('drop-after');
+  });
+  strip.addEventListener('dragleave', () => strip.classList.remove('drop-after'));
+  strip.addEventListener('drop', e => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    clearAllDropClasses();
+    if (!draggedId || !state.tree.length) return;
+    const last = state.tree[state.tree.length - 1];
+    if (last.id === draggedId) return;
+    moveNodeBy(draggedId, last.id, 'after');
+  });
 }
 
 function renderNodes(nodes, container, depth) {
@@ -58,15 +153,26 @@ function renderNodes(nodes, container, depth) {
       ${expandIcon}
       <span class="node-name" style="color:${nameColor};font-weight:${nameWeight}">${esc(displayName)}</span>
       ${modsBadge}${tbBadge}${winBadge}${lenBadge}${countBadge}
+      <button class="row-del" title="delete" tabindex="-1">✕</button>
     `;
 
     row.addEventListener('click', e => {
+      if (e.target.classList.contains('row-del')) return;
       if (isPool) {
         node.open = !node.open;
       }
       state.selectedId = node.id;
       rerender();
     });
+
+    row.querySelector('.row-del').addEventListener('click', e => {
+      e.stopPropagation();
+      removeNode(state.tree, node.id);
+      if (state.selectedId === node.id) state.selectedId = null;
+      rerender();
+    });
+
+    wireDrag(row, node);
 
     container.appendChild(row);
 
