@@ -65,10 +65,19 @@ class MatchRepo:
     def context(self, *, pool_id: str | None = None,
                 round_name: str | None = None) -> dict:
         from .base import match_filter
-        clause_mt, params_mt = match_filter(pool_id, round_name, alias="mt")
-        where_mt = f" AND{clause_mt}" if clause_mt else ""
+        conds: list[str] = ["1=1"]
+        params_m: list[str] = []
+        if pool_id:
+            conds.append("pool_id = ?")
+            params_m.append(pool_id)
+        if round_name:
+            conds.append("round_name = ?")
+            params_m.append(round_name)
+        where_m = " AND ".join(conds)
+        # ruleset_vs > 1 means real teams (>1 player per team); 1v1 has vs=1
         has_teams: bool = self._conn.execute(
-            f"SELECT COUNT(*) FROM match_teams mt WHERE 1=1{where_mt}", params_mt
+            f"SELECT COUNT(*) FROM matches WHERE {where_m} AND ruleset_vs > 1",
+            params_m,
         ).fetchone()[0] > 0
 
         clause_ma, params_ma = match_filter(pool_id, round_name, alias="ma")
