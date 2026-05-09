@@ -59,8 +59,10 @@ export function applyContext(ctx) {
   if (teamPerfSec) teamPerfSec.hidden = !ctx.has_teams;
   const closestSec = document.getElementById('extras-closest-section');
   const blowoutsSec = document.getElementById('extras-blowouts-section');
+  const carriesSec = document.getElementById('extras-carries-section');
   if (closestSec) closestSec.hidden = !ctx.has_bracket;
   if (blowoutsSec) blowoutsSec.hidden = !ctx.has_bracket;
+  if (carriesSec) carriesSec.hidden = !ctx.has_teams;
 }
 
 export function refreshPoolOptions() {

@@ -69,6 +69,7 @@
 
   /* section */
   .stats-section { display: flex; flex-direction: column; gap: 6px; }
+  .stats-section[hidden] { display: none; }
   .stats-section-head {
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 5px;
@@ -280,7 +281,7 @@
         <div class="stats-section-head">biggest blowouts</div>
         <div id="extras-blowouts-wrap"><div class="empty-msg">loading…</div></div>
       </div>
-      <div class="stats-section">
+      <div class="stats-section" id="extras-carries-section">
         <div class="stats-section-head">biggest carry performances</div>
         <div id="extras-carries-wrap"><div class="empty-msg">loading…</div></div>
       </div>

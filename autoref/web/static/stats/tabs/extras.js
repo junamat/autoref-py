@@ -11,18 +11,22 @@ export async function loadExtras() {
   const params = new URLSearchParams({ count_failed: countFailed, ...currentFilterParams() });
 
   const hasBracket = state.context?.has_bracket !== false;
+  const hasTeams = state.context?.has_teams !== false;
   const closestSec = document.getElementById('extras-closest-section');
   const blowoutsSec = document.getElementById('extras-blowouts-section');
+  const carriesSec = document.getElementById('extras-carries-section');
   if (closestSec) closestSec.hidden = !hasBracket;
   if (blowoutsSec) blowoutsSec.hidden = !hasBracket;
+  if (carriesSec) carriesSec.hidden = !hasTeams;
 
   const closest = document.getElementById('extras-closest-wrap');
   const blowouts = document.getElementById('extras-blowouts-wrap');
   const carries = document.getElementById('extras-carries-wrap');
   const ppWrap = document.getElementById('extras-pp-wrap');
   const zppWrap = document.getElementById('extras-zpp-wrap');
-  const wraps = [carries, ppWrap, zppWrap];
+  const wraps = [ppWrap, zppWrap];
   if (hasBracket) { wraps.push(closest, blowouts); }
+  if (hasTeams) { wraps.push(carries); }
   wraps.forEach(w => { if (w) w.innerHTML = '<div class="empty-msg">loading…</div>'; });
 
   let data;
