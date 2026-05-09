@@ -147,7 +147,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
                 map_pp = pp_df.groupby("beatmap_id")["pp"].agg(["mean", "std"])
                 pp_df = pp_df.join(map_pp, on="beatmap_id", rsuffix="_map")
-                pp_df["zpp"] = ((pp_df["pp"] - pp_df["mean"]) / pp_df["std"]).fillna(0.0)
+                pp_df["zpp"] = ((pp_df["pp"] - pp_df["mean_map"]) / pp_df["std_map"]).fillna(0.0)
                 zpp_top = pp_df.nlargest(top_n, "zpp")
                 for _, r in zpp_top.iterrows():
                     bid = int(r["beatmap_id"])
