@@ -1,3 +1,4 @@
+import time
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
@@ -40,7 +41,14 @@ def register(app: FastAPI, server: "WebServer") -> None:
             "SELECT id FROM users WHERE osu_user_id = ?", (osu_user.id,)
         ).fetchone()
         if row is None:
-            return RedirectResponse("/login?error=no_account")
+            server.db._conn.execute(
+                "INSERT INTO users(osu_user_id, osu_username, role, created_at) VALUES(?, ?, 'player', ?)",
+                (osu_user.id, osu_user.username, int(time.time())),
+            )
+            server.db._conn.commit()
+            row = server.db._conn.execute(
+                "SELECT id FROM users WHERE osu_user_id = ?", (osu_user.id,)
+            ).fetchone()
 
         token = new_session(row[0], server.db)
         response = RedirectResponse("/")
