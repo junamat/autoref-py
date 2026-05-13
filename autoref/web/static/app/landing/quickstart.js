@@ -3,6 +3,8 @@
 import { $, esc } from '/static/shared/util.js';
 
 let qsTeams = [{ name: 'Blue', players: [] }, { name: 'Red', players: [] }];
+let _defaultVs = 1;
+let _defaultTs = 1;
 
 function renderQsTeams() {
   const list = $('qs-team-list');
@@ -61,6 +63,67 @@ function addQsTeam() {
   qsTeams.push({ name: val, players: [] });
   $('qs-team-input').value = '';
   renderQsTeams();
+}
+
+export async function loadSettings() {
+  try {
+    const s = await fetch('/api/settings').then(r => r.ok ? r.json() : {});
+    _defaultVs = s.default_vs ?? 1;
+    _defaultTs = s.default_ts ?? 1;
+    _applyPlayerMode();
+  } catch (_) {}
+}
+
+function _applyPlayerMode() {
+  const playerMode = _defaultTs === 1;
+  const teamSection = $('qs-team-list')?.closest('.qs-field');
+  const teamAddRow = $('qs-team-input')?.parentElement;
+
+  if (!playerMode) {
+    if (teamSection) teamSection.hidden = false;
+    if (teamAddRow) teamAddRow.hidden = false;
+    return;
+  }
+
+  // rebuild team list as N plain player-name inputs
+  if (teamSection) teamSection.hidden = true;
+  if (teamAddRow) teamAddRow.hidden = true;
+
+  let playerInputs = $('qs-player-inputs');
+  if (!playerInputs) {
+    playerInputs = document.createElement('div');
+    playerInputs.id = 'qs-player-inputs';
+    playerInputs.className = 'qs-field';
+    const label = document.createElement('div');
+    label.className = 'qs-label';
+    label.textContent = 'players';
+    playerInputs.appendChild(label);
+    $('quickstart-form').insertBefore(playerInputs, teamSection ?? $('qs-team-list')?.closest('.qs-field') ?? null);
+  }
+
+  // rebuild inputs for _defaultVs players
+  const existing = [...playerInputs.querySelectorAll('input')];
+  while (playerInputs.querySelectorAll('input').length < _defaultVs) {
+    const idx = playerInputs.querySelectorAll('input').length;
+    const inp = document.createElement('input');
+    inp.className = 'qs-input';
+    inp.id = `qs-player-${idx}`;
+    inp.placeholder = `player ${idx + 1} username`;
+    inp.style.marginTop = '3px';
+    playerInputs.appendChild(inp);
+  }
+  // trim if vs shrunk
+  playerInputs.querySelectorAll('input').forEach((inp, i) => {
+    if (i >= _defaultVs) inp.remove();
+  });
+}
+
+function _buildTeamsFromPlayerInputs() {
+  const inputs = document.querySelectorAll('#qs-player-inputs input');
+  return [...inputs].map(inp => {
+    const name = inp.value.trim() || inp.placeholder;
+    return { name, players: [name] };
+  });
 }
 
 export async function loadPools() {
@@ -192,11 +255,13 @@ export function wireQuickstart({ onSuccess } = {}) {
     const poolId = $('qs-pool').value || null;
     const round = $('qs-round')?.value.trim() || null;
     const scheduledAt = $('qs-scheduled-at')?.value || null;
+    const teams = _defaultTs === 1 ? _buildTeamsFromPlayerInputs() : qsTeams;
 
     const payload = {
       type, mode, room_name: name,
       best_of: bo, bans_per_team: bans,
-      teams: qsTeams,
+      teams,
+      vs: _defaultVs,
       ...(poolId ? { pool_id: poolId } : {}),
       ...(round ? { round_name: round } : {}),
       ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),

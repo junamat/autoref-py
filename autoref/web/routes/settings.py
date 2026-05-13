@@ -44,6 +44,13 @@ def _validate(body: dict) -> list[str]:
                 errors.append(f"default_team_mode must be one of {_VALID_TEAM_MODES}")
         except (TypeError, ValueError):
             errors.append("default_team_mode must be an integer")
+    for _count_field in ("default_vs", "default_ts"):
+        if _count_field in body:
+            try:
+                if int(body[_count_field]) < 1:
+                    errors.append(f"{_count_field} must be ≥1")
+            except (TypeError, ValueError):
+                errors.append(f"{_count_field} must be an integer")
     for tf in _TIMER_FIELDS:
         if tf in body:
             try:
