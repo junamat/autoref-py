@@ -51,6 +51,12 @@ def _validate(body: dict) -> list[str]:
                     errors.append(f"{_count_field} must be ≥1")
             except (TypeError, ValueError):
                 errors.append(f"{_count_field} must be an integer")
+    if "default_vs_team" in body:
+        try:
+            if int(body["default_vs_team"]) < 2:
+                errors.append("default_vs_team must be ≥2")
+        except (TypeError, ValueError):
+            errors.append("default_vs_team must be an integer")
     for tf in _TIMER_FIELDS:
         if tf in body:
             try:

@@ -5,6 +5,7 @@ import { $, esc } from '/static/shared/util.js';
 let qsTeams = [{ name: 'Blue', players: [] }, { name: 'Red', players: [] }];
 let _defaultVs = 1;
 let _defaultTs = 1;
+let _defaultVsTeam = 2;
 
 function renderQsTeams() {
   const list = $('qs-team-list');
@@ -70,22 +71,26 @@ export async function loadSettings() {
     const s = await fetch('/api/settings').then(r => r.ok ? r.json() : {});
     _defaultVs = s.default_vs ?? 1;
     _defaultTs = s.default_ts ?? 1;
+    _defaultVsTeam = s.default_vs_team ?? 2;
     _applyPlayerMode();
   } catch (_) {}
 }
 
 function _applyPlayerMode() {
   const playerMode = _defaultTs === 1;
+  const isQuals = $('qs-type')?.querySelector('.active')?.dataset.val === 'qualifiers';
   const teamSection = $('qs-team-list')?.closest('.qs-field');
   const teamAddRow = $('qs-team-input')?.parentElement;
 
-  if (!playerMode) {
+  // Non-player-mode OR quals: use team builder (dynamic, add as needed)
+  if (!playerMode || isQuals) {
     if (teamSection) teamSection.hidden = false;
     if (teamAddRow) teamAddRow.hidden = false;
+    $('qs-player-inputs')?.remove();
     return;
   }
 
-  // rebuild team list as N plain player-name inputs
+  // Bracket + player mode: one fixed input per team slot
   if (teamSection) teamSection.hidden = true;
   if (teamAddRow) teamAddRow.hidden = true;
 
@@ -101,8 +106,8 @@ function _applyPlayerMode() {
     $('quickstart-form').insertBefore(playerInputs, teamSection ?? $('qs-team-list')?.closest('.qs-field') ?? null);
   }
 
-  // _defaultVs = number of players/sides; _defaultTs=1 means 1 player per side
-  while (playerInputs.querySelectorAll('input').length < _defaultVs) {
+  const sideCount = _defaultVsTeam;
+  while (playerInputs.querySelectorAll('input').length < sideCount) {
     const idx = playerInputs.querySelectorAll('input').length;
     const inp = document.createElement('input');
     inp.className = 'qs-input';
@@ -112,7 +117,7 @@ function _applyPlayerMode() {
     playerInputs.appendChild(inp);
   }
   playerInputs.querySelectorAll('input').forEach((inp, i) => {
-    if (i >= _defaultVs) inp.remove();
+    if (i >= sideCount) inp.remove();
   });
 }
 
@@ -199,6 +204,7 @@ export function wireQuickstart({ onSuccess } = {}) {
     const isQuals = $('qs-type').querySelector('.active')?.dataset.val === 'qualifiers';
     $('qs-bo-field').hidden = isQuals;
     $('qs-bans-field').hidden = isQuals;
+    _applyPlayerMode();
   });
 
   renderQsTeams();
@@ -253,14 +259,15 @@ export function wireQuickstart({ onSuccess } = {}) {
     const poolId = $('qs-pool').value || null;
     const round = $('qs-round')?.value.trim() || null;
     const scheduledAt = $('qs-scheduled-at')?.value || null;
+    const isQuals = type === 'qualifiers';
     const playerMode = _defaultTs === 1;
-    const teams = playerMode ? _buildTeamsFromPlayerInputs() : qsTeams;
+    const teams = (playerMode && !isQuals) ? _buildTeamsFromPlayerInputs() : qsTeams;
 
     const payload = {
       type, mode, room_name: name,
       best_of: bo, bans_per_team: bans,
       teams,
-      ...(playerMode ? { vs: 1 } : {}),
+      ...(playerMode ? { vs: _defaultVs, ts: _defaultTs } : {}),
       ...(poolId ? { pool_id: poolId } : {}),
       ...(round ? { round_name: round } : {}),
       ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),
@@ -275,8 +282,16 @@ export function wireQuickstart({ onSuccess } = {}) {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) alert('Error: ' + (data.error || res.status));
-      else if (onSuccess) onSuccess(data);
+      if (!res.ok) { alert('Error: ' + (data.error || res.status)); return; }
+      if (data.status === 'pending') {
+        $('qs-submit').textContent = 'starting…';
+        const startRes = await fetch(`/api/matches/${data.id}/start`, { method: 'POST' });
+        const startData = await startRes.json().catch(() => ({}));
+        if (!startRes.ok) { alert('Error starting match: ' + (startData.error || startRes.status)); return; }
+        if (onSuccess) onSuccess(startData);
+      } else {
+        if (onSuccess) onSuccess(data);
+      }
     } catch (e) {
       alert('Failed: ' + e.message);
     } finally {

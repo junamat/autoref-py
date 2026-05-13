@@ -40,6 +40,7 @@
       if (k === 'default_refs') {
         data[k] = v.split(',').map(s => s.trim()).filter(Boolean);
       } else if (['port', 'default_best_of', 'default_team_mode',
+                  'default_vs', 'default_ts', 'default_vs_team',
                   'timer_pick', 'timer_ban', 'timer_protect', 'timer_ready_up',
                   'timer_start_map', 'timer_force_start', 'timer_between_maps', 'timer_closing'].includes(k)) {
         data[k] = Number(v);
