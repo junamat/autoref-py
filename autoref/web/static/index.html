@@ -62,6 +62,16 @@
         <div id="qs-pane-match" class="qs-pane">
           <div id="quickstart-form">
             <div class="qs-field">
+              <div class="qs-label">template <span class="mono xs" style="color:var(--muted);margin-left:6px">optional</span></div>
+              <div style="display:flex;gap:4px">
+                <select class="qs-input" id="qs-template" style="flex:1">
+                  <option value="">— no template —</option>
+                </select>
+                <button class="ghost-btn xs" id="qs-template-load">load</button>
+                <button class="ghost-btn xs" id="qs-template-save">save</button>
+              </div>
+            </div>
+            <div class="qs-field">
               <div class="qs-label">match type</div>
               <div class="qs-toggle" id="qs-type">
                 <div class="qs-opt active" data-val="bracket">bracket</div>

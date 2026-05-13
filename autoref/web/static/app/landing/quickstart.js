@@ -77,6 +77,53 @@ export async function loadPools() {
   } catch (_) {}
 }
 
+let _templates = [];
+
+export async function loadTemplates() {
+  try {
+    _templates = await fetch('/api/match-templates').then(r => r.ok ? r.json() : []);
+    const sel = $('qs-template');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— no template —</option>';
+    for (const t of _templates) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    }
+  } catch (_) {}
+}
+
+function _applyTemplate(payload) {
+  if (!payload) return;
+
+  if (payload.type) {
+    $('qs-type').querySelectorAll('.qs-opt').forEach(o => {
+      o.classList.toggle('active', o.dataset.val === payload.type);
+    });
+    const isQuals = payload.type === 'qualifiers';
+    $('qs-bo-field').hidden = isQuals;
+    $('qs-bans-field').hidden = isQuals;
+  }
+  if (payload.mode) {
+    $('qs-mode').querySelectorAll('.qs-opt').forEach(o => {
+      o.classList.toggle('active', o.dataset.val === payload.mode);
+    });
+  }
+  if (payload.room_name) $('qs-name').value = payload.room_name;
+  if (payload.best_of)   $('qs-bo').value   = payload.best_of;
+  if (payload.bans_per_team !== undefined) $('qs-bans').value = payload.bans_per_team;
+  if (payload.pool_id)   $('qs-pool').value  = payload.pool_id;
+  if (payload.round_name) $('qs-round').value = payload.round_name;
+  if (Array.isArray(payload.teams)) {
+    qsTeams = payload.teams.map(t => ({
+      name: t.name || '',
+      players: Array.isArray(t.players) ? t.players : [],
+    }));
+    renderQsTeams();
+  }
+}
+
 export function wireQuickstart() {
   document.querySelectorAll('.qs-toggle').forEach(toggle => {
     toggle.addEventListener('click', e => {
@@ -97,6 +144,44 @@ export function wireQuickstart() {
 
   $('qs-team-add').addEventListener('click', addQsTeam);
   $('qs-team-input').addEventListener('keydown', e => { if (e.key === 'Enter') addQsTeam(); });
+
+  $('qs-template-load')?.addEventListener('click', () => {
+    const id = parseInt($('qs-template').value);
+    const tmpl = _templates.find(t => t.id === id);
+    if (tmpl) _applyTemplate(tmpl.payload);
+  });
+
+  $('qs-template-save')?.addEventListener('click', async () => {
+    const name = prompt('Template name:')?.trim();
+    if (!name) return;
+    const type = $('qs-type').querySelector('.active')?.dataset.val || 'bracket';
+    const mode = $('qs-mode').querySelector('.active')?.dataset.val || 'off';
+    const payload = {
+      type, mode,
+      room_name: $('qs-name').value.trim() || 'autoref match',
+      best_of: parseInt($('qs-bo').value) || 1,
+      bans_per_team: parseInt($('qs-bans').value) || 0,
+      teams: qsTeams,
+      ...($('qs-pool').value ? { pool_id: $('qs-pool').value } : {}),
+      ...($('qs-round')?.value.trim() ? { round_name: $('qs-round').value.trim() } : {}),
+    };
+    try {
+      const res = await fetch('/api/match-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert('Error: ' + (data.detail || res.status));
+        return;
+      }
+      await loadTemplates();
+      if (data.id) $('qs-template').value = data.id;
+    } catch (e) {
+      alert('Failed: ' + e.message);
+    }
+  });
 
   $('qs-submit').addEventListener('click', async () => {
     const type = $('qs-type').querySelector('.active')?.dataset.val || 'bracket';

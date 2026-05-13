@@ -3,7 +3,7 @@
 import { $ } from '/static/shared/util.js';
 import { sockets, nav } from './state.js';
 import { connectLanding, connectMatch } from './ws.js';
-import { loadPools } from './landing/quickstart.js';
+import { loadPools, loadTemplates } from './landing/quickstart.js';
 
 export function showLanding() {
   nav.currentMatchId = null;
@@ -13,6 +13,7 @@ export function showLanding() {
   history.pushState(null, '', '/');
   connectLanding();
   loadPools();
+  loadTemplates();
 }
 
 export function showMatch(matchId) {
