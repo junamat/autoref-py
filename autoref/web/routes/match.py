@@ -1,6 +1,9 @@
 """Match lifecycle routes."""
+import json
 import logging
+import time
 import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import Depends, FastAPI, Request
@@ -34,6 +37,21 @@ def register(app: FastAPI, server: "WebServer") -> None:
         try:
             body = await request.json()
             match_id = str(uuid.uuid4())[:8]
+            scheduled_at_str = body.pop("scheduled_at", None)
+            if scheduled_at_str:
+                dt = datetime.fromisoformat(scheduled_at_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                scheduled_at = int(dt.timestamp())
+                now = int(time.time())
+                server.db._conn.execute(
+                    "INSERT INTO live_matches"
+                    "(match_id, owner_user_id, payload_json, scheduled_at, assigned_ref_id, status, created_at, updated_at)"
+                    " VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+                    (match_id, user.id, json.dumps(body), scheduled_at, user.id, now, now),
+                )
+                server.db._conn.commit()
+                return JSONResponse({"id": match_id, "status": "scheduled"}, status_code=201)
             server._pending[match_id] = {
                 **body,
                 "_bancho_username": user.irc_username,

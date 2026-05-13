@@ -29,8 +29,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
         if not osu_username:
             raise HTTPException(status_code=400, detail="osu_username required")
         role = body.get("role", "ref")
-        if role not in ("host", "ref"):
-            raise HTTPException(status_code=400, detail="role must be host or ref")
+        if role not in ("host", "ref", "player"):
+            raise HTTPException(status_code=400, detail="role must be host, ref, or player")
         now = int(time.time())
         try:
             cursor = server.db._conn.execute(
@@ -58,8 +58,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
             return JSONResponse({"ok": True})
         if "role" in updates and current.role != "host":
             raise HTTPException(status_code=403, detail="only host can change role")
-        if "role" in updates and updates["role"] not in ("host", "ref"):
-            raise HTTPException(status_code=400, detail="role must be host or ref")
+        if "role" in updates and updates["role"] not in ("host", "ref", "player"):
+            raise HTTPException(status_code=400, detail="role must be host, ref, or player")
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         vals = list(updates.values()) + [uid]
         server.db._conn.execute(f"UPDATE users SET {set_clause} WHERE id = ?", vals)

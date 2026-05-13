@@ -2,7 +2,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from ...core.beatmap_cache import get_beatmap_cache
@@ -18,12 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 def register(app: FastAPI, server: "WebServer") -> None:
+    from .._auth_dep import require_not_player
+
     @app.get("/api/pools")
     async def list_pools():
         return JSONResponse([pool_to_detail(p) for p in _POOL_STORE.list()])
 
     @app.post("/api/pools")
-    async def save_pool(request: Request):
+    async def save_pool(request: Request, _user=Depends(require_not_player)):
         try:
             body = await request.json()
             pool_id = _POOL_STORE.save(body)
@@ -35,7 +37,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
             return JSONResponse({"error": "internal_error"}, status_code=500)
 
     @app.delete("/api/pools/{pool_id}")
-    async def delete_pool(pool_id: str):
+    async def delete_pool(pool_id: str, _user=Depends(require_not_player)):
         if not _POOL_STORE.delete(pool_id):
             return JSONResponse({"error": "not found"}, status_code=404)
         return JSONResponse({"ok": True})

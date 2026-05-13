@@ -3,6 +3,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from autoref.core.auth import new_session
 from autoref.core.config import Config
 from autoref.core.config import load as load_config
 from autoref.core.config import save as save_config
@@ -12,6 +13,7 @@ from autoref.web.routes.settings import register
 
 def make_app(db, cfg=None):
     app = FastAPI()
+    app.state.db = db
 
     class FakeServer:
         def __init__(self):
@@ -24,6 +26,15 @@ def make_app(db, cfg=None):
     return app
 
 
+def _host_cookie(db):
+    db._conn.execute(
+        "INSERT OR IGNORE INTO users(osu_user_id, osu_username, role, created_at) VALUES(9999, 'host', 'host', 0)"
+    )
+    db._conn.commit()
+    uid = db._conn.execute("SELECT id FROM users WHERE osu_user_id = 9999").fetchone()[0]
+    return {"session": new_session(uid, db)}
+
+
 @pytest.fixture
 def db(tmp_path):
     return MatchDatabase(tmp_path / "test.db")
@@ -31,7 +42,7 @@ def db(tmp_path):
 
 @pytest.fixture
 def client(db):
-    return TestClient(make_app(db))
+    return TestClient(make_app(db), cookies=_host_cookie(db))
 
 
 # V2: GET shape — no secrets, *_set flags present
@@ -89,8 +100,7 @@ def test_put_valid(client):
 def test_requires_restart_on_port_change(db):
     cfg = Config(port=8080)
     save_config(db, cfg)
-    app = make_app(db, cfg)
-    c = TestClient(app)
+    c = TestClient(make_app(db, cfg), cookies=_host_cookie(db))
     r = c.put("/api/settings", json={"port": 9999})
     assert r.json()["requires_restart"] is True
 
@@ -98,8 +108,7 @@ def test_requires_restart_on_port_change(db):
 def test_no_restart_for_other_fields(db):
     cfg = Config(port=8080)
     save_config(db, cfg)
-    app = make_app(db, cfg)
-    c = TestClient(app)
+    c = TestClient(make_app(db, cfg), cookies=_host_cookie(db))
     r = c.put("/api/settings", json={"default_mode": "auto"})
     assert r.json()["requires_restart"] is False
 
@@ -108,8 +117,7 @@ def test_no_restart_for_other_fields(db):
 def test_empty_secret_not_overwritten(db):
     cfg = Config(bancho_password="original")
     save_config(db, cfg)
-    app = make_app(db, cfg)
-    c = TestClient(app)
+    c = TestClient(make_app(db, cfg), cookies=_host_cookie(db))
     c.put("/api/settings", json={"bancho_password": ""})
     reloaded = load_config(db)
     assert reloaded.bancho_password == "original"
@@ -118,8 +126,7 @@ def test_empty_secret_not_overwritten(db):
 def test_nonempty_secret_overwritten(db):
     cfg = Config(bancho_password="old")
     save_config(db, cfg)
-    app = make_app(db, cfg)
-    c = TestClient(app)
+    c = TestClient(make_app(db, cfg), cookies=_host_cookie(db))
     c.put("/api/settings", json={"bancho_password": "new"})
     reloaded = load_config(db)
     assert reloaded.bancho_password == "new"
@@ -129,8 +136,7 @@ def test_nonempty_secret_overwritten(db):
 def test_put_persists_to_db(db):
     cfg = Config()
     save_config(db, cfg)
-    app = make_app(db, cfg)
-    c = TestClient(app)
+    c = TestClient(make_app(db, cfg), cookies=_host_cookie(db))
     c.put("/api/settings", json={"bancho_username": "saveduser"})
     reloaded = load_config(db)
     assert reloaded.bancho_username == "saveduser"

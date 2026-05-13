@@ -1,7 +1,7 @@
 """GET /api/settings and PUT /api/settings routes."""
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 if TYPE_CHECKING:
@@ -59,6 +59,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     from ...core.config import _SECRET_FIELDS, to_api
     from ...core.config import save as save_config
+    from .._auth_dep import require_not_player
 
     _config_field_names = {f.name for f in dc_fields(server.config.__class__)}
 
@@ -68,7 +69,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         return JSONResponse(to_api(server.config))
 
     @app.put("/api/settings")
-    async def put_settings(request: Request):
+    async def put_settings(request: Request, _user=Depends(require_not_player)):
         """Update server configuration and return requires_restart flag."""
         body: dict[str, Any] = await request.json()
 

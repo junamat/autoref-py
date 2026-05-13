@@ -16,3 +16,9 @@ def require_role(role: str):
             raise HTTPException(status_code=403, detail="forbidden")
         return user
     return _dep
+
+
+async def require_not_player(user: User = Depends(require_login)) -> User:
+    if user.role == "player":
+        raise HTTPException(status_code=403, detail="forbidden")
+    return user

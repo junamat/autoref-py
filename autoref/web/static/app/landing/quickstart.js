@@ -106,6 +106,7 @@ export function wireQuickstart() {
     const bans = parseInt($('qs-bans').value) || 0;
     const poolId = $('qs-pool').value || null;
     const round = $('qs-round')?.value.trim() || null;
+    const scheduledAt = $('qs-scheduled-at')?.value || null;
 
     const payload = {
       type, mode, room_name: name,
@@ -113,6 +114,7 @@ export function wireQuickstart() {
       teams: qsTeams,
       ...(poolId ? { pool_id: poolId } : {}),
       ...(round ? { round_name: round } : {}),
+      ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),
     };
 
     $('qs-submit').textContent = 'creating…';

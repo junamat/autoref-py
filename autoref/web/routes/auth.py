@@ -49,6 +49,12 @@ def register(app: FastAPI, server: "WebServer") -> None:
             row = server.db._conn.execute(
                 "SELECT id FROM users WHERE osu_user_id = ?", (osu_user.id,)
             ).fetchone()
+        else:
+            server.db._conn.execute(
+                "UPDATE users SET osu_username = ? WHERE osu_user_id = ?",
+                (osu_user.username, osu_user.id),
+            )
+            server.db._conn.commit()
 
         token = new_session(row[0], server.db)
         response = RedirectResponse("/")

@@ -313,6 +313,40 @@ class WebServer:
         self._tasks[match_id] = asyncio.create_task(_run())
         return iface
 
+    async def _poll_scheduled(self) -> None:
+        """Auto-start scheduled matches when their scheduled_at time arrives."""
+        while True:
+            await asyncio.sleep(30)
+            now = int(__import__("time").time())
+            try:
+                rows = self.db._conn.execute(
+                    "SELECT match_id, payload_json, assigned_ref_id FROM live_matches "
+                    "WHERE status = 'pending' AND scheduled_at IS NOT NULL AND scheduled_at <= ?",
+                    (now,),
+                ).fetchall()
+            except Exception:
+                logger.exception("scheduled poll query failed")
+                continue
+            for mid, payload_json, ref_id in rows:
+                if mid in self._tasks:
+                    continue
+                user = self.db._conn.execute(
+                    "SELECT irc_username, irc_password FROM users WHERE id = ?", (ref_id,)
+                ).fetchone()
+                if not user or not user[0] or not user[1]:
+                    logger.warning("scheduled match %s: ref %s missing IRC creds", mid, ref_id)
+                    continue
+                try:
+                    payload = json.loads(payload_json or "{}")
+                    await self._create_match(
+                        payload, match_id=mid,
+                        bancho_username=user[0],
+                        bancho_password=user[1],
+                    )
+                    logger.info("scheduled match %s auto-started", mid)
+                except Exception:
+                    logger.exception("failed to auto-start scheduled match %s", mid)
+
     async def start(self) -> None:
         import uvicorn
         from fastapi import FastAPI
@@ -330,6 +364,8 @@ class WebServer:
         app.mount("/static", StaticFiles(directory=self.static_dir), name="static")
         register_all(app, self)
         app.add_middleware(SetupGateMiddleware, db=self.db)
+
+        asyncio.ensure_future(self._poll_scheduled())
 
         config = uvicorn.Config(app, host=self.host, port=self.port, log_level="info")
         srv = uvicorn.Server(config)
