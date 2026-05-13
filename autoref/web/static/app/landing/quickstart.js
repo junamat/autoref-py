@@ -101,8 +101,7 @@ function _applyPlayerMode() {
     $('quickstart-form').insertBefore(playerInputs, teamSection ?? $('qs-team-list')?.closest('.qs-field') ?? null);
   }
 
-  // rebuild inputs for _defaultVs players
-  const existing = [...playerInputs.querySelectorAll('input')];
+  // _defaultVs = number of players/sides; _defaultTs=1 means 1 player per side
   while (playerInputs.querySelectorAll('input').length < _defaultVs) {
     const idx = playerInputs.querySelectorAll('input').length;
     const inp = document.createElement('input');
@@ -112,7 +111,6 @@ function _applyPlayerMode() {
     inp.style.marginTop = '3px';
     playerInputs.appendChild(inp);
   }
-  // trim if vs shrunk
   playerInputs.querySelectorAll('input').forEach((inp, i) => {
     if (i >= _defaultVs) inp.remove();
   });
@@ -255,13 +253,14 @@ export function wireQuickstart({ onSuccess } = {}) {
     const poolId = $('qs-pool').value || null;
     const round = $('qs-round')?.value.trim() || null;
     const scheduledAt = $('qs-scheduled-at')?.value || null;
-    const teams = _defaultTs === 1 ? _buildTeamsFromPlayerInputs() : qsTeams;
+    const playerMode = _defaultTs === 1;
+    const teams = playerMode ? _buildTeamsFromPlayerInputs() : qsTeams;
 
     const payload = {
       type, mode, room_name: name,
       best_of: bo, bans_per_team: bans,
       teams,
-      vs: _defaultVs,
+      ...(playerMode ? { vs: 1 } : {}),
       ...(poolId ? { pool_id: poolId } : {}),
       ...(round ? { round_name: round } : {}),
       ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),

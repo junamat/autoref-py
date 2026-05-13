@@ -47,7 +47,7 @@ class Config:
     default_refs: list[str] = field(default_factory=list)
     default_best_of: int = 1
     default_team_mode: int = 0
-    default_vs: int = 1
+    default_vs: int = 2
     default_ts: int = 1
     timer_pick: int = 120
     timer_ban: int = 120
