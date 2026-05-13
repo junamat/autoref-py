@@ -124,7 +124,7 @@ function _applyTemplate(payload) {
   }
 }
 
-export function wireQuickstart() {
+export function wireQuickstart({ onSuccess } = {}) {
   document.querySelectorAll('.qs-toggle').forEach(toggle => {
     toggle.addEventListener('click', e => {
       const opt = e.target.closest('.qs-opt');
@@ -212,6 +212,7 @@ export function wireQuickstart() {
       });
       const data = await res.json();
       if (!res.ok) alert('Error: ' + (data.error || res.status));
+      else if (onSuccess) onSuccess(data);
     } catch (e) {
       alert('Failed: ' + e.message);
     } finally {

@@ -41,6 +41,12 @@ def register(app: FastAPI, server: "WebServer") -> None:
             return RedirectResponse("/stats", status_code=302)
         return FileResponse(server.static_dir / "settings.html")
 
+    @app.get("/matches/new")
+    async def matches_new_page(request: Request):
+        if _is_player(request):
+            return RedirectResponse("/stats", status_code=302)
+        return FileResponse(server.static_dir / "matches_new.html")
+
     @app.get("/login")
     async def login_page():
         return FileResponse(server.static_dir / "login.html")

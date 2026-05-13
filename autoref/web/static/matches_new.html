@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autoref — new match</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { overflow-y: auto; height: auto; min-height: 100vh; }
+  .mn-page { max-width: 480px; margin: 0 auto; padding: 2rem 1rem; }
+  .mn-topbar { display:flex; align-items:center; gap:1rem; margin-bottom:2rem; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="mn-page">
+  <div class="mn-topbar">
+    <a href="/" class="logo" style="text-decoration:none">autoref</a>
+    <span class="muted mono xs">new match</span>
+    <div style="flex:1"></div>
+    <button class="ghost-btn" id="theme-toggle" title="toggle light/dark">◑</button>
+    <a href="/" class="ghost-btn" style="text-decoration:none">← matches</a>
+    <a href="/stats" class="ghost-btn" style="text-decoration:none">stats</a>
+  </div>
+
+  <div id="landing-quickstart">
+    <div id="qs-tabs"></div>
+    <div id="qs-pane-match" class="qs-pane">
+      <div id="quickstart-form">
+        <div class="qs-field">
+          <div class="qs-label">template <span class="mono xs" style="color:var(--muted);margin-left:6px">optional</span></div>
+          <div style="display:flex;gap:4px">
+            <select class="qs-input" id="qs-template" style="flex:1">
+              <option value="">— no template —</option>
+            </select>
+            <button class="ghost-btn xs" id="qs-template-load">load</button>
+            <button class="ghost-btn xs" id="qs-template-save">save</button>
+          </div>
+        </div>
+        <div class="qs-field">
+          <div class="qs-label">match type</div>
+          <div class="qs-toggle" id="qs-type">
+            <div class="qs-opt active" data-val="bracket">bracket</div>
+            <div class="qs-opt" data-val="qualifiers">qualifiers</div>
+          </div>
+        </div>
+        <div class="qs-field">
+          <div class="qs-label">room name</div>
+          <input class="qs-input" id="qs-name" placeholder="QF: Blue vs Red">
+        </div>
+        <div class="qs-field" id="qs-bo-field">
+          <div class="qs-label">best of</div>
+          <input class="qs-input" id="qs-bo" placeholder="9" style="width:60px">
+        </div>
+        <div class="qs-field" id="qs-bans-field">
+          <div class="qs-label">bans per team</div>
+          <input class="qs-input" id="qs-bans" placeholder="2" style="width:60px">
+        </div>
+        <div class="qs-field">
+          <div class="qs-label">teams</div>
+          <div id="qs-team-list"></div>
+          <div style="display:flex;gap:4px;margin-top:4px">
+            <input class="qs-input" id="qs-team-input" placeholder="team name" style="flex:1">
+            <button class="ghost-btn xs" id="qs-team-add">+ add</button>
+          </div>
+        </div>
+        <div class="qs-field">
+          <div class="qs-label">ref mode</div>
+          <div class="qs-toggle" id="qs-mode">
+            <div class="qs-opt active" data-val="off">off</div>
+            <div class="qs-opt" data-val="assisted">assisted</div>
+            <div class="qs-opt" data-val="auto">auto</div>
+          </div>
+        </div>
+        <div class="qs-field">
+          <div class="qs-label">pool <a href="/pool-builder" class="mono xs" style="color:var(--blue);text-decoration:none;margin-left:6px">+ new</a></div>
+          <select class="qs-input" id="qs-pool" style="width:100%">
+            <option value="">— no pool —</option>
+          </select>
+        </div>
+        <div class="qs-field">
+          <div class="qs-label">round <span class="mono xs" style="color:var(--muted);margin-left:6px">optional</span></div>
+          <input class="qs-input" id="qs-round" placeholder="QF, RO16, Grand Finals…" style="width:100%">
+        </div>
+        <div class="qs-field">
+          <div class="qs-label">schedule <span class="mono xs" style="color:var(--muted);margin-left:6px">optional — auto-start at time</span></div>
+          <input class="qs-input" id="qs-scheduled-at" type="datetime-local" style="width:100%">
+        </div>
+      </div>
+    </div>
+    <button class="join-btn" id="qs-submit" style="width:calc(100% - 20px);margin:0 10px 10px">create</button>
+  </div>
+</div>
+<script type="module" src="/static/matches_new.js"></script>
+</body>
+</html>
