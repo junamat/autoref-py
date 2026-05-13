@@ -19,7 +19,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         try:
             url = authorize_url(server.config)
         except ValueError:
-            raise HTTPException(status_code=400, detail="osu_client_id not configured")
+            raise HTTPException(status_code=400, detail="osu_client_id not configured") from None
         return RedirectResponse(url)
 
     @app.get("/api/auth/callback")
