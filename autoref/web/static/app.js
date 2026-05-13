@@ -3,7 +3,6 @@
 import { $ } from '/static/shared/util.js';
 import { showLanding, showMatch } from '/static/app/router.js';
 import { sendWS } from '/static/app/ws.js';
-import { wireQuickstart } from '/static/app/landing/quickstart.js';
 import { wireChat } from '/static/app/match/chat.js';
 import { wirePlayers } from '/static/app/match/players.js';
 import { wireAssisted } from '/static/app/match/assisted.js';
@@ -38,7 +37,6 @@ $('panic-btn').addEventListener('click', () => sendWS('!panic'));
 $('leave-btn').addEventListener('click', showLanding);
 
 /* ── module wiring ───────────────────────────────────────────── */
-wireQuickstart();
 wireChat();
 wirePlayers();
 wireAssisted();
