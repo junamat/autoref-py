@@ -9,7 +9,7 @@ export function showLanding() {
   $('landing-page').hidden = false;
   $('match-view').hidden = true;
   if (sockets.ws) { sockets.ws.close(); sockets.ws = null; }
-  history.pushState(null, '', '/');
+  history.pushState(null, '', '/ref');
   connectLanding();
 }
 

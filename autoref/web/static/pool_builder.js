@@ -10,13 +10,9 @@ import { wireCompose } from './pool_builder/modals/compose.js';
 import { wireSeparate } from './pool_builder/modals/separate.js';
 import { wireStatsDefaults } from './pool_builder/modals/statsDefaults.js';
 import { bootFromQuery, wireSave } from './pool_builder/save.js';
+import { initNav } from '/static/shared/nav.js';
 
-/* ── theme ───────────────────────────────────────────────────── */
-if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
-$('theme-toggle').addEventListener('click', () => {
-  document.body.classList.toggle('light');
-  localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
-});
+initNav({ active: 'pool-builder' });
 
 /* ── toolbar ─────────────────────────────────────────────────── */
 $('pb-add-pool-btn').addEventListener('click', addTopLevelPool);

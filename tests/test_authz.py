@@ -159,20 +159,43 @@ def _pages_app(db, server_static_dir):
     return app
 
 
-def test_index_redirects_player(db, tmp_path):
+def test_index_public_for_player(db, tmp_path):
     (tmp_path / "index.html").write_text("<html/>")
     uid = _add_user(db, 20, "player")
     c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
     r = c.get("/", cookies=_session_cookie(db, uid))
+    assert r.status_code == 200
+
+
+def test_index_public_for_anon(db, tmp_path):
+    (tmp_path / "index.html").write_text("<html/>")
+    c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
+    r = c.get("/")
+    assert r.status_code == 200
+
+
+def test_ref_redirects_player(db, tmp_path):
+    (tmp_path / "ref.html").write_text("<html/>")
+    uid = _add_user(db, 24, "player")
+    c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
+    r = c.get("/ref", cookies=_session_cookie(db, uid))
     assert r.status_code == 302
     assert r.headers["location"] == "/stats"
 
 
-def test_index_allows_ref(db, tmp_path):
-    (tmp_path / "index.html").write_text("<html/>")
+def test_ref_redirects_anon(db, tmp_path):
+    (tmp_path / "ref.html").write_text("<html/>")
+    c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
+    r = c.get("/ref")
+    assert r.status_code == 302
+    assert r.headers["location"] == "/stats"
+
+
+def test_ref_allows_ref(db, tmp_path):
+    (tmp_path / "ref.html").write_text("<html/>")
     uid = _add_user(db, 21, "ref")
     c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
-    r = c.get("/", cookies=_session_cookie(db, uid))
+    r = c.get("/ref", cookies=_session_cookie(db, uid))
     assert r.status_code == 200
 
 
@@ -185,10 +208,26 @@ def test_pool_builder_redirects_player(db, tmp_path):
     assert r.headers["location"] == "/stats"
 
 
+def test_pool_builder_redirects_anon(db, tmp_path):
+    (tmp_path / "pool_builder.html").write_text("<html/>")
+    c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
+    r = c.get("/pool-builder")
+    assert r.status_code == 302
+    assert r.headers["location"] == "/stats"
+
+
 def test_settings_redirects_player(db, tmp_path):
     (tmp_path / "settings.html").write_text("<html/>")
     uid = _add_user(db, 23, "player")
     c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
     r = c.get("/settings", cookies=_session_cookie(db, uid))
+    assert r.status_code == 302
+    assert r.headers["location"] == "/stats"
+
+
+def test_settings_redirects_anon(db, tmp_path):
+    (tmp_path / "settings.html").write_text("<html/>")
+    c = TestClient(_pages_app(db, tmp_path), follow_redirects=False)
+    r = c.get("/settings")
     assert r.status_code == 302
     assert r.headers["location"] == "/stats"

@@ -8,13 +8,10 @@ import { loadExtras } from '/static/stats/tabs/extras.js';
 import { loadStandings } from '/static/stats/tabs/standings.js';
 import { loadResults } from '/static/stats/tabs/results.js';
 import { loadTeamPerformances } from '/static/stats/tabs/teamPerf.js';
+import { initNav } from '/static/shared/nav.js';
 
-/* ── theme ───────────────────────────────────────────────────── */
-if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
-document.getElementById('theme-toggle').addEventListener('click', () => {
-  document.body.classList.toggle('light');
-  localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
-  load();
+initNav({ active: 'stats' }).then(() => {
+  document.getElementById('theme-toggle').addEventListener('click', load);
 });
 
 /* ── tabs ────────────────────────────────────────────────────── */

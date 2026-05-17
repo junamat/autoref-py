@@ -1,3 +1,6 @@
+import { initNav } from '/static/shared/nav.js';
+initNav({ active: 'settings' });
+
 (async () => {
   const form = document.getElementById('settings-form');
   const msg  = document.getElementById('settings-msg');

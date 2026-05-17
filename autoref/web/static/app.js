@@ -6,13 +6,9 @@ import { sendWS } from '/static/app/ws.js';
 import { wireChat } from '/static/app/match/chat.js';
 import { wirePlayers } from '/static/app/match/players.js';
 import { wireAssisted } from '/static/app/match/assisted.js';
+import { initNav } from '/static/shared/nav.js';
 
-/* ── theme ───────────────────────────────────────────────────── */
-if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
-$('theme-toggle').addEventListener('click', () => {
-  document.body.classList.toggle('light');
-  localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
-});
+initNav({ active: 'ref' });
 
 /* ── drawer tabs ─────────────────────────────────────────────── */
 document.querySelectorAll('.drawer-tab').forEach(tab => {
