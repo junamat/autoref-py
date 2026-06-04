@@ -52,6 +52,7 @@ export function renderLeaderboard(rows, metricCol, ascending, method, totalMaps)
       ? Math.min(100, (1 - (val - 1) / (maxVal - 1 || 1)) * 100).toFixed(1)
       : Math.min(100, (Math.abs(val) / maxVal) * 100).toFixed(1);
     const fmt = Number.isInteger(val) ? val.toLocaleString() : val.toFixed(4);
+    const barColor = val < 0 ? 'var(--red)' : 'var(--blue)';
     const participation = totalMaps > 0 ? r.maps_played / totalMaps : 0;
     const star = participation > 0.7 ? '<span style="color:var(--yellow)" title="played >70% of pool">★</span>' : '';
     const avgScore = r.avg_score != null ? Math.round(r.avg_score).toLocaleString() : '—';
@@ -61,8 +62,8 @@ export function renderLeaderboard(rows, metricCol, ascending, method, totalMaps)
       <td>${esc(r.username || r.user_id)}</td>
       <td class="z-bar-cell">
         <div class="z-bar-wrap">
-          <div class="z-bar-bg"><div class="z-bar-fill" style="width:${pct}%"></div></div>
-          <span class="z-val">${fmt}</span>
+          <div class="z-bar-bg"><div class="z-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+          <span class="z-val" style="color:${barColor}">${fmt}</span>
         </div>
       </td>
       <td class="r">${avgScore}</td>
