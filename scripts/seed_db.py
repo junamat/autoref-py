@@ -126,13 +126,15 @@ def seed_4wc(db_path: str) -> None:
                 conn.execute(
                     "INSERT INTO game_scores "
                     "(match_id, turn, beatmap_id, user_id, username, team_index, "
-                    " score, accuracy, max_combo, mods, passed, perfect, rank) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    " score, accuracy, max_combo, mods, passed, perfect, rank, "
+                    " nmiss, n50, n100, n300, ngeki, nkatu) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         match_id, turn, int(row["beatmap_id"]),
                         int(row["user_id"]), str(row["username"]), 0,
                         int(row["score"]), float(row["accuracy"]), 0,
                         json.dumps(mods), int(row["passed"]), 0, None,
+                        0, 0, 0, 0, 0, 0,
                     ),
                 )
 
@@ -300,14 +302,16 @@ def seed_2v2(db_path: str) -> None:
             conn.execute(
                 "INSERT INTO game_scores "
                 "(match_id, turn, beatmap_id, user_id, username, team_index, "
-                " score, accuracy, max_combo, mods, passed, perfect, rank) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " score, accuracy, max_combo, mods, passed, perfect, rank, "
+                " nmiss, n50, n100, n300, ngeki, nkatu) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     match_id, bid_to_turn[bid], bid,
                     uid, str(row["player"]), t_idx,
                     int(row["score"]), float(row["accuracy"]), 0,
                     json.dumps(mods_list), _is_pass(str(row["rank"])), 0,
                     str(row["rank"]).strip(),
+                    0, 0, 0, 0, 0, 0,
                 ),
             )
 
@@ -437,14 +441,16 @@ def seed_di(db_path: str) -> None:
             conn.execute(
                 "INSERT INTO game_scores "
                 "(match_id, turn, beatmap_id, user_id, username, team_index, "
-                " score, accuracy, max_combo, mods, passed, perfect, rank) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " score, accuracy, max_combo, mods, passed, perfect, rank, "
+                " nmiss, n50, n100, n300, ngeki, nkatu) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     match_id, bid_to_turn[bid], bid,
                     uid, str(row["player"]), t_idx,
                     int(row["score"]), float(row["accuracy"]), 0,
                     json.dumps(_split_mods(str(row.get("mods") or ""))),
                     _is_pass(str(row["rank"])), 0, str(row["rank"]).strip(),
+                    0, 0, 0, 0, 0, 0,
                 ),
             )
 
@@ -532,13 +538,15 @@ def seed_di_quals(db_path: str) -> None:
                 conn.execute(
                     "INSERT INTO game_scores "
                     "(match_id, turn, beatmap_id, user_id, username, team_index, "
-                    " score, accuracy, max_combo, mods, passed, perfect, rank) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    " score, accuracy, max_combo, mods, passed, perfect, rank, "
+                    " nmiss, n50, n100, n300, ngeki, nkatu) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         match_id, turn, int(row["beatmap_id"]),
                         int(row["user_id"]), str(row["username"]), t_idx,
                         int(row["score"]), float(row["accuracy"]), 0,
                         json.dumps(mods), int(row["passed"]), 0, None,
+                        0, 0, 0, 0, 0, 0,
                     ),
                 )
 

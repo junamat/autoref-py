@@ -349,7 +349,9 @@ class WebServer:
 
     async def start(self) -> None:
         import uvicorn
-        from fastapi import FastAPI
+        from aiosu.exceptions import RefreshTokenExpiredError
+        from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
         from fastapi.staticfiles import StaticFiles
 
         from ._gate import SetupGateMiddleware
@@ -361,6 +363,22 @@ class WebServer:
 
         app = FastAPI()
         app.state.db = self.db
+
+        @app.exception_handler(RefreshTokenExpiredError)
+        async def refresh_token_expired_handler(request: Request, exc: RefreshTokenExpiredError):
+            """Auto-logout user when osu! API token expires."""
+            logger.warning("osu! API token expired, logging out user")
+            token = request.cookies.get("session")
+            if token:
+                self.db._conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+                self.db._conn.commit()
+            response = JSONResponse(
+                {"error": "osu_api_token_expired", "message": "Please re-authenticate with osu!"},
+                status_code=401,
+            )
+            response.delete_cookie("session")
+            return response
+
         app.mount("/static", StaticFiles(directory=self.static_dir), name="static")
         register_all(app, self)
         app.add_middleware(SetupGateMiddleware, db=self.db)
