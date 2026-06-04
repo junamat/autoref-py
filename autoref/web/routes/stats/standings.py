@@ -8,7 +8,7 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from ._common import _build_map_code_lookup, _build_map_order_lookup, predicate_for
+from ._common import _build_map_code_lookup, _build_map_mod_group_lookup, _build_map_order_lookup, predicate_for
 
 if TYPE_CHECKING:
     from ...server import WebServer
@@ -33,6 +33,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         predicate = predicate_for(count_failed)
         scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
         code_by_bid = _build_map_code_lookup()
+        pool_mods_by_bid = _build_map_mod_group_lookup()
 
         if scores.empty:
             return JSONResponse({"maps": [], "has_teams": False})
@@ -103,6 +104,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 "title":         bm.get("title", ""),
                 "version":       bm.get("version", ""),
                 "mods":          map_mods,
+                "pool_mod":      pool_mods_by_bid.get(int(bid)),
                 "players":       players,
                 "team_totals":   team_totals,
             })

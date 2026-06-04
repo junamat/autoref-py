@@ -6,7 +6,7 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from ._common import _build_map_code_lookup, _build_map_order_lookup, predicate_for
+from ._common import _build_map_code_lookup, _build_map_mod_group_lookup, _build_map_order_lookup, predicate_for
 
 if TYPE_CHECKING:
     from ...server import WebServer
@@ -106,11 +106,14 @@ def register(app: FastAPI, server: "WebServer") -> None:
                     all_mods.extend(_json.loads(m))
             mods_by_bid[int(bid)] = list(set(all_mods))
 
+        pool_mods_by_bid = _build_map_mod_group_lookup()
+
         map_order = [
             {
                 "beatmap_id": int(b),
                 "name": code_by_bid.get(int(b)),
                 "mods": mods_by_bid.get(int(b), []),
+                "pool_mod": pool_mods_by_bid.get(int(b)),
             }
             for b in all_bids
         ]
