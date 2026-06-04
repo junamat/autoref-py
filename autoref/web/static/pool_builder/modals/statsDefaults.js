@@ -34,6 +34,7 @@ export function wireStatsDefaults() {
     populateMethodSelect('pb-cfg-method', d.method || '');
     $('pb-cfg-count-failed').value = d.count_failed === undefined ? '' : String(d.count_failed);
     $('pb-cfg-aggregate').value = d.aggregate || '';
+    $('pb-cfg-scope').value = d.scope || '';
     $('pb-stats-cfg-overlay').classList.remove('hidden');
   });
 
@@ -47,10 +48,12 @@ export function wireStatsDefaults() {
     const m  = $('pb-cfg-method').value;
     const cf = $('pb-cfg-count-failed').value;
     const ag = $('pb-cfg-aggregate').value;
+    const sc = $('pb-cfg-scope').value;
     if (qm) out.qualifier_method = qm;
     if (m)  out.method = m;
     if (cf !== '') out.count_failed = cf === 'true';
     if (ag) out.aggregate = ag;
+    if (sc) out.scope = sc;
     state.currentStatsDefaults = out;
     $('pb-stats-cfg-overlay').classList.add('hidden');
   });

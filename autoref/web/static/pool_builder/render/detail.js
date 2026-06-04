@@ -1,4 +1,5 @@
 import { $, esc } from '/static/shared/util.js';
+import { modColor, MOD_COLORS } from '/static/shared/modColors.js';
 import { state } from '../state.js';
 import { findNode, getEffectiveMods, removeNode, countMaps } from '../tree.js';
 import { getAdjustedLength, getAdjustedAR, getAdjustedOD, getAdjustedCS, fmtTime } from '../utils.js';
@@ -186,6 +187,46 @@ export function renderPoolDetail(body, node) {
     const opt = e.target.closest('.pb-toggle-opt');
     if (!opt) return;
     node.type = opt.dataset.val;
+    rerender();
+  });
+
+  const colorRow = document.createElement('div');
+  colorRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin:8px 0';
+  const defaultColor = modColor(node.name);
+  const currentColor = node.color || defaultColor;
+  const colorOptions = Object.entries(MOD_COLORS).map(([k, v]) =>
+    `<option value="${v}"${v === currentColor ? ' selected' : ''}>${k}</option>`
+  ).join('');
+  colorRow.innerHTML = `
+    <div class="pb-field-label" style="margin:0;white-space:nowrap">display color</div>
+    <input type="color" id="det-pool-color" value="${currentColor}" style="width:32px;height:24px;padding:0;border:1px solid var(--border);border-radius:3px;background:transparent;cursor:pointer">
+    <select id="det-pool-color-preset" style="background:var(--head);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:2px 6px;font-size:11px;font-family:inherit">
+      <option value="">auto (${node.name ? node.name.slice(0, 2).toUpperCase() : '?'})</option>
+      ${colorOptions}
+    </select>
+    <button class="ghost-btn" id="det-pool-color-reset" style="padding:2px 8px;font-size:10px">reset</button>
+  `;
+  body.appendChild(colorRow);
+
+  $('det-pool-color').addEventListener('input', e => {
+    node.color = e.target.value;
+    $('det-pool-color-preset').value = '';
+    rerender();
+  });
+  $('det-pool-color-preset').addEventListener('change', e => {
+    if (e.target.value) {
+      node.color = e.target.value;
+      $('det-pool-color').value = e.target.value;
+    } else {
+      delete node.color;
+      $('det-pool-color').value = defaultColor;
+    }
+    rerender();
+  });
+  $('det-pool-color-reset').addEventListener('click', () => {
+    delete node.color;
+    $('det-pool-color').value = defaultColor;
+    $('det-pool-color-preset').value = '';
     rerender();
   });
 

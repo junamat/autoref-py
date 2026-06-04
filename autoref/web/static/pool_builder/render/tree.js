@@ -1,4 +1,5 @@
 import { $, esc } from '/static/shared/util.js';
+import { modColor } from '/static/shared/modColors.js';
 import { state } from '../state.js';
 import { fmtTime } from '../utils.js';
 import { totalMaps, totalLen, removeNode, findNode, isDescendant } from '../tree.js';
@@ -116,7 +117,8 @@ function renderNodes(nodes, container, depth) {
   for (const node of nodes) {
     const isPool = node.type !== 'map';
     const isSelected = node.id === state.selectedId;
-    const poolColor = node.type === 'modpool' ? 'var(--yellow)' : 'var(--blue)';
+    const defaultPoolColor = node.type === 'modpool' ? 'var(--yellow)' : 'var(--blue)';
+    const poolColor = node.color || defaultPoolColor;
     const indent = depth * 16;
 
     const row = document.createElement('div');
@@ -133,7 +135,7 @@ function renderNodes(nodes, container, depth) {
     const displayName = node.code || node.name;
 
     const modsBadge = node.mods
-      ? `<span class="node-badge" style="border:1px solid rgba(251,191,36,.4);color:var(--yellow)">${esc(node.mods)}</span>`
+      ? `<span class="node-badge" style="border:1px solid ${modColor(node.mods)}44;color:${modColor(node.mods)}">${esc(node.mods)}</span>`
       : '';
     const tbBadge = node.tb
       ? `<span class="node-badge" style="border:1px dashed var(--muted);color:var(--muted)">TB</span>`
