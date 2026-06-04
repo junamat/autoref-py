@@ -38,16 +38,18 @@ export async function loadFilterOptions() {
   if (state.filterOptions.rounds && state.filterOptions.rounds.length) {
     roundSel.innerHTML = `<option value="">all rounds</option>` +
       state.filterOptions.rounds.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
-    roundSel.hidden = false;
-    // Auto-select OQ26 if it exists
+    // Auto-select OQ26 if it exists, then hide selector
     if (state.filterOptions.rounds.includes('OQ26')) {
       roundSel.value = 'OQ26';
     }
+    roundSel.hidden = true;
+    const roundLbl = document.getElementById('cfg-round-label');
+    if (roundLbl) roundLbl.hidden = true;
   }
   refreshPoolOptions();
   if (state.filterOptions.pools && state.filterOptions.pools.length >= 1) {
-    poolSel.hidden = false;
-    poolLbl.hidden = false;
+    poolSel.hidden = true;
+    poolLbl.hidden = true;
   }
 }
 
@@ -101,19 +103,9 @@ export function refreshPoolOptions() {
     poolSel.value = visiblePools.some(p => p.id === prev) ? prev : '';
   }
 
-  if (visiblePools.length <= 1 && (state.filterOptions.pools.length <= 1)) {
-    // Still show selector if there's at least 1 pool in store
-    if (state.filterOptions.pools.length === 0) {
-      poolSel.hidden = true;
-      poolLbl.hidden = true;
-    } else {
-      poolSel.hidden = false;
-      poolLbl.hidden = false;
-    }
-  } else {
-    poolSel.hidden = false;
-    poolLbl.hidden = false;
-  }
+  // Always hide pool selector (immutable)
+  poolSel.hidden = true;
+  poolLbl.hidden = true;
 
   const pool = poolSel.value;
   if (pool && state.filterOptions.pool_colors?.[pool]) {
