@@ -69,3 +69,9 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/users")
     async def users_page():
         return FileResponse(server.static_dir / "users.html")
+
+    @app.get("/mp-import")
+    async def mp_import_page(request: Request):
+        if _is_restricted(request):
+            return RedirectResponse("/stats", status_code=302)
+        return FileResponse(server.static_dir / "mp_import.html")

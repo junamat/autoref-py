@@ -1,6 +1,6 @@
-from ..._state import _POOL_STORE, _build_map_code_lookup, _build_map_order_lookup
+from ..._state import _POOL_STORE, _build_map_code_lookup, _build_map_mod_group_lookup, _build_map_order_lookup
 
-__all__ = ["_POOL_STORE", "_build_map_code_lookup", "_build_map_order_lookup", "predicate_for"]
+__all__ = ["_POOL_STORE", "_build_map_code_lookup", "_build_map_mod_group_lookup", "_build_map_order_lookup", "predicate_for"]
 
 
 def predicate_for(count_failed: bool):

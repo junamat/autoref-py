@@ -19,7 +19,7 @@ class LeaderboardRow(TypedDict, total=False):
     best: BestScore
 
 
-class MapPoolRow(TypedDict):
+class MapPoolRow(TypedDict, total=False):
     beatmap_id: int
     name: str | None
     pool_order: int
@@ -30,3 +30,5 @@ class MapPoolRow(TypedDict):
     protects_unused: int
     avg_score: int | None
     avg_acc: float | None
+    mods: list[str]
+    play_count: int

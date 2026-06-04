@@ -1,4 +1,4 @@
-from ..schemas.pool import PoolDetail, PoolSummary
+from ..schemas.pool import PoolDetail, PoolSummary, StatsDefaults
 
 
 def pool_to_summary(pool: dict) -> PoolSummary:
@@ -7,9 +7,12 @@ def pool_to_summary(pool: dict) -> PoolSummary:
 
 
 def pool_to_detail(pool: dict) -> PoolDetail:
-    """Full pool dict including tree."""
-    return PoolDetail(
-        id=pool["id"],
-        name=pool.get("name", ""),
-        tree=pool.get("tree", []),
-    )
+    """Full pool dict including tree and stats_defaults."""
+    result: PoolDetail = {
+        "id": pool["id"],
+        "name": pool.get("name", ""),
+        "tree": pool.get("tree", []),
+    }
+    if "stats_defaults" in pool:
+        result["stats_defaults"] = pool["stats_defaults"]
+    return result

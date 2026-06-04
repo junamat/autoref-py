@@ -68,3 +68,29 @@ def _build_map_order_lookup() -> dict[int, int]:
     for pool in _POOL_STORE.list():
         _walk(pool.get("tree", []))
     return order
+
+
+def _build_map_mod_group_lookup() -> dict[int, str]:
+    """Walk every saved pool, return {beatmap_id: mod_group} (e.g. {3814680: "NM"}).
+
+    Strips trailing digits from the map code to get the mod group.
+    On collisions across pools, the last one wins.
+    """
+    lookup: dict[int, str] = {}
+
+    def _walk(nodes):
+        for n in nodes:
+            if n.get("type") == "map":
+                bid = n.get("bid")
+                code = n.get("code")
+                if bid and code:
+                    try:
+                        lookup[int(bid)] = str(code).rstrip("0123456789") or "NM"
+                    except (TypeError, ValueError):
+                        pass
+            elif n.get("children"):
+                _walk(n["children"])
+
+    for pool in _POOL_STORE.list():
+        _walk(pool.get("tree", []))
+    return lookup

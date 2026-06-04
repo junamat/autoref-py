@@ -79,9 +79,14 @@ def register(app: FastAPI, server: "WebServer") -> None:
                     })
                 team_totals.sort(key=lambda t: -cast(int, t["total_score"]))
 
+            map_mods = []
+            if players:
+                map_mods = players[0].get("mods", [])
+            
             maps_out.append({
                 "beatmap_id":  int(bid),
                 "name":        code_by_bid.get(int(bid)),
+                "mods":        map_mods,
                 "players":     players,
                 "team_totals": team_totals,
             })

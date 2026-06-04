@@ -28,15 +28,78 @@ def register(app: FastAPI, server: "WebServer") -> None:
         picks   = server.db.get_pick_actions(pool_id=pool_id, round_name=round_name)
         code_by_bid = _build_map_code_lookup()
 
-        if scores.empty or picks.empty:
+        if scores.empty:
             return JSONResponse({
                 "closest_maps": [], "biggest_blowouts": [], "biggest_carries": [],
+                "highest_pp": [], "highest_zpp": [],
             })
 
         scores = scores.loc[scores.apply(predicate, axis=1)].copy()
         if scores.empty:
             return JSONResponse({
                 "closest_maps": [], "biggest_blowouts": [], "biggest_carries": [],
+                "highest_pp": [], "highest_zpp": [],
+            })
+
+        # Calculate PP values for all scores
+        highest_pp: list = []
+        highest_zpp: list = []
+        try:
+            from ....core.stats import augment_pp
+            aug = await augment_pp(scores, db=server.db)
+            if "pp" in aug.columns and aug["pp"].notna().any():
+                pp_df = aug.dropna(subset=["pp"]).copy()
+                pp_top = pp_df.nlargest(top_n, "pp")
+                for _, r in pp_top.iterrows():
+                    bid = int(r["beatmap_id"])
+                    mods = json.loads(r["mods"]) if pd.notna(r["mods"]) and r["mods"] else []
+                    highest_pp.append({
+                        "match_id":   int(r["match_id"]),
+                        "round_name": r["round_name"] if "round_name" in r and pd.notna(r["round_name"]) else None,
+                        "user_id":    int(r["user_id"]),
+                        "username":   r["username"],
+                        "beatmap_id": bid,
+                        "name":       code_by_bid.get(bid),
+                        "mods":       mods,
+                        "score":      int(r["score"]),
+                        "accuracy":   round(float(r["accuracy"]), 4),
+                        "rank":       (r["rank"] if pd.notna(r["rank"]) else None),
+                        "pp":         round(float(r["pp"]), 1),
+                    })
+
+                map_pp = pp_df.groupby("beatmap_id")["pp"].agg(["mean", "std"]).reset_index()
+                map_pp = map_pp.rename(columns={"mean": "mean_pp", "std": "std_pp"})
+                pp_df = pp_df.merge(map_pp, on="beatmap_id", how="left")
+                pp_df["zpp"] = pp_df.apply(
+                    lambda r: ((r["pp"] - r["mean_pp"]) / r["std_pp"]) if pd.notna(r["std_pp"]) and r["std_pp"] > 0 else 0.0,
+                    axis=1
+                )
+                zpp_top = pp_df.nlargest(top_n, "zpp")
+                for _, r in zpp_top.iterrows():
+                    bid = int(r["beatmap_id"])
+                    mods = json.loads(r["mods"]) if pd.notna(r["mods"]) and r["mods"] else []
+                    highest_zpp.append({
+                        "match_id":   int(r["match_id"]),
+                        "round_name": r["round_name"] if "round_name" in r and pd.notna(r["round_name"]) else None,
+                        "user_id":    int(r["user_id"]),
+                        "username":   r["username"],
+                        "beatmap_id": bid,
+                        "name":       code_by_bid.get(bid),
+                        "mods":       mods,
+                        "score":      int(r["score"]),
+                        "accuracy":   round(float(r["accuracy"]), 4),
+                        "rank":       (r["rank"] if pd.notna(r["rank"]) else None),
+                        "pp":         round(float(r["pp"]), 1),
+                        "zpp":        round(float(r["zpp"]), 3),
+                    })
+        except Exception:
+            logger.warning("pp augmentation failed", exc_info=True)
+
+        # If no picks, return PP data but skip pick-based stats
+        if picks.empty:
+            return JSONResponse({
+                "closest_maps": [], "biggest_blowouts": [], "biggest_carries": [],
+                "highest_pp": highest_pp, "highest_zpp": highest_zpp,
             })
 
         picks_key = picks[["match_id", "beatmap_id", "round_name"]].drop_duplicates(
@@ -48,6 +111,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         if pick_scores.empty:
             return JSONResponse({
                 "closest_maps": [], "biggest_blowouts": [], "biggest_carries": [],
+                "highest_pp": highest_pp, "highest_zpp": highest_zpp,
             })
 
         team_totals = (pick_scores
@@ -119,55 +183,6 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 "team_avg_z": round(float(r["team_avg_z"]), 3),
                 "carry_z":    round(float(r["carry_z"]), 3),
             })
-
-        highest_pp: list = []
-        highest_zpp: list = []
-        try:
-            from ....core.stats import augment_pp
-            aug = await augment_pp(pick_scores, db=server.db)
-            if "pp" in aug.columns and aug["pp"].notna().any():
-                pp_df = aug.dropna(subset=["pp"]).copy()
-                pp_top = pp_df.nlargest(top_n, "pp")
-                for _, r in pp_top.iterrows():
-                    bid = int(r["beatmap_id"])
-                    mods = json.loads(r["mods"]) if pd.notna(r["mods"]) and r["mods"] else []
-                    highest_pp.append({
-                        "match_id":   int(r["match_id"]),
-                        "round_name": r["round_name"] if "round_name" in r and pd.notna(r["round_name"]) else None,
-                        "user_id":    int(r["user_id"]),
-                        "username":   r["username"],
-                        "beatmap_id": bid,
-                        "name":       code_by_bid.get(bid),
-                        "mods":       mods,
-                        "score":      int(r["score"]),
-                        "accuracy":   round(float(r["accuracy"]), 4),
-                        "rank":       (r["rank"] if pd.notna(r["rank"]) else None),
-                        "pp":         round(float(r["pp"]), 1),
-                    })
-
-                map_pp = pp_df.groupby("beatmap_id")["pp"].agg(["mean", "std"])
-                pp_df = pp_df.join(map_pp, on="beatmap_id", rsuffix="_map")
-                pp_df["zpp"] = ((pp_df["pp"] - pp_df["mean_map"]) / pp_df["std_map"]).fillna(0.0)
-                zpp_top = pp_df.nlargest(top_n, "zpp")
-                for _, r in zpp_top.iterrows():
-                    bid = int(r["beatmap_id"])
-                    mods = json.loads(r["mods"]) if pd.notna(r["mods"]) and r["mods"] else []
-                    highest_zpp.append({
-                        "match_id":   int(r["match_id"]),
-                        "round_name": r["round_name"] if "round_name" in r and pd.notna(r["round_name"]) else None,
-                        "user_id":    int(r["user_id"]),
-                        "username":   r["username"],
-                        "beatmap_id": bid,
-                        "name":       code_by_bid.get(bid),
-                        "mods":       mods,
-                        "score":      int(r["score"]),
-                        "accuracy":   round(float(r["accuracy"]), 4),
-                        "rank":       (r["rank"] if pd.notna(r["rank"]) else None),
-                        "pp":         round(float(r["pp"]), 1),
-                        "zpp":        round(float(r["zpp"]), 3),
-                    })
-        except Exception:
-            logger.warning("pp augmentation failed", exc_info=True)
 
         return JSONResponse({
             "closest_maps":     closest,

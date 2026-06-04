@@ -97,7 +97,23 @@ def register(app: FastAPI, server: "WebServer") -> None:
             df["beatmap_id"].unique(),
             key=lambda b: (map_order_lookup.get(int(b), 99999), -pick_counts.get(int(b), 0))
         )
-        map_order = [{"beatmap_id": int(b), "name": code_by_bid.get(int(b))} for b in all_bids]
+        import json as _json
+        mods_by_bid: dict[int, list[str]] = {}
+        for bid, grp in df.groupby("beatmap_id"):
+            all_mods = []
+            for m in grp["mods"]:
+                if _json.loads(m) if m else []:
+                    all_mods.extend(_json.loads(m))
+            mods_by_bid[int(bid)] = list(set(all_mods))
+        
+        map_order = [
+            {
+                "beatmap_id": int(b),
+                "name": code_by_bid.get(int(b)),
+                "mods": mods_by_bid.get(int(b), []),
+            }
+            for b in all_bids
+        ]
 
         return JSONResponse({
             "teams":         teams_out,

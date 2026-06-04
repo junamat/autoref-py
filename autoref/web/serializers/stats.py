@@ -16,10 +16,12 @@ def build_mappool_row(
     acc_by_map: dict[int, float],
     code_by_bid: dict[int, str],
     order_by_bid: dict[int, int],
+    mods_by_bid: dict[int, list[str]] | None = None,
+    play_count_by_map: dict[int, int] | None = None,
 ) -> MapPoolRow:
     """Build one MapPoolRow from aggregated DB query results."""
     split = split_by_bid.get(bid, {})
-    return MapPoolRow(
+    row: MapPoolRow = MapPoolRow(
         beatmap_id=bid,
         name=code_by_bid.get(bid),
         pool_order=order_by_bid.get(bid, 99999),
@@ -30,7 +32,11 @@ def build_mappool_row(
         protects_unused=split.get("protect_only", 0),
         avg_score=avg_by_map.get(bid),
         avg_acc=acc_by_map.get(bid),
+        play_count=play_count_by_map.get(bid, 0) if play_count_by_map else 0,
     )
+    if mods_by_bid and bid in mods_by_bid:
+        row["mods"] = mods_by_bid[bid]
+    return row
 
 
 def enrich_leaderboard_rows(

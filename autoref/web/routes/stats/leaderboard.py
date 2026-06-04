@@ -39,6 +39,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
         avg_by_map: dict = {}
         acc_by_map: dict = {}
+        play_count_by_map: dict = {}
+        mods_by_bid: dict = {}
         if not all_scores.empty:
             filtered = all_scores.loc[all_scores.apply(predicate, axis=1)]
             if not filtered.empty:
@@ -50,12 +52,27 @@ def register(app: FastAPI, server: "WebServer") -> None:
                     filtered.groupby("beatmap_id")["accuracy"].mean()
                     .round(4).to_dict()
                 )
+                play_count_by_map = (
+                    filtered.groupby("beatmap_id").size().to_dict()
+                )
+                import json as _json
+                for bid, grp in filtered.groupby("beatmap_id"):
+                    mods_list = []
+                    for m in grp["mods"]:
+                        if _json.loads(m) if m else []:
+                            mods_list.extend(_json.loads(m))
+                    mods_by_bid[int(bid)] = list(set(mods_list))
 
         pool_rows: dict = {}
         for _, row in map_stats.iterrows():
             bid = int(row["beatmap_id"])
             pool_rows.setdefault(bid, {})
             pool_rows[bid][row["step"]] = int(row["count"])
+
+        # Include beatmaps from scores even if no actions (MP-imported matches)
+        if not all_scores.empty:
+            for bid in all_scores["beatmap_id"].unique():
+                pool_rows.setdefault(int(bid), {})
 
         split_by_bid: dict = {}
         for _, row in map_breakdown.iterrows():
@@ -68,7 +85,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         code_by_bid = _build_map_code_lookup()
         order_by_bid = _build_map_order_lookup()
         mappool = [
-            build_mappool_row(bid, counts, split_by_bid, avg_by_map, acc_by_map, code_by_bid, order_by_bid)
+            build_mappool_row(bid, counts, split_by_bid, avg_by_map, acc_by_map, code_by_bid, order_by_bid, mods_by_bid, play_count_by_map)
             for bid, counts in pool_rows.items()
         ]
 
