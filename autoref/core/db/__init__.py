@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,12 +24,16 @@ class MatchDatabase:
     higher-level orchestrators for common multi-table operations.
     """
 
-    def __init__(self, path: str | Path = "matches.db") -> None:
+    def __init__(self, path: str | Path | None = None) -> None:
         """Open (or create) the database at path and run all pending migrations.
 
         Args:
             path: Filesystem path to the SQLite file. Created if absent.
+                  Defaults to $DATA_DIR/matches.db or ./matches.db
         """
+        if path is None:
+            data_dir = os.getenv("DATA_DIR", ".")
+            path = os.path.join(data_dir, "matches.db")
         self._conn = connect(path)
         run_migrations(self._conn)
         self.matches = MatchRepo(self._conn)

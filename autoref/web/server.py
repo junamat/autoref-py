@@ -2,7 +2,6 @@
 import asyncio
 import json
 import logging
-import os
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -89,7 +88,7 @@ class WebServer:
         self._tasks: dict[str, asyncio.Task] = {}
         self._snapshot_tasks: dict[str, asyncio.Task] = {}
         self._match_metadata: dict[str, dict] = {}  # match_id -> {owner_user_id, controller_type, payload_json}
-        self.db = MatchDatabase(db_path if db_path is not None else os.getenv("AUTOREF_DB", "matches.db"))
+        self.db = MatchDatabase(db_path if db_path is not None else None)
         self.config = load_config(self.db)
         self.host = host if host is not None else self.config.host
         self.port = port if port is not None else self.config.port

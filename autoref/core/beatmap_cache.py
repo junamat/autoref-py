@@ -14,8 +14,8 @@ from .result import Err, Ok
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CACHE_FILE = Path.home() / ".cache" / "autoref" / "beatmaps.json"
-_DEFAULT_OSU_DIR = Path.home() / ".cache" / "autoref" / "osu"
+_DEFAULT_CACHE_FILE = Path(os.getenv("DATA_DIR", Path.home() / ".cache" / "autoref")) / "beatmaps.json"
+_DEFAULT_OSU_DIR = Path(os.getenv("DATA_DIR", Path.home() / ".cache" / "autoref")) / "osu"
 _PREFETCH_CONCURRENCY = 10
 _OSU_FILE_URL = "https://osu.ppy.sh/osu/{bid}"
 

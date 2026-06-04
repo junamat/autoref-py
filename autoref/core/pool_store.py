@@ -1,15 +1,16 @@
 """PoolStore: persistent disk-backed registry of saved mappools.
 
 Stores the pool-builder tree as a JSON object, one entry per pool ID.
-Default path: ~/.cache/autoref/pools.json (override via the constructor).
+Default path: $DATA_DIR/pools.json or ~/.cache/autoref/pools.json
 """
 import json
 import logging
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_POOLS_FILE = Path.home() / ".cache" / "autoref" / "pools.json"
+_DEFAULT_POOLS_FILE = Path(os.getenv("DATA_DIR", str(Path.home() / ".cache" / "autoref"))) / "pools.json"
 
 
 class PoolStore:
