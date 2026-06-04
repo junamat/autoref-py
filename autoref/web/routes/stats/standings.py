@@ -42,9 +42,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
         if df.empty:
             return JSONResponse({"maps": [], "has_teams": False})
 
-        df = df.sort_values("score", ascending=False).drop_duplicates(
-            subset=["user_id", "beatmap_id"]
-        )
+        # Keep all scores — players who play a map multiple times appear multiple times
 
         map_stats = df.groupby("beatmap_id")["score"].agg(["mean", "std"])
         df = df.join(map_stats, on="beatmap_id")
