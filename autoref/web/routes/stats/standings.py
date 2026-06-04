@@ -24,11 +24,12 @@ def register(app: FastAPI, server: "WebServer") -> None:
         """Per-map top players and team standings.
 
         Returns:
-          maps: list of {beatmap_id, name, players: [{rank, user_id, username,
+          maps: list of {beatmap_id, name, artist, title, version, players: [{rank, user_id, username,
                 score, accuracy, z, mods, rank_grade}], team_totals: [{team_name,
                 total_score, avg_z}]}
           has_teams: bool — True when team_index data is present
         """
+        from ....beatmap_cache import get_beatmap_cache
         predicate = predicate_for(count_failed)
         scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
         code_by_bid = _build_map_code_lookup()
@@ -49,6 +50,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
         df["z"] = ((df["score"] - df["mean"]) / df["std"]).fillna(0.0)
 
         has_teams = df["team_name"].notna().any() if "team_name" in df.columns else False
+
+        beatmap_cache = get_beatmap_cache()
 
         maps_out = []
         for bid, grp in df.groupby("beatmap_id"):
@@ -83,9 +86,15 @@ def register(app: FastAPI, server: "WebServer") -> None:
             if players:
                 map_mods = players[0].get("mods", [])
             
+            # Get beatmap metadata from cache
+            bm = beatmap_cache.get(int(bid)) or {}
+            
             maps_out.append({
                 "beatmap_id":  int(bid),
                 "name":        code_by_bid.get(int(bid)),
+                "artist":      bm.get("artist", ""),
+                "title":       bm.get("title", ""),
+                "version":     bm.get("version", ""),
                 "mods":        map_mods,
                 "players":     players,
                 "team_totals": team_totals,

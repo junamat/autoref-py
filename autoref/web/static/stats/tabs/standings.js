@@ -29,9 +29,12 @@ export async function loadStandings() {
 
   const cards = data.maps.map(m => {
     const color = modColor(m.name, m.mods || m.beatmap_id);
-    const title = m.name
+    const code = m.name
       ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:700">${esc(m.name)}</a>`
       : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;
+    const meta = (m.artist || m.title || m.version)
+      ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(m.artist)} — ${esc(m.title)} [${esc(m.version)}]</div>`
+      : '';
 
     const rows = m.players.map(p => {
       const rankClass = p.rank <= 3 ? `rank-${p.rank}` : '';
@@ -47,7 +50,7 @@ export async function loadStandings() {
     }).join('');
 
     return `<div class="standings-card">
-      <div class="standings-card-head">${title}</div>
+      <div class="standings-card-head">${code}${meta}</div>
       <div class="standings-card-body">
         <table class="stats-table">
           <thead><tr>
@@ -67,9 +70,12 @@ export async function loadStandings() {
     teamSection.hidden = false;
     const teamCards = data.maps.map(m => {
       const color = modColor(m.name, m.mods || m.beatmap_id);
-      const title = m.name
+      const code = m.name
         ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:700">${esc(m.name)}</a>`
         : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;
+      const meta = (m.artist || m.title || m.version)
+        ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(m.artist)} — ${esc(m.title)} [${esc(m.version)}]</div>`
+        : '';
 
       const rows = (m.team_totals || []).map((t, i) => {
         const rank = i + 1;
@@ -83,7 +89,7 @@ export async function loadStandings() {
       }).join('');
 
       return `<div class="standings-card">
-        <div class="standings-card-head">${title}</div>
+        <div class="standings-card-head">${code}${meta}</div>
         <div class="standings-card-body">
           <table class="stats-table">
             <thead><tr>
