@@ -1,0 +1,1 @@
+ALTER TABLE match_teams ADD COLUMN seed INTEGER;

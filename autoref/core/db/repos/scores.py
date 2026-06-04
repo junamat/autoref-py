@@ -24,8 +24,9 @@ class ScoreRepo:
                 self._conn.execute(
                     "INSERT INTO game_scores "
                     "(match_id, turn, beatmap_id, user_id, username, team_index, "
-                    " score, accuracy, max_combo, mods, passed, perfect, rank) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " score, accuracy, max_combo, mods, passed, perfect, rank, "
+                    " nmiss, n50, n100, n300, ngeki, nkatu) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         match_id, turn, beatmap_id,
                         s["user_id"], s.get("username"), s.get("team_index"),
@@ -34,6 +35,12 @@ class ScoreRepo:
                         int(bool(s["passed"])),
                         int(bool(s.get("perfect", False))),
                         s.get("rank"),
+                        int(s.get("nmiss", 0)),
+                        int(s.get("n50", 0)),
+                        int(s.get("n100", 0)),
+                        int(s.get("n300", 0)),
+                        int(s.get("ngeki", 0)),
+                        int(s.get("nkatu", 0)),
                     ),
                 )
 
@@ -60,5 +67,41 @@ class ScoreRepo:
         filt = f"WHERE {clause}" if clause else ""
         return pd.read_sql(
             sql("scores.all_with_team").format(filter=filt),
+            self._conn, params=params,
+        )
+
+    def score_turn_totals(self, *, pool_id: str | None = None,
+                           round_name: str | None = None) -> pd.DataFrame:
+        clause, params = match_filter(pool_id, round_name, alias="g")
+        filt = f"WHERE {clause}" if clause else ""
+        return pd.read_sql(
+            sql("scores.score_turn_totals").format(filter=filt),
+            self._conn, params=params,
+        )
+
+    def map_team_scores(self, *, pool_id: str | None = None,
+                        round_name: str | None = None) -> pd.DataFrame:
+        clause, params = match_filter(pool_id, round_name, alias="g")
+        filt = f"WHERE {clause}" if clause else ""
+        return pd.read_sql(
+            sql("scores.map_team_scores").format(filter=filt),
+            self._conn, params=params,
+        )
+
+    def team_pool_scores(self, *, pool_id: str | None = None,
+                         round_name: str | None = None) -> pd.DataFrame:
+        clause, params = match_filter(pool_id, round_name, alias="g")
+        filt = f"WHERE {clause}" if clause else ""
+        return pd.read_sql(
+            sql("scores.team_pool_scores").format(filter=filt),
+            self._conn, params=params,
+        )
+
+    def scores_with_round(self, *, pool_id: str | None = None,
+                          round_name: str | None = None) -> pd.DataFrame:
+        clause, params = match_filter(pool_id, round_name, alias="g")
+        filt = f"WHERE {clause}" if clause else ""
+        return pd.read_sql(
+            sql("scores.scores_with_round").format(filter=filt),
             self._conn, params=params,
         )

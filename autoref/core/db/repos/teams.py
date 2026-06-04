@@ -11,10 +11,11 @@ class TeamRepo:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
-    def insert_team(self, match_id: int, idx: int, name: str) -> None:
+    def insert_team(self, match_id: int, idx: int, name: str,
+                    seed: int | None = None) -> None:
         self._conn.execute(
-            "INSERT INTO match_teams VALUES (?, ?, ?)",
-            (match_id, idx, name),
+            "INSERT INTO match_teams VALUES (?, ?, ?, ?)",
+            (match_id, idx, name, seed),
         )
 
     def stats(self) -> pd.DataFrame:

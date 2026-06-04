@@ -46,3 +46,30 @@ class ActionRepo:
             sql("actions.map_action_breakdown").format(filter=filt),
             self._conn, params=params,
         )
+
+    def pick_win_rates(self, *, pool_id: str | None = None,
+                       round_name: str | None = None) -> pd.DataFrame:
+        clause, params = match_filter(pool_id, round_name, alias="a")
+        filt = f"AND {clause}" if clause else ""
+        return pd.read_sql(
+            sql("actions.pick_win_rates").format(filter=filt),
+            self._conn, params=params,
+        )
+
+    def first_picks(self, *, pool_id: str | None = None,
+                    round_name: str | None = None) -> pd.DataFrame:
+        clause, params = match_filter(pool_id, round_name, alias="a")
+        filt = f"AND {clause}" if clause else ""
+        return pd.read_sql(
+            sql("actions.first_picks").format(filter=filt),
+            self._conn, params=params,
+        )
+
+    def all_actions_ordered(self, *, pool_id: str | None = None,
+                            round_name: str | None = None) -> pd.DataFrame:
+        clause, params = match_filter(pool_id, round_name, alias="a")
+        filt = f"WHERE {clause}" if clause else ""
+        return pd.read_sql(
+            sql("actions.all_actions_ordered").format(filter=filt),
+            self._conn, params=params,
+        )

@@ -88,4 +88,52 @@ class MatchRepo:
             params_ma,
         ).fetchone()[0] > 0
 
-        return {"has_teams": has_teams, "has_bracket": has_bracket}
+        has_tb: bool = self._conn.execute(
+            f"SELECT COUNT(*) FROM matches WHERE {where_m} AND tb_beatmap_id IS NOT NULL",
+            params_m,
+        ).fetchone()[0] > 0
+
+        return {"has_teams": has_teams, "has_bracket": has_bracket, "has_tb": has_tb}
+
+    def tb_incidence(self, *, pool_id: str | None = None,
+                     round_name: str | None = None) -> pd.DataFrame:
+        from .base import match_filter
+        clause, params = match_filter(pool_id, round_name, alias="m")
+        filt = f"WHERE {clause}" if clause else ""
+        return pd.read_sql(
+            sql("matches.tb_incidence").format(filter=filt),
+            self._conn, params=params,
+        )
+
+    def upset_data(self, *, pool_id: str | None = None,
+                   round_name: str | None = None) -> pd.DataFrame:
+        from .base import match_filter
+        clause, params = match_filter(pool_id, round_name, alias="m")
+        filt = f"AND {clause}" if clause else ""
+        df = pd.read_sql(
+            sql("matches.upset_data").format(filter=filt),
+            self._conn, params=params,
+        )
+        if not df.empty and "winner_team" in df.columns:
+            df["upset"] = (df["winner_team"] == df["lower_seed_team"]).astype(int)
+        return df
+
+    def delete_match(self, match_id: int) -> bool:
+        """Delete a match and all associated data from the database.
+
+        Returns True if a match was deleted, False if not found.
+        """
+        # Check if match exists
+        row = self._conn.execute(
+            "SELECT match_id FROM matches WHERE match_id = ?", (match_id,)
+        ).fetchone()
+        if row is None:
+            return False
+
+        # Delete in dependency order (child tables first)
+        self._conn.execute("DELETE FROM game_scores WHERE match_id = ?", (match_id,))
+        self._conn.execute("DELETE FROM match_teams WHERE match_id = ?", (match_id,))
+        self._conn.execute("DELETE FROM match_actions WHERE match_id = ?", (match_id,))
+        self._conn.execute("DELETE FROM matches WHERE match_id = ?", (match_id,))
+        self._conn.commit()
+        return True

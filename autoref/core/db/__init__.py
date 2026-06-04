@@ -63,7 +63,7 @@ class MatchDatabase:
 
         mid = self.matches.save_match_row(match, winner_team_index)
         for i, team in enumerate(match.teams):
-            self.teams.insert_team(mid, i, team.name)
+            self.teams.insert_team(mid, i, team.name, seed=getattr(team, "seed", None))
         self.actions.insert_actions(mid, match.match_status)
         self.scores.insert_scores(mid, getattr(match, "game_scores", []), mults_by_bid)
 
@@ -146,6 +146,51 @@ class MatchDatabase:
                        round_name: str | None = None) -> pd.DataFrame:
         """Return all game scores joined with team data, optionally filtered."""
         return self.scores.all_with_team(pool_id=pool_id, round_name=round_name)
+
+    def get_score_turn_totals(self, *, pool_id: str | None = None,
+                               round_name: str | None = None) -> pd.DataFrame:
+        """Return per-turn team score totals for trajectory plots."""
+        return self.scores.score_turn_totals(pool_id=pool_id, round_name=round_name)
+
+    def get_map_team_scores(self, *, pool_id: str | None = None,
+                            round_name: str | None = None) -> pd.DataFrame:
+        """Return per-map team score totals for closeness/variance plots."""
+        return self.scores.map_team_scores(pool_id=pool_id, round_name=round_name)
+
+    def get_team_pool_scores(self, *, pool_id: str | None = None,
+                             round_name: str | None = None) -> pd.DataFrame:
+        """Return team scores per pool for heatmap plots."""
+        return self.scores.team_pool_scores(pool_id=pool_id, round_name=round_name)
+
+    def get_scores_with_round(self, *, pool_id: str | None = None,
+                              round_name: str | None = None) -> pd.DataFrame:
+        """Return all scores with round/pool metadata for meta plots."""
+        return self.scores.scores_with_round(pool_id=pool_id, round_name=round_name)
+
+    def get_pick_win_rates(self, *, pool_id: str | None = None,
+                           round_name: str | None = None) -> pd.DataFrame:
+        """Return per-map pick counts and picker-win counts."""
+        return self.actions.pick_win_rates(pool_id=pool_id, round_name=round_name)
+
+    def get_first_picks(self, *, pool_id: str | None = None,
+                        round_name: str | None = None) -> pd.DataFrame:
+        """Return first pick per match for opener frequency plots."""
+        return self.actions.first_picks(pool_id=pool_id, round_name=round_name)
+
+    def get_all_actions_ordered(self, *, pool_id: str | None = None,
+                                round_name: str | None = None) -> pd.DataFrame:
+        """Return all match actions ordered by turn for flow/strategy plots."""
+        return self.actions.all_actions_ordered(pool_id=pool_id, round_name=round_name)
+
+    def get_tb_incidence(self, *, pool_id: str | None = None,
+                         round_name: str | None = None) -> pd.DataFrame:
+        """Return tiebreaker incidence per pool."""
+        return self.matches.tb_incidence(pool_id=pool_id, round_name=round_name)
+
+    def get_upset_data(self, *, pool_id: str | None = None,
+                       round_name: str | None = None) -> pd.DataFrame:
+        """Return match data with upset flags for lower-seed win rate plots."""
+        return self.matches.upset_data(pool_id=pool_id, round_name=round_name)
 
     def update_pp_bulk(self,
                        updates: list[tuple[int, float | None, str | None]]) -> int:
