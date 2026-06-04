@@ -39,6 +39,10 @@ export async function loadFilterOptions() {
     roundSel.innerHTML = `<option value="">all rounds</option>` +
       state.filterOptions.rounds.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
     roundSel.hidden = false;
+    // Auto-select OQ26 if it exists
+    if (state.filterOptions.rounds.includes('OQ26')) {
+      roundSel.value = 'OQ26';
+    }
   }
   refreshPoolOptions();
   if (state.filterOptions.pools && state.filterOptions.pools.length >= 1) {
@@ -87,8 +91,11 @@ export function refreshPoolOptions() {
   poolSel.innerHTML = `<option value="">all pools</option>` +
     visiblePools.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   
-  // Auto-select first pool if only one exists and no previous selection
-  if (visiblePools.length === 1 && !prev) {
+  // Auto-select OpenQualifiers4wc26 pool if it exists, otherwise first pool if only one
+  const preferredPool = visiblePools.find(p => p.name === 'OpenQualifiers4wc26' || p.id === 'OpenQualifiers4wc26');
+  if (preferredPool) {
+    poolSel.value = preferredPool.id;
+  } else if (visiblePools.length === 1 && !prev) {
     poolSel.value = visiblePools[0].id;
   } else {
     poolSel.value = visiblePools.some(p => p.id === prev) ? prev : '';
