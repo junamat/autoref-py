@@ -26,6 +26,7 @@ const SECTIONS = [
 ];
 
 let _available = null;
+let _lastPlotCtx = null;
 
 export async function checkPlotsAvailable() {
   if (_available !== null) return _available;
@@ -46,10 +47,24 @@ export async function renderPlots(ctx) {
     return;
   }
 
+  // Build a signature of what affects plots (not method)
   const context = ctx.context ? ctx.context() : {};
+  const poolDefaults = ctx.poolDefaults ? ctx.poolDefaults() : {};
+  const plotCtxSig = JSON.stringify({
+    theme: ctx.theme(),
+    countFailed: ctx.countFailed(),
+    filterParams: ctx.filterParams(),
+    scope: poolDefaults.scope || (context.has_bracket ? 'bracket' : 'qualifiers'),
+    hasBracket: context.has_bracket,
+    hasTb: context.has_tb,
+    rounds: state.filterOptions?.rounds?.length,
+  });
+
+  // Skip re-render if nothing plot-relevant changed
+  if (_lastPlotCtx === plotCtxSig) return;
+  _lastPlotCtx = plotCtxSig;
   
   // Get scope from pool's stats_defaults, or fall back to auto-detection
-  const poolDefaults = ctx.poolDefaults ? ctx.poolDefaults() : {};
   let scope;
   if (poolDefaults.scope === 'qualifiers') {
     scope = SCOPE_QUALIFIERS;
