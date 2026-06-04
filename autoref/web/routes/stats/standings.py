@@ -29,7 +29,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 total_score, avg_z}]}
           has_teams: bool — True when team_index data is present
         """
-        from ....beatmap_cache import get_beatmap_cache
+        from ....core.beatmap_cache import get_beatmap_cache
         predicate = predicate_for(count_failed)
         scores = server.db.get_all_scores(pool_id=pool_id, round_name=round_name)
         code_by_bid = _build_map_code_lookup()
@@ -90,14 +90,15 @@ def register(app: FastAPI, server: "WebServer") -> None:
             bm = beatmap_cache.get(int(bid)) or {}
             
             maps_out.append({
-                "beatmap_id":  int(bid),
-                "name":        code_by_bid.get(int(bid)),
-                "artist":      bm.get("artist", ""),
-                "title":       bm.get("title", ""),
-                "version":     bm.get("version", ""),
-                "mods":        map_mods,
-                "players":     players,
-                "team_totals": team_totals,
+                "beatmap_id":    int(bid),
+                "beatmapset_id": bm.get("beatmapset_id"),
+                "name":          code_by_bid.get(int(bid)),
+                "artist":        bm.get("artist", ""),
+                "title":         bm.get("title", ""),
+                "version":       bm.get("version", ""),
+                "mods":          map_mods,
+                "players":       players,
+                "team_totals":   team_totals,
             })
 
         map_order = _build_map_order_lookup()

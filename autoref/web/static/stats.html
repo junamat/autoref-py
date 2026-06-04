@@ -190,9 +190,11 @@
   .standings-card table { width: 100%; table-layout: auto; }
   .standings-card td, .standings-card th { white-space: nowrap; }
   .standings-card-head {
-    padding: 6px 10px; font-size: 10px; font-weight: 700;
+    display: block; padding: 6px 10px; font-size: 10px; font-weight: 700;
     border-bottom: 1px solid var(--border); background: var(--head);
+    text-decoration: none; color: inherit;
   }
+  .standings-card-head:hover { opacity: 0.85; }
 </style>
 </head>
 <body>

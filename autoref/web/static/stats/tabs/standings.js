@@ -30,11 +30,16 @@ export async function loadStandings() {
   const cards = data.maps.map(m => {
     const color = modColor(m.name, m.mods || m.beatmap_id);
     const code = m.name
-      ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:700">${esc(m.name)}</a>`
+      ? `<span style="color:${color};font-weight:700">${esc(m.name)}</span>`
       : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;
     const meta = (m.artist || m.title || m.version)
       ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(m.artist)} — ${esc(m.title)} [${esc(m.version)}]</div>`
       : '';
+    const banner = m.beatmapset_id
+      ? `linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.85)), url(https://assets.ppy.sh/beatmaps/${m.beatmapset_id}/covers/cover.jpg)`
+      : '';
+    const bannerStyle = banner ? `background-image:${banner};background-size:cover;background-position:center;` : '';
+    const mapUrl = `https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}`;
 
     const rows = m.players.map(p => {
       const rankClass = p.rank <= 3 ? `rank-${p.rank}` : '';
@@ -50,7 +55,7 @@ export async function loadStandings() {
     }).join('');
 
     return `<div class="standings-card">
-      <div class="standings-card-head">${code}${meta}</div>
+      <a class="standings-card-head" href="${mapUrl}" target="_blank" rel="noopener" style="${bannerStyle}">${code}${meta}</a>
       <div class="standings-card-body">
         <table class="stats-table">
           <thead><tr>
@@ -71,11 +76,16 @@ export async function loadStandings() {
     const teamCards = data.maps.map(m => {
       const color = modColor(m.name, m.mods || m.beatmap_id);
       const code = m.name
-        ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:700">${esc(m.name)}</a>`
+        ? `<span style="color:${color};font-weight:700">${esc(m.name)}</span>`
         : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;
       const meta = (m.artist || m.title || m.version)
         ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(m.artist)} — ${esc(m.title)} [${esc(m.version)}]</div>`
         : '';
+      const banner = m.beatmapset_id
+        ? `linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.85)), url(https://assets.ppy.sh/beatmaps/${m.beatmapset_id}/covers/cover.jpg)`
+        : '';
+      const bannerStyle = banner ? `background-image:${banner};background-size:cover;background-position:center;` : '';
+      const mapUrl = `https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}`;
 
       const rows = (m.team_totals || []).map((t, i) => {
         const rank = i + 1;
@@ -89,7 +99,7 @@ export async function loadStandings() {
       }).join('');
 
       return `<div class="standings-card">
-        <div class="standings-card-head">${code}${meta}</div>
+        <a class="standings-card-head" href="${mapUrl}" target="_blank" rel="noopener" style="${bannerStyle}">${code}${meta}</a>
         <div class="standings-card-body">
           <table class="stats-table">
             <thead><tr>
