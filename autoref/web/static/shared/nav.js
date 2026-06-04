@@ -20,7 +20,7 @@ export async function initNav({ active = null } = {}) {
 
   const parts = [];
   if (active !== 'stats')
-    parts.push('<a href="/stats" class="ghost-btn" style="text-decoration:none">stats</a>');
+    parts.push('<a href="/" class="ghost-btn" style="text-decoration:none">stats</a>');
   if (isPriv) {
     if (active !== 'ref')
       parts.push('<a href="/ref" class="ghost-btn" style="text-decoration:none">ref</a>');

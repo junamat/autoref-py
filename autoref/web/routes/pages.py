@@ -18,40 +18,40 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.get("/")
     async def index():
-        return FileResponse(server.static_dir / "index.html")
+        return FileResponse(server.static_dir / "stats.html")
 
     @app.get("/ref")
     async def ref_dashboard(request: Request):
         if _is_restricted(request):
-            return RedirectResponse("/stats", status_code=302)
+            return RedirectResponse("/", status_code=302)
         return FileResponse(server.static_dir / "ref.html")
 
     @app.get("/pool-builder")
     async def pool_builder(request: Request):
         if _is_restricted(request):
-            return RedirectResponse("/stats", status_code=302)
+            return RedirectResponse("/", status_code=302)
         return FileResponse(server.static_dir / "pool_builder.html")
 
     @app.get("/stats")
     async def stats_page():
-        return FileResponse(server.static_dir / "stats.html")
+        return RedirectResponse("/", status_code=302)
 
     @app.get("/match/{match_id}")
     async def match_view(match_id: str, request: Request):
         if _is_restricted(request):
-            return RedirectResponse("/stats", status_code=302)
+            return RedirectResponse("/", status_code=302)
         return FileResponse(server.static_dir / "ref.html")
 
     @app.get("/settings")
     async def settings_page(request: Request):
         if _is_restricted(request):
-            return RedirectResponse("/stats", status_code=302)
+            return RedirectResponse("/", status_code=302)
         return FileResponse(server.static_dir / "settings.html")
 
     @app.get("/matches/new")
     async def matches_new_page(request: Request):
         if _is_restricted(request):
-            return RedirectResponse("/stats", status_code=302)
+            return RedirectResponse("/", status_code=302)
         return FileResponse(server.static_dir / "matches_new.html")
 
     @app.get("/login")
@@ -73,5 +73,5 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/mp-import")
     async def mp_import_page(request: Request):
         if _is_restricted(request):
-            return RedirectResponse("/stats", status_code=302)
+            return RedirectResponse("/", status_code=302)
         return FileResponse(server.static_dir / "mp_import.html")
