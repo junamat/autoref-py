@@ -56,5 +56,26 @@ document.getElementById('cfg-pool').addEventListener('change', () => {
   load();
 });
 
+/* ── plot zoom modal ─────────────────────────────────────────── */
+const plotModal = document.getElementById('plot-modal');
+const plotModalImg = document.getElementById('plot-modal-img');
+const plotModalClose = plotModal.querySelector('.plot-modal-close');
+const plotModalOverlay = plotModal.querySelector('.plot-modal-overlay');
+
+document.addEventListener('click', e => {
+  const img = e.target.closest('.plot-block[data-clickable] .plot-img');
+  if (!img) return;
+  e.preventDefault();
+  const hiresSrc = img.src.replace(/format=png/, 'format=hires');
+  plotModalImg.src = hiresSrc;
+  plotModalImg.alt = img.alt;
+  plotModal.hidden = false;
+});
+
+function closePlotModal() { plotModal.hidden = true; plotModalImg.src = ''; }
+plotModalClose.addEventListener('click', closePlotModal);
+plotModalOverlay.addEventListener('click', closePlotModal);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !plotModal.hidden) closePlotModal(); });
+
 /* ── boot ────────────────────────────────────────────────────── */
 loadFilterOptions().then(() => { applyPoolDefaults(); loadContext(); load(); });

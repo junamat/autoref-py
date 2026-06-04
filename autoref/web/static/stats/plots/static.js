@@ -44,7 +44,7 @@ register({
       const label = sel.options[sel.selectedIndex]?.dataset.label || sel.value;
       dist.innerHTML = plotBlock(ctx, 'score_distribution',
         `Score distribution · ${label}`,
-        { beatmap_id: sel.value, label });
+        { beatmap_id: sel.value, label, clickable: false });
     };
     sel.addEventListener('change', renderDist);
     renderDist();

@@ -127,6 +127,20 @@
     gap: 16px;
   }
   .plot-block { min-height: 400px; }
+  .plot-block[data-clickable] .plot-img { cursor: zoom-in; }
+
+  /* plot zoom modal */
+  #plot-modal { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; }
+  #plot-modal[hidden] { display: none; }
+  .plot-modal-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); }
+  .plot-modal-content { position: relative; max-width: 95vw; max-height: 95vh; }
+  .plot-modal-content img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 4px; }
+  .plot-modal-close {
+    position: absolute; top: -36px; right: 0;
+    background: none; border: none; color: var(--text); font-size: 28px;
+    cursor: pointer; line-height: 1; padding: 4px 8px;
+  }
+  .plot-modal-close:hover { color: var(--blue); }
 
   /* interactive scatter */
   .iplot { width: 100%; display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 2px; }
@@ -320,6 +334,16 @@
 
   </div>
 </div>
+
+<!-- plot zoom modal -->
+<div id="plot-modal" hidden>
+  <div class="plot-modal-overlay"></div>
+  <div class="plot-modal-content">
+    <button class="plot-modal-close" aria-label="close">&times;</button>
+    <img id="plot-modal-img" alt="">
+  </div>
+</div>
+
 <script type="module" src="/static/stats.js"></script>
 </body>
 </html>

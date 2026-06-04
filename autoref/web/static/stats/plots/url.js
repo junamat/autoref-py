@@ -20,7 +20,8 @@ export function plotBlock(ctx, name, title, params = {}) {
   const baseQs = buildQs(ctx, params);
   const svgUrl = `/api/stats/plot/${name}?format=svg&${baseQs.toString()}`;
   const hiresUrl = `/api/stats/plot/${name}?format=hires&${baseQs.toString()}`;
-  return `<div class="plot-block" data-plot="${esc(name)}">
+  const clickable = params.clickable !== false;
+  return `<div class="plot-block" data-plot="${esc(name)}"${clickable ? ' data-clickable="true"' : ''}>
     <div class="plot-head">
       <span class="plot-title">${esc(title)}</span>
       <div class="plot-actions">
