@@ -28,7 +28,8 @@ export function renderMappool(rows) {
     const label = r.name || r.beatmap_id;
     const href = `https://osu.ppy.sh/b/${encodeURIComponent(r.beatmap_id)}`;
     // Pool mod takes priority over player mods for color
-    const color = modColor(r.name, r.pool_mod || r.mods || r.beatmap_id);
+    const modsArg = r.pool_mod ? [r.pool_mod] : (r.mods && r.mods.length ? r.mods : r.beatmap_id);
+    const color = modColor(r.name, modsArg);
     const picked = r.protects_picked ?? 0;
     const unused = r.protects_unused ?? 0;
     const meta = (r.artist || r.title || r.version)
