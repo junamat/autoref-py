@@ -1,11 +1,18 @@
 'use strict';
 
 import { esc } from '/static/shared/util.js';
+import { modColor } from '/static/shared/modColors.js';
 
-export function mapLink(name, beatmapId) {
+export function mapLink(name, beatmapIdOrMods, mods) {
+  let beatmapId = beatmapIdOrMods;
+  if (typeof beatmapIdOrMods === 'object' && !Array.isArray(beatmapIdOrMods)) {
+    beatmapId = beatmapIdOrMods.beatmap_id;
+    mods = beatmapIdOrMods.mods;
+  }
   const href = `https://osu.ppy.sh/b/${encodeURIComponent(beatmapId)}`;
   const label = name || beatmapId;
-  return `<a href="${href}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:700;text-decoration:none">${esc(label)}</a>`;
+  const color = modColor(name, mods || beatmapId);
+  return `<a href="${href}" target="_blank" rel="noopener" style="color:${color};font-weight:700;text-decoration:none">${esc(label)}</a>`;
 }
 
 export function renderPpTable(rows, mode) {
@@ -20,7 +27,7 @@ export function renderPpTable(rows, mode) {
     return `<tr>
       <td class="rank-cell">${i + 1}</td>
       <td>${esc(r.username || r.user_id)}</td>
-      <td>${mapLink(r.name, r.beatmap_id)}${modsBadge}</td>
+      <td>${mapLink(r.name, r.beatmap_id, r.mods)}${modsBadge}</td>
       <td class="r mono">${r.score.toLocaleString()}</td>
       <td class="r" style="color:var(--green)">${(r.accuracy * 100).toFixed(2)}%</td>
       ${ppCell}
@@ -73,7 +80,7 @@ export function renderCarryTable(rows) {
     return `<tr>
       <td class="rank-cell">${i + 1}</td>
       <td>${esc(r.username || r.user_id)}</td>
-      <td>${mapLink(r.name, r.beatmap_id)}${modsBadge}</td>
+      <td>${mapLink(r.name, r.beatmap_id, r.mods)}${modsBadge}</td>
       <td class="r mono">${r.score.toLocaleString()}</td>
       <td class="r" style="color:var(--green)">${(r.accuracy * 100).toFixed(2)}%</td>
       <td class="r mono xs muted" title="player z">${r.z.toFixed(2)}</td>

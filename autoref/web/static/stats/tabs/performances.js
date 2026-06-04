@@ -2,7 +2,7 @@
 
 import { esc, activeVal } from '/static/shared/util.js';
 import { state, invalidateTabs } from '../state.js';
-import { currentFilterParams } from '../filters.js';
+import { currentFilterParams, currentPoolDefaults } from '../filters.js';
 import { buildMethodToggle } from '../methods.js';
 import { renderLeaderboard } from '../tables/leaderboard.js';
 import { renderMappool } from '../tables/mappool.js';
@@ -18,6 +18,8 @@ function buildPlotCtx(mappoolRows) {
     theme: () => document.body.classList.contains('light') ? 'light' : 'dark',
     countFailed: () => activeVal('cfg-failed') !== 'false',
     filterParams: () => currentFilterParams(),
+    context: () => state.context || {},
+    poolDefaults: () => currentPoolDefaults(),
   };
 }
 

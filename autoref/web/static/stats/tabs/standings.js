@@ -1,6 +1,7 @@
 'use strict';
 
 import { esc, activeVal } from '/static/shared/util.js';
+import { modColor } from '/static/shared/modColors.js';
 import { state } from '../state.js';
 import { currentFilterParams } from '../filters.js';
 
@@ -27,9 +28,10 @@ export async function loadStandings() {
   }
 
   const cards = data.maps.map(m => {
+    const color = modColor(m.name, m.mods || m.beatmap_id);
     const title = m.name
-      ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;font-weight:700">${esc(m.name)}</a>`
-      : `<span style="color:var(--blue);font-weight:700">${m.beatmap_id}</span>`;
+      ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:700">${esc(m.name)}</a>`
+      : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;
 
     const rows = m.players.map(p => {
       const rankClass = p.rank <= 3 ? `rank-${p.rank}` : '';
@@ -64,9 +66,10 @@ export async function loadStandings() {
   if (data.has_teams && teamSection && state.context?.has_teams !== false) {
     teamSection.hidden = false;
     const teamCards = data.maps.map(m => {
+      const color = modColor(m.name, m.mods || m.beatmap_id);
       const title = m.name
-        ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;font-weight:700">${esc(m.name)}</a>`
-        : `<span style="color:var(--blue);font-weight:700">${m.beatmap_id}</span>`;
+        ? `<a href="https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:700">${esc(m.name)}</a>`
+        : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;
 
       const rows = (m.team_totals || []).map((t, i) => {
         const rank = i + 1;

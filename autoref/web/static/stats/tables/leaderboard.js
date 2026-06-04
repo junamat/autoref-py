@@ -1,6 +1,7 @@
 'use strict';
 
 import { esc } from '/static/shared/util.js';
+import { modColor } from '/static/shared/modColors.js';
 
 const GRADE_COLOR = {
   X: 'var(--yellow)', XH: 'var(--yellow)',
@@ -16,13 +17,14 @@ function bestCell(best) {
   if (!best) return '<span class="muted">—</span>';
   const label = best.name || best.beatmap_id;
   const href = `https://osu.ppy.sh/b/${encodeURIComponent(best.beatmap_id)}`;
+  const color = modColor(best.name, best.mods || best.beatmap_id);
   const grade = best.rank || '';
   const gradeColor = GRADE_COLOR[grade] || 'var(--muted)';
   const mods = (best.mods || []).join('');
   const modsBadge = mods ? `<span style="font-size:9px;color:var(--yellow);margin-left:4px">+${esc(mods)}</span>` : '';
   return `
     <span style="display:inline-flex;align-items:center;gap:6px">
-      <a href="${href}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:700;text-decoration:none">${esc(label)}</a>${modsBadge}
+      <a href="${href}" target="_blank" rel="noopener" style="color:${color};font-weight:700;text-decoration:none">${esc(label)}</a>${modsBadge}
       <span style="color:${gradeColor};font-weight:700;font-size:10px">${esc(grade)}</span>
       <span class="mono xs muted">${(best.accuracy * 100).toFixed(2)}%</span>
       <span class="mono xs">${best.score.toLocaleString()}</span>

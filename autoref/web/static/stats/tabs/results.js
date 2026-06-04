@@ -1,6 +1,7 @@
 'use strict';
 
 import { esc, activeVal } from '/static/shared/util.js';
+import { modColor } from '/static/shared/modColors.js';
 import { state } from '../state.js';
 import { currentFilterParams } from '../filters.js';
 
@@ -36,7 +37,8 @@ export async function loadResults() {
   const headerCells = maps.map(m => {
     const label = m.name || m.beatmap_id;
     const href = `https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}`;
-    return `<th class="r" style="white-space:nowrap"><a href="${href}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">${esc(label)}</a></th>`;
+    const color = modColor(m.name, m.mods || m.beatmap_id);
+    return `<th class="r" style="white-space:nowrap"><a href="${href}" target="_blank" rel="noopener" style="color:${color};text-decoration:none">${esc(label)}</a></th>`;
   }).join('');
 
   const bodyRows = teams.map((t, i) => {

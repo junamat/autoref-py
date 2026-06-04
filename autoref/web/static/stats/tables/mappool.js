@@ -1,6 +1,7 @@
 'use strict';
 
 import { esc } from '/static/shared/util.js';
+import { modColor } from '/static/shared/modColors.js';
 import { state } from '../state.js';
 
 export function renderMappool(rows) {
@@ -16,15 +17,17 @@ export function renderMappool(rows) {
     if (aOrder !== bOrder) return aOrder - bOrder;
     return (b.picks + b.bans + b.protects) - (a.picks + a.bans + a.protects);
   });
-  const maxPicks = Math.max(...rows.map(r => r.picks), 1);
   const hasBracket = state.context?.has_bracket !== false;
+  const maxVal = Math.max(...rows.map(r => hasBracket ? r.picks : (r.play_count || 0)), 1);
 
   const tbody = rows.map(r => {
-    const barW = Math.round((r.picks / maxPicks) * 60);
+    const val = hasBracket ? r.picks : (r.play_count || 0);
+    const barW = Math.round((val / maxVal) * 60);
     const avgFmt = r.avg_score != null ? Math.round(r.avg_score).toLocaleString() : '—';
     const accFmt = r.avg_acc != null ? `${(r.avg_acc * 100).toFixed(2)}%` : '—';
     const label = r.name || r.beatmap_id;
     const href = `https://osu.ppy.sh/b/${encodeURIComponent(r.beatmap_id)}`;
+    const color = modColor(r.name, r.mods || r.beatmap_id);
     const picked = r.protects_picked ?? 0;
     const unused = r.protects_unused ?? 0;
     const bracketCells = hasBracket ? `
@@ -33,8 +36,8 @@ export function renderMappool(rows) {
       <td class="r" style="color:var(--green)" title="protects that were then picked">${picked}</td>
       <td class="r" style="color:var(--muted)" title="protects that were not picked">${unused}</td>` : '';
     return `<tr>
-      <td class="mono" style="font-weight:700" title="beatmap ${esc(r.beatmap_id)}"><a href="${href}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">${esc(label)}</a></td>
-      <td class="r" style="color:var(--blue)">${r.picks}
+      <td class="mono" style="font-weight:700" title="beatmap ${esc(r.beatmap_id)}"><a href="${href}" target="_blank" rel="noopener" style="color:${color};text-decoration:none">${esc(label)}</a></td>
+      <td class="r" style="color:var(--blue)">${val}
         <span class="pick-bar" style="width:${barW}px;background:var(--blue);opacity:0.5"></span>
       </td>${bracketCells}
       <td class="r">${avgFmt}</td>
@@ -47,11 +50,12 @@ export function renderMappool(rows) {
       <th class="r">prot</th>
       <th class="r" title="protects that were then picked">prot ✓</th>
       <th class="r" title="protects that were not picked">prot ✗</th>` : '';
+  const firstColHeader = hasBracket ? 'picks' : 'played';
 
   wrap.innerHTML = `<table class="stats-table">
     <thead><tr>
       <th>map</th>
-      <th class="r">picks</th>${bracketHeaders}
+      <th class="r">${firstColHeader}</th>${bracketHeaders}
       <th class="r">avg score</th>
       <th class="r">avg acc</th>
     </tr></thead>

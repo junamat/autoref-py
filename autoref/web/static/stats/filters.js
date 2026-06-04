@@ -1,6 +1,7 @@
 'use strict';
 
 import { esc } from '/static/shared/util.js';
+import { setCustomColors } from '/static/shared/modColors.js';
 import { state, invalidateTabs } from './state.js';
 
 export function currentFilterParams() {
@@ -22,6 +23,12 @@ export async function loadFilterOptions() {
     const res = await fetch('/api/stats/filters');
     if (!res.ok) return;
     state.filterOptions = await res.json();
+    const pool = document.getElementById('cfg-pool')?.value || '';
+    if (pool && state.filterOptions.pool_colors?.[pool]) {
+      setCustomColors(state.filterOptions.pool_colors[pool]);
+    } else {
+      setCustomColors({});
+    }
   } catch { return; }
 
   const roundSel = document.getElementById('cfg-round');
@@ -34,7 +41,7 @@ export async function loadFilterOptions() {
     roundSel.hidden = false;
   }
   refreshPoolOptions();
-  if (state.filterOptions.pools && state.filterOptions.pools.length > 1) {
+  if (state.filterOptions.pools && state.filterOptions.pools.length >= 1) {
     poolSel.hidden = false;
     poolLbl.hidden = false;
   }
@@ -79,13 +86,32 @@ export function refreshPoolOptions() {
   const prev = poolSel.value;
   poolSel.innerHTML = `<option value="">all pools</option>` +
     visiblePools.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
-  poolSel.value = visiblePools.some(p => p.id === prev) ? prev : '';
+  
+  // Auto-select first pool if only one exists and no previous selection
+  if (visiblePools.length === 1 && !prev) {
+    poolSel.value = visiblePools[0].id;
+  } else {
+    poolSel.value = visiblePools.some(p => p.id === prev) ? prev : '';
+  }
 
   if (visiblePools.length <= 1 && (state.filterOptions.pools.length <= 1)) {
-    poolSel.hidden = true;
-    poolLbl.hidden = true;
+    // Still show selector if there's at least 1 pool in store
+    if (state.filterOptions.pools.length === 0) {
+      poolSel.hidden = true;
+      poolLbl.hidden = true;
+    } else {
+      poolSel.hidden = false;
+      poolLbl.hidden = false;
+    }
   } else {
     poolSel.hidden = false;
     poolLbl.hidden = false;
+  }
+
+  const pool = poolSel.value;
+  if (pool && state.filterOptions.pool_colors?.[pool]) {
+    setCustomColors(state.filterOptions.pool_colors[pool]);
+  } else {
+    setCustomColors({});
   }
 }
