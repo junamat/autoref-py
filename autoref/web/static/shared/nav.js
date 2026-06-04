@@ -34,8 +34,6 @@ export async function initNav({ active = null } = {}) {
   if (account) {
     if (active !== 'account')
       parts.push('<a href="/account" class="ghost-btn" style="text-decoration:none">account</a>');
-  } else {
-    parts.push('<a href="/login" class="ghost-btn" style="text-decoration:none">login</a>');
   }
 
   container.innerHTML = parts.join('');
