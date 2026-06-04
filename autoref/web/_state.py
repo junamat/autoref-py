@@ -71,10 +71,11 @@ def _build_map_order_lookup() -> dict[int, int]:
 
 
 def _build_map_mod_group_lookup() -> dict[int, str]:
-    """Walk every saved pool, return {beatmap_id: mod_group} (e.g. {3814680: "NM"}).
+    """Walk every saved pool, return {beatmap_id: mod_group} (e.g. {3814680: "HD"}).
 
-    Strips trailing digits from the map code to get the mod group.
-    On collisions across pools, the last one wins.
+    Uses the map node's `mods` field from the pool tree. Falls back to stripping
+    digits from the code if mods is empty. On collisions across pools, the last
+    one wins.
     """
     lookup: dict[int, str] = {}
 
@@ -82,10 +83,15 @@ def _build_map_mod_group_lookup() -> dict[int, str]:
         for n in nodes:
             if n.get("type") == "map":
                 bid = n.get("bid")
-                code = n.get("code")
-                if bid and code:
+                mods = n.get("mods", "")
+                code = n.get("code", "")
+                if bid:
                     try:
-                        lookup[int(bid)] = str(code).rstrip("0123456789") or "NM"
+                        bid_int = int(bid)
+                        if mods:
+                            lookup[bid_int] = str(mods)
+                        elif code and bid_int not in lookup:
+                            lookup[bid_int] = str(code).rstrip("0123456789") or "NM"
                     except (TypeError, ValueError):
                         pass
             elif n.get("children"):
