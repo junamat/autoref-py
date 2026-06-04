@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+
 import numpy as np
 import pandas as pd
 
@@ -37,7 +38,7 @@ def player_mod_radar(
         return _encode(fig, fmt)
 
     mod_group_by_bid = mod_group_by_bid or {}
-    
+
     def _get_mod_group(row):
         # First try actual mods played on this score
         if "mods" in row and pd.notna(row["mods"]):
@@ -49,13 +50,13 @@ def player_mod_radar(
                         return "".join(sorted(filtered))
             except Exception:
                 pass
-        
+
         # Fall back to pool structure, but ignore generic group names
         pool_group = mod_group_by_bid.get(int(row["beatmap_id"]))
         if pool_group and pool_group.upper() not in ("MAP", "MISC", ""):
             return pool_group
         return "NM"
-    
+
     df["mod_group"] = df.apply(_get_mod_group, axis=1)
 
     df = df.sort_values("score", ascending=False).drop_duplicates(

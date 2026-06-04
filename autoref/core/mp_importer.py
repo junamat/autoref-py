@@ -41,7 +41,7 @@ def _score_to_dict(s: Any, users: dict[int, str]) -> dict:
     match_obj = getattr(s, "match", None)
     if match_obj is not None:
         team = getattr(match_obj, "team", None)
-    
+
     # Extract hit counts from statistics
     stats = getattr(s, "statistics", None)
     nmiss = getattr(stats, "count_miss", 0) if stats else 0
@@ -50,7 +50,7 @@ def _score_to_dict(s: Any, users: dict[int, str]) -> dict:
     n300 = getattr(stats, "count_300", 0) if stats else 0
     ngeki = getattr(stats, "count_geki", 0) if stats else 0
     nkatu = getattr(stats, "count_katu", 0) if stats else 0
-    
+
     return {
         "user_id": int(s.user_id),
         "username": users.get(int(s.user_id)),

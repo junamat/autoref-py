@@ -105,7 +105,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 if _json.loads(m) if m else []:
                     all_mods.extend(_json.loads(m))
             mods_by_bid[int(bid)] = list(set(all_mods))
-        
+
         map_order = [
             {
                 "beatmap_id": int(b),

@@ -106,7 +106,7 @@ class Lobby:
         return self._lobby
 
     @property
-    def channel(self) -> bancho.BanchoLobbyChannel:
+    def channel(self) -> bancho.BanchoChannel:
         return self._lb.channel
 
     @property

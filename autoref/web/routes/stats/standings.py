@@ -91,10 +91,10 @@ def register(app: FastAPI, server: "WebServer") -> None:
             map_mods = []
             if players:
                 map_mods = players[0].get("mods", [])
-            
+
             # Get beatmap metadata from cache
             bm = beatmap_cache.get(int(bid)) or {}
-            
+
             maps_out.append({
                 "beatmap_id":    int(bid),
                 "beatmapset_id": bm.get("beatmapset_id"),

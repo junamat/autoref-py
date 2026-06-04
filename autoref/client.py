@@ -29,7 +29,7 @@ def make_client() -> aiosu.v2.Client:
 
 async def safe_api_call(func, *args, **kwargs):
     """Execute an API call with automatic logout on token expiration.
-    
+
     Catches RefreshTokenExpiredError and returns None to signal the caller
     should log the user out.
     """

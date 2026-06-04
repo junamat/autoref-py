@@ -1,4 +1,4 @@
-from ..schemas.pool import PoolDetail, PoolSummary, StatsDefaults
+from ..schemas.pool import PoolDetail, PoolSummary
 
 
 def pool_to_summary(pool: dict) -> PoolSummary:
