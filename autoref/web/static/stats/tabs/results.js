@@ -37,7 +37,8 @@ export async function loadResults() {
   const headerCells = maps.map(m => {
     const label = m.name || m.beatmap_id;
     const href = `https://osu.ppy.sh/b/${encodeURIComponent(m.beatmap_id)}`;
-    const color = modColor(m.name, m.mods || m.beatmap_id);
+    const modsArg = m.pool_mod ? [m.pool_mod] : (m.mods && m.mods.length ? m.mods : m.beatmap_id);
+    const color = modColor(m.name, modsArg);
     return `<th class="r" style="white-space:nowrap"><a href="${href}" target="_blank" rel="noopener" style="color:${color};text-decoration:none">${esc(label)}</a></th>`;
   }).join('');
 

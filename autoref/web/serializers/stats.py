@@ -18,6 +18,8 @@ def build_mappool_row(
     order_by_bid: dict[int, int],
     mods_by_bid: dict[int, list[str]] | None = None,
     play_count_by_map: dict[int, int] | None = None,
+    beatmap_cache=None,
+    pool_mods_by_bid: dict[int, str] | None = None,
 ) -> MapPoolRow:
     """Build one MapPoolRow from aggregated DB query results."""
     split = split_by_bid.get(bid, {})
@@ -34,8 +36,16 @@ def build_mappool_row(
         avg_acc=acc_by_map.get(bid),
         play_count=play_count_by_map.get(bid, 0) if play_count_by_map else 0,
     )
+    # Pool mods take priority over player mods for color inference
+    if pool_mods_by_bid and bid in pool_mods_by_bid:
+        row["pool_mod"] = pool_mods_by_bid[bid]
     if mods_by_bid and bid in mods_by_bid:
         row["mods"] = mods_by_bid[bid]
+    if beatmap_cache:
+        bm = beatmap_cache.get(bid) or {}
+        row["artist"] = bm.get("artist", "")
+        row["title"] = bm.get("title", "")
+        row["version"] = bm.get("version", "")
     return row
 
 

@@ -28,7 +28,8 @@ export async function loadStandings() {
   }
 
   const cards = data.maps.map(m => {
-    const color = modColor(m.name, m.mods || m.beatmap_id);
+    const modsArg = m.pool_mod ? [m.pool_mod] : (m.mods && m.mods.length ? m.mods : m.beatmap_id);
+    const color = modColor(m.name, modsArg);
     const code = m.name
       ? `<span style="color:${color};font-weight:700">${esc(m.name)}</span>`
       : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;
@@ -75,7 +76,8 @@ export async function loadStandings() {
   if (data.has_teams && teamSection && state.context?.has_teams !== false) {
     teamSection.hidden = false;
     const teamCards = data.maps.map(m => {
-      const color = modColor(m.name, m.mods || m.beatmap_id);
+      const modsArg = m.pool_mod ? [m.pool_mod] : (m.mods && m.mods.length ? m.mods : m.beatmap_id);
+      const color = modColor(m.name, modsArg);
       const code = m.name
         ? `<span style="color:${color};font-weight:700">${esc(m.name)}</span>`
         : `<span style="color:${color};font-weight:700">${m.beatmap_id}</span>`;

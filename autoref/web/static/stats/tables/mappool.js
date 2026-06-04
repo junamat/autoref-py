@@ -27,16 +27,24 @@ export function renderMappool(rows) {
     const accFmt = r.avg_acc != null ? `${(r.avg_acc * 100).toFixed(2)}%` : '—';
     const label = r.name || r.beatmap_id;
     const href = `https://osu.ppy.sh/b/${encodeURIComponent(r.beatmap_id)}`;
-    const color = modColor(r.name, r.mods || r.beatmap_id);
+    // Pool mod takes priority over player mods for color
+    const modsArg = r.pool_mod ? [r.pool_mod] : (r.mods && r.mods.length ? r.mods : r.beatmap_id);
+    const color = modColor(r.name, modsArg);
     const picked = r.protects_picked ?? 0;
     const unused = r.protects_unused ?? 0;
+    const meta = (r.artist || r.title || r.version)
+      ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(r.artist)} — ${esc(r.title)} [${esc(r.version)}]</div>`
+      : '';
     const bracketCells = hasBracket ? `
       <td class="r" style="color:var(--red)">${r.bans}</td>
       <td class="r" style="color:var(--yellow)" title="protects total">${r.protects}</td>
       <td class="r" style="color:var(--green)" title="protects that were then picked">${picked}</td>
       <td class="r" style="color:var(--muted)" title="protects that were not picked">${unused}</td>` : '';
     return `<tr>
-      <td class="mono" style="font-weight:700" title="beatmap ${esc(r.beatmap_id)}"><a href="${href}" target="_blank" rel="noopener" style="color:${color};text-decoration:none">${esc(label)}</a></td>
+      <td class="mono" style="font-weight:700" title="beatmap ${esc(r.beatmap_id)}">
+        <a href="${href}" target="_blank" rel="noopener" style="color:${color};text-decoration:none">${esc(label)}</a>
+        ${meta}
+      </td>
       <td class="r" style="color:var(--blue)">${val}
         <span class="pick-bar" style="width:${barW}px;background:var(--blue);opacity:0.5"></span>
       </td>${bracketCells}

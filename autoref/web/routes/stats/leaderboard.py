@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from ...serializers.stats import build_mappool_row, enrich_leaderboard_rows
-from ._common import _build_map_code_lookup, _build_map_order_lookup, predicate_for
+from ._common import _build_map_code_lookup, _build_map_mod_group_lookup, _build_map_order_lookup, predicate_for
 
 if TYPE_CHECKING:
     from ...server import WebServer
@@ -19,6 +19,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/stats")
     async def api_stats(method: str = "zscore", count_failed: bool = True, aggregate: str = "sum",
                         pool_id: str | None = None, round_name: str | None = None):
+        from ....core.beatmap_cache import get_beatmap_cache
         from ....core.stats import METHODS, PP_METHODS, leaderboard_async
         if method not in METHODS:
             return JSONResponse({"error": f"unknown method: {method}"}, status_code=400)
@@ -84,8 +85,10 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
         code_by_bid = _build_map_code_lookup()
         order_by_bid = _build_map_order_lookup()
+        pool_mods_by_bid = _build_map_mod_group_lookup()
+        beatmap_cache = get_beatmap_cache()
         mappool = [
-            build_mappool_row(bid, counts, split_by_bid, avg_by_map, acc_by_map, code_by_bid, order_by_bid, mods_by_bid, play_count_by_map)
+            build_mappool_row(bid, counts, split_by_bid, avg_by_map, acc_by_map, code_by_bid, order_by_bid, mods_by_bid, play_count_by_map, beatmap_cache, pool_mods_by_bid)
             for bid, counts in pool_rows.items()
         ]
 
