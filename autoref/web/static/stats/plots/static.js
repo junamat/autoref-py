@@ -1,12 +1,13 @@
 'use strict';
 
 import { esc } from '/static/shared/util.js';
-import { register, SECTION_MAPPOOL, SECTION_PERF } from './registry.js';
+import { register, SECTION_MAPPOOL, SECTION_MAP_ANALYSIS, SCOPE_BRACKET, SCOPE_QUALIFIERS } from './registry.js';
 import { plotBlock } from './url.js';
 
 register({
   name: 'pickban_heat',
   section: SECTION_MAPPOOL,
+  scope: SCOPE_BRACKET,
   mount(host, ctx) {
     host.innerHTML = plotBlock(ctx, 'pickban_heat', 'Pick / ban / protect heat');
   },
@@ -14,14 +15,17 @@ register({
 
 register({
   name: 'score_distribution',
-  section: SECTION_PERF,
+  section: SECTION_MAP_ANALYSIS,
+  scope: SCOPE_QUALIFIERS,
   mount(host, ctx) {
-    const played = ctx.mappoolRows.filter(r => r.avg_score != null);
+    const rows = ctx.mappoolRows || [];
+    const played = rows.filter(r => r.avg_score != null);
+    if (!rows.length) {
+      host.innerHTML = `<div class="empty-msg">select a pool to see per-map distributions</div>`;
+      return;
+    }
     if (!played.length) {
-      host.innerHTML = `
-        <div class="plot-controls"><span>no played maps yet</span></div>
-        <div id="plot-distribution"></div>
-      `;
+      host.innerHTML = `<div class="empty-msg">no played maps yet</div>`;
       return;
     }
     const opts = played.map(r => {

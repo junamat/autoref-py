@@ -1,7 +1,7 @@
 'use strict';
 
 import { esc } from '/static/shared/util.js';
-import { register, SECTION_PERF } from './registry.js';
+import { register, SECTION_PLAYER, SCOPE_QUALIFIERS } from './registry.js';
 
 function shellHtml(ctx) {
   const baseQs = new URLSearchParams({
@@ -172,7 +172,8 @@ function renderSVG(host, data) {
 
 register({
   name: 'consistency_scatter',
-  section: SECTION_PERF,
+  section: SECTION_PLAYER,
+  scope: SCOPE_QUALIFIERS,
   async mount(host, ctx) {
     host.innerHTML = shellHtml(ctx);
     const inner = host.querySelector('#iplot-consistency');
