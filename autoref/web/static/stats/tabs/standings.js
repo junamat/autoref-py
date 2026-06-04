@@ -51,6 +51,7 @@ export async function loadStandings() {
         <td class="r mono xs">${p.score.toLocaleString()}</td>
         <td class="r" style="color:var(--green)">${(p.accuracy * 100).toFixed(2)}%</td>
         <td class="r mono xs muted">${p.z.toFixed(2)}</td>
+        <td class="r mono xs muted">${p.z_acc.toFixed(2)}</td>
       </tr>`;
     }).join('');
 
@@ -60,7 +61,7 @@ export async function loadStandings() {
         <table class="stats-table">
           <thead><tr>
             <th>#</th><th>player</th>
-            <th class="r">score</th><th class="r">acc</th><th class="r">z</th>
+            <th class="r">score</th><th class="r">acc</th><th class="r">z</th><th class="r">z-acc</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -95,6 +96,7 @@ export async function loadStandings() {
           <td style="font-weight:700">${esc(t.team_name)}</td>
           <td class="r mono xs">${t.total_score.toLocaleString()}</td>
           <td class="r mono xs muted">${t.avg_z.toFixed(2)}</td>
+          <td class="r mono xs muted">${t.avg_z_acc.toFixed(2)}</td>
         </tr>`;
       }).join('');
 
@@ -104,7 +106,7 @@ export async function loadStandings() {
           <table class="stats-table">
             <thead><tr>
               <th>#</th><th>team</th>
-              <th class="r">total score</th><th class="r">avg z</th>
+              <th class="r">total score</th><th class="r">avg z</th><th class="r">avg z-acc</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>

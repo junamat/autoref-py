@@ -49,6 +49,10 @@ def register(app: FastAPI, server: "WebServer") -> None:
         df = df.join(map_stats, on="beatmap_id")
         df["z"] = ((df["score"] - df["mean"]) / df["std"]).fillna(0.0)
 
+        acc_stats = df.groupby("beatmap_id")["accuracy"].agg(["mean", "std"])
+        df = df.join(acc_stats, on="beatmap_id", rsuffix="_acc")
+        df["z_acc"] = ((df["accuracy"] - df["mean_acc"]) / df["std_acc"]).fillna(0.0)
+
         has_teams = df["team_name"].notna().any() if "team_name" in df.columns else False
 
         beatmap_cache = get_beatmap_cache()
@@ -66,6 +70,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                     "score":      int(r["score"]),
                     "accuracy":   round(float(r["accuracy"]), 4),
                     "z":          round(float(r["z"]), 3),
+                    "z_acc":      round(float(r["z_acc"]), 3),
                     "mods":       mods,
                     "rank_grade": (r["rank"] if pd.notna(r["rank"]) else None),
                 })
@@ -79,6 +84,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                         "team_name":   str(tname),
                         "total_score": int(tgrp["score"].sum()),
                         "avg_z":       round(float(tgrp["z"].mean()), 3),
+                        "avg_z_acc":   round(float(tgrp["z_acc"].mean()), 3),
                     })
                 team_totals.sort(key=lambda t: -cast(int, t["total_score"]))
 
