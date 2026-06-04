@@ -25,7 +25,7 @@ register({
 register({
   name: 'map_close_factor',
   section: SECTION_MAP_ANALYSIS,
-  scope: SCOPE_QUALIFIERS,
+  scope: SCOPE_BRACKET,
   mount(host, ctx) {
     host.innerHTML = plotBlock(ctx, 'map_close_factor', 'Map closeness (blowout vs swing)');
   },
