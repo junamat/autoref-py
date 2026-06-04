@@ -31,6 +31,7 @@ class MapPoolRow(TypedDict, total=False):
     avg_score: int | None
     avg_acc: float | None
     mods: list[str]
+    pool_mod: str
     play_count: int
     artist: str
     title: str
