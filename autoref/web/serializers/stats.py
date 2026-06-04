@@ -18,6 +18,7 @@ def build_mappool_row(
     order_by_bid: dict[int, int],
     mods_by_bid: dict[int, list[str]] | None = None,
     play_count_by_map: dict[int, int] | None = None,
+    beatmap_cache=None,
 ) -> MapPoolRow:
     """Build one MapPoolRow from aggregated DB query results."""
     split = split_by_bid.get(bid, {})
@@ -36,6 +37,11 @@ def build_mappool_row(
     )
     if mods_by_bid and bid in mods_by_bid:
         row["mods"] = mods_by_bid[bid]
+    if beatmap_cache:
+        bm = beatmap_cache.get(bid) or {}
+        row["artist"] = bm.get("artist", "")
+        row["title"] = bm.get("title", "")
+        row["version"] = bm.get("version", "")
     return row
 
 
