@@ -12,6 +12,10 @@ class OsuUser:
 
 
 def _redirect_uri(config: "Config") -> str:
+    import os
+    base = os.getenv("BASE_URL")
+    if base:
+        return f"{base}/api/auth/callback"
     host = config.host if config.host not in ("0.0.0.0", "") else "localhost"
     return f"http://{host}:{config.port}/api/auth/callback"
 
