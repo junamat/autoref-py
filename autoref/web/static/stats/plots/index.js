@@ -11,6 +11,7 @@ import {
   SCOPE_QUALIFIERS,
   SCOPE_BRACKET,
 } from './registry.js';
+import { state } from '../state.js';
 import './static.js';
 import './consistency.js';
 import './new_plots.js';
@@ -64,6 +65,13 @@ export async function renderPlots(ctx) {
     const wrap = document.getElementById(s.wrapId);
     if (!section || !wrap) continue;
     const plots = bySection(s.key, scope);
+    
+    // Hide meta analysis if only 1 round exists
+    if (s.key === SECTION_META && state.filterOptions?.rounds?.length <= 1) {
+      section.hidden = true;
+      wrap.innerHTML = '';
+      continue;
+    }
     
     // Check if any plots in this section are visible after applying conditions
     const visiblePlots = plots.filter(p => !p.condition || p.condition(context));
