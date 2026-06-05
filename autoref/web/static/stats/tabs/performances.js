@@ -14,6 +14,11 @@ import { loadTeamPerformances } from './teamPerf.js';
 
 let cachedMappoolData = null;
 
+export function resetMappoolCache() {
+  cachedMappoolData = null;
+  state.mappoolLoaded = false;
+}
+
 function buildPlotCtx(mappoolRows) {
   return {
     mappoolRows,
