@@ -38,7 +38,7 @@ export function renderLeaderboard(rows, metricCol, ascending, method, totalMaps)
     return;
   }
 
-  const label = document.querySelector(`#cfg-calc .cfg-opt.active`)?.textContent || metricCol;
+  const label = document.querySelector('#cfg-calc option:checked')?.textContent || metricCol;
   const isPlacement = method === 'placements';
 
   const values = rows.map(r => r[metricCol] ?? 0);

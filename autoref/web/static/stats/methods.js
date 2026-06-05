@@ -5,27 +5,23 @@ import { state } from './state.js';
 import { currentPoolDefaults } from './filters.js';
 
 export function buildMethodToggle(methods, onChange) {
-  const toggle = document.getElementById('cfg-calc');
+  const select = document.getElementById('cfg-calc');
   const crown = currentPoolDefaults().qualifier_method;
-  toggle.innerHTML = methods.map(m =>
-    `<div class="cfg-opt${m.key === state.currentMethod ? ' active' : ''}" data-val="${esc(m.key)}">${m.key === crown ? '👑 ' : ''}${esc(m.label)}</div>`
+  select.innerHTML = methods.map(m =>
+    `<option value="${esc(m.key)}"${m.key === state.currentMethod ? ' selected' : ''}>${m.key === crown ? '👑 ' : ''}${esc(m.label)}</option>`
   ).join('');
-  toggle.addEventListener('click', e => {
-    const opt = e.target.closest('.cfg-opt');
-    if (!opt) return;
-    toggle.querySelectorAll('.cfg-opt').forEach(o => o.classList.remove('active'));
-    opt.classList.add('active');
-    state.currentMethod = opt.dataset.val;
+  select.addEventListener('change', () => {
+    state.currentMethod = select.value;
     onChange('method');
   });
 }
 
 export function rebuildCrown() {
   if (!state.methodsReady || !state.filterOptions) return;
-  const toggle = document.getElementById('cfg-calc');
+  const select = document.getElementById('cfg-calc');
   const crown = currentPoolDefaults().qualifier_method;
-  toggle.querySelectorAll('.cfg-opt').forEach(opt => {
-    const key = opt.dataset.val;
+  Array.from(select.options).forEach(opt => {
+    const key = opt.value;
     const label = opt.textContent.replace(/^👑\s*/, '');
     opt.textContent = (key === crown ? '👑 ' : '') + label;
   });
@@ -41,9 +37,8 @@ export function applyPoolDefaults() {
     state.currentMethod = d.method;
     changed = true;
     if (state.methodsReady) {
-      document.querySelectorAll('#cfg-calc .cfg-opt').forEach(o => {
-        o.classList.toggle('active', o.dataset.val === state.currentMethod);
-      });
+      const select = document.getElementById('cfg-calc');
+      select.value = state.currentMethod;
     }
   }
   const setToggle = (groupId, val) => {
