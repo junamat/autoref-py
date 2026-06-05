@@ -9,7 +9,9 @@ export const state = {
   standingsLoaded: false,
   resultsLoaded: false,
   teamPerfLoaded: false,
+  mappoolLoaded: false,
   context: null,
+  lastParams: {},
 };
 
 export function invalidateTabs() {
@@ -17,4 +19,18 @@ export function invalidateTabs() {
   state.standingsLoaded = false;
   state.resultsLoaded = false;
   state.teamPerfLoaded = false;
+  state.mappoolLoaded = false;
+}
+
+export function tabAffects(tab, changed) {
+  const deps = {
+    performances: ['method', 'count_failed', 'aggregate', 'filter'],
+    mappool: ['method', 'count_failed', 'aggregate', 'filter'],
+    results: ['method', 'count_failed', 'aggregate', 'filter'],
+    standings: ['count_failed', 'best_only', 'filter'],
+    extras: ['count_failed', 'filter'],
+    teamPerf: ['count_failed', 'filter'],
+  };
+  const tabDeps = deps[tab] || [];
+  return changed.some(c => tabDeps.includes(c));
 }

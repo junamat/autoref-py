@@ -11,7 +11,7 @@ import { loadTeamPerformances } from '/static/stats/tabs/teamPerf.js';
 import { initNav } from '/static/shared/nav.js';
 
 initNav({ active: 'stats' }).then(() => {
-  document.getElementById('theme-toggle').addEventListener('click', load);
+  document.getElementById('theme-toggle').addEventListener('click', () => load('filter'));
 });
 
 /* ── tabs ────────────────────────────────────────────────────── */
@@ -26,35 +26,36 @@ tabs.forEach(tab => {
     if (target === 'standings' && !state.standingsLoaded) loadStandings();
     if (target === 'results' && !state.resultsLoaded) loadResults();
     if (target === 'performances' && !state.teamPerfLoaded) loadTeamPerformances();
+    if (target === 'mappool' && !state.mappoolLoaded) load('filter');
   });
 });
 
 /* ── config toggles ──────────────────────────────────────────── */
-function wireToggle(groupId) {
+function wireToggle(groupId, paramKey) {
   document.getElementById(groupId).addEventListener('click', e => {
     const opt = e.target.closest('.cfg-opt');
     if (!opt) return;
     document.querySelectorAll(`#${groupId} .cfg-opt`).forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
-    load();
+    load(paramKey);
   });
 }
-wireToggle('cfg-failed');
-wireToggle('cfg-aggregate');
-wireToggle('cfg-best-only');
+wireToggle('cfg-failed', 'count_failed');
+wireToggle('cfg-aggregate', 'aggregate');
+wireToggle('cfg-best-only', 'best_only');
 
-document.getElementById('stats-reload').addEventListener('click', load);
+document.getElementById('stats-reload').addEventListener('click', () => load('filter'));
 
 document.getElementById('cfg-round').addEventListener('change', () => {
   refreshPoolOptions();
   applyPoolDefaults();
   loadContext();
-  load();
+  load('filter');
 });
 document.getElementById('cfg-pool').addEventListener('change', () => {
   applyPoolDefaults();
   loadContext();
-  load();
+  load('filter');
 });
 
 /* ── plot zoom modal ─────────────────────────────────────────── */
@@ -79,4 +80,4 @@ plotModalOverlay.addEventListener('click', closePlotModal);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !plotModal.hidden) closePlotModal(); });
 
 /* ── boot ────────────────────────────────────────────────────── */
-loadFilterOptions().then(() => { applyPoolDefaults(); loadContext(); load(); });
+loadFilterOptions().then(() => { applyPoolDefaults(); loadContext(); load('filter'); });
