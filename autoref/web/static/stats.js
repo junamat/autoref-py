@@ -41,6 +41,7 @@ function wireToggle(groupId) {
 }
 wireToggle('cfg-failed');
 wireToggle('cfg-aggregate');
+wireToggle('cfg-best-only');
 
 document.getElementById('stats-reload').addEventListener('click', load);
 

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def register(app: FastAPI, server: "WebServer") -> None:
     @app.get("/api/stats/standings")
     async def api_stats_standings(count_failed: bool = True,
+                                  best_only: bool = False,
                                   pool_id: str | None = None,
                                   round_name: str | None = None):
         """Per-map top players and team standings.
@@ -42,7 +43,9 @@ def register(app: FastAPI, server: "WebServer") -> None:
         if df.empty:
             return JSONResponse({"maps": [], "has_teams": False})
 
-        # Keep all scores — players who play a map multiple times appear multiple times
+        if best_only:
+            df = (df.sort_values("score", ascending=False)
+                    .drop_duplicates(subset=["user_id", "beatmap_id"]))
 
         map_stats = df.groupby("beatmap_id")["score"].agg(["mean", "std"])
         df = df.join(map_stats, on="beatmap_id")
