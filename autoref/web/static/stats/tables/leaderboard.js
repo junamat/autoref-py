@@ -13,9 +13,9 @@ const GRADE_COLOR = {
   F: 'var(--muted)',
 };
 
-function bestCell(best) {
+function scoreCell(best, label) {
   if (!best) return '<span class="muted">—</span>';
-  const label = best.name || best.beatmap_id;
+  const mapLabel = best.name || best.beatmap_id;
   const href = `https://osu.ppy.sh/b/${encodeURIComponent(best.beatmap_id)}`;
   const color = modColor(best.name, best.mods || best.beatmap_id);
   const grade = best.rank || '';
@@ -24,7 +24,7 @@ function bestCell(best) {
   const modsBadge = mods ? `<span style="font-size:9px;color:var(--yellow);margin-left:4px">+${esc(mods)}</span>` : '';
   return `
     <span style="display:inline-flex;align-items:center;gap:6px">
-      <a href="${href}" target="_blank" rel="noopener" style="color:${color};font-weight:700;text-decoration:none">${esc(label)}</a>${modsBadge}
+      <a href="${href}" target="_blank" rel="noopener" style="color:${color};font-weight:700;text-decoration:none">${esc(mapLabel)}</a>${modsBadge}
       <span style="color:${gradeColor};font-weight:700;font-size:10px">${esc(grade)}</span>
       <span class="mono xs muted">${(best.accuracy * 100).toFixed(2)}%</span>
       <span class="mono xs">${best.score.toLocaleString()}</span>
@@ -69,7 +69,8 @@ export function renderLeaderboard(rows, metricCol, ascending, method, totalMaps)
       <td class="r">${avgScore}</td>
       <td class="r" style="color:var(--green)">${avgAcc}</td>
       <td class="r">${r.maps_played}</td>
-      <td>${bestCell(r.best)}</td>
+      <td>${scoreCell(r.best, 'best')}</td>
+      <td>${scoreCell(r.highest_score, 'highest')}</td>
     </tr>`;
   }).join('');
 
@@ -82,6 +83,7 @@ export function renderLeaderboard(rows, metricCol, ascending, method, totalMaps)
       <th class="r">avg acc</th>
       <th class="r">maps</th>
       <th>best score</th>
+      <th>highest score</th>
     </tr></thead>
     <tbody>${tbody}</tbody>
   </table>`;

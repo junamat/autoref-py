@@ -16,7 +16,7 @@ export function buildMethodToggle(methods, onChange) {
     toggle.querySelectorAll('.cfg-opt').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
     state.currentMethod = opt.dataset.val;
-    onChange();
+    onChange('method');
   });
 }
 
