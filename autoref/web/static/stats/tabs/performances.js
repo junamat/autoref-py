@@ -18,7 +18,7 @@ function buildPlotCtx(mappoolRows) {
   return {
     mappoolRows,
     theme: () => document.body.classList.contains('light') ? 'light' : 'dark',
-    countFailed: () => activeVal('cfg-failed') !== 'false',
+    countFailed: () => true,
     filterParams: () => currentFilterParams(),
     context: () => state.context || {},
     poolDefaults: () => currentPoolDefaults(),
@@ -28,10 +28,9 @@ function buildPlotCtx(mappoolRows) {
 export async function loadMappool(changed = 'filter') {
   if (!tabAffects('mappool', [changed]) && cachedMappoolData) return;
 
-  const countFailed = activeVal('cfg-failed') !== 'false';
   const aggregate = activeVal('cfg-aggregate') || 'sum';
   const params = new URLSearchParams({
-    method: state.currentMethod, count_failed: countFailed, aggregate,
+    method: state.currentMethod, count_failed: true, aggregate,
     ...currentFilterParams(),
   });
   const url = `/api/stats?${params.toString()}`;
@@ -59,10 +58,9 @@ export async function load(changed = 'filter') {
   const perfAffected = tabAffects('performances', [changed]);
 
   if (perfAffected) {
-    const countFailed = activeVal('cfg-failed') !== 'false';
     const aggregate = activeVal('cfg-aggregate') || 'sum';
     const params = new URLSearchParams({
-      method: state.currentMethod, count_failed: countFailed, aggregate,
+      method: state.currentMethod, count_failed: true, aggregate,
       ...currentFilterParams(),
     });
     const url = `/api/stats?${params.toString()}`;

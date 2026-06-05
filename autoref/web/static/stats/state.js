@@ -24,12 +24,12 @@ export function invalidateTabs() {
 
 export function tabAffects(tab, changed) {
   const deps = {
-    performances: ['method', 'count_failed', 'aggregate', 'filter'],
-    mappool: ['count_failed', 'filter'],
-    results: ['method', 'count_failed', 'aggregate', 'filter'],
-    standings: ['count_failed', 'best_only', 'filter'],
-    extras: ['count_failed', 'filter'],
-    teamPerf: ['count_failed', 'filter'],
+    performances: ['method', 'aggregate', 'filter'],
+    mappool: ['filter'],
+    results: ['method', 'aggregate', 'filter'],
+    standings: ['best_only', 'filter'],
+    extras: ['filter'],
+    teamPerf: ['filter'],
   };
   const tabDeps = deps[tab] || [];
   return changed.some(c => tabDeps.includes(c));

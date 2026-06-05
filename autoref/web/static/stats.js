@@ -40,7 +40,6 @@ function wireToggle(groupId, paramKey) {
     load(paramKey);
   });
 }
-wireToggle('cfg-failed', 'count_failed');
 wireToggle('cfg-aggregate', 'aggregate');
 wireToggle('cfg-best-only', 'best_only');
 

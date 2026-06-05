@@ -54,7 +54,6 @@ export function applyPoolDefaults() {
     target.classList.add('active');
     changed = true;
   };
-  if (d.count_failed !== undefined) setToggle('cfg-failed', String(d.count_failed));
   if (d.aggregate) setToggle('cfg-aggregate', d.aggregate);
   rebuildCrown();
   return changed;

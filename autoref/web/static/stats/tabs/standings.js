@@ -17,9 +17,8 @@ const GRADE_COLOR = {
 
 export async function loadStandings() {
   state.standingsLoaded = true;
-  const countFailed = activeVal('cfg-failed') !== 'false';
   const bestOnly = activeVal('cfg-best-only') === 'true';
-  const params = new URLSearchParams({ count_failed: countFailed, best_only: bestOnly, ...currentFilterParams() });
+  const params = new URLSearchParams({ count_failed: true, best_only: bestOnly, ...currentFilterParams() });
   const wrap = document.getElementById('standings-wrap');
   if (wrap) wrap.innerHTML = '<div class="empty-msg">loading…</div>';
 

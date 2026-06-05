@@ -6,8 +6,7 @@ import { currentFilterParams } from '../filters.js';
 
 export async function loadTeamPerformances() {
   state.teamPerfLoaded = true;
-  const countFailed = activeVal('cfg-failed') !== 'false';
-  const params = new URLSearchParams({ count_failed: countFailed, ...currentFilterParams() });
+  const params = new URLSearchParams({ count_failed: true, ...currentFilterParams() });
   const wrap = document.getElementById('team-perf-wrap');
   if (wrap) wrap.innerHTML = '<div class="empty-msg">loading…</div>';
 

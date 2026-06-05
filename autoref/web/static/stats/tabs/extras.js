@@ -7,8 +7,7 @@ import { renderPpTable, renderDiffTable, renderCarryTable } from '../tables/extr
 
 export async function loadExtras() {
   state.extrasLoaded = true;
-  const countFailed = activeVal('cfg-failed') !== 'false';
-  const params = new URLSearchParams({ count_failed: countFailed, ...currentFilterParams() });
+  const params = new URLSearchParams({ count_failed: true, ...currentFilterParams() });
 
   const hasBracket = state.context?.has_bracket !== false;
   const hasTeams = state.context?.has_teams !== false;
