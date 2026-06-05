@@ -47,9 +47,11 @@ export async function loadStandings() {
       const rankClass = p.rank <= 3 ? `rank-${p.rank}` : '';
       const mods = (p.mods || []).join('');
       const modsBadge = mods ? `<span style="font-size:9px;color:var(--yellow);margin-left:3px">+${esc(mods)}</span>` : '';
+      const grade = p.rank_grade || '';
       return `<tr>
         <td class="rank-cell ${rankClass}">${p.rank}</td>
         <td>${esc(p.username || p.user_id)}${modsBadge}</td>
+        <td class="c mono xs">${grade}</td>
         <td class="r mono xs">${p.score.toLocaleString()}</td>
         <td class="r" style="color:var(--green)">${(p.accuracy * 100).toFixed(2)}%</td>
         <td class="r mono xs muted">${p.z.toFixed(2)}</td>
@@ -62,7 +64,7 @@ export async function loadStandings() {
       <div class="standings-card-body">
         <table class="stats-table">
           <thead><tr>
-            <th>#</th><th>player</th>
+            <th>#</th><th>player</th><th>grade</th>
             <th class="r">score</th><th class="r">acc</th><th class="r">z</th><th class="r">z-acc</th>
           </tr></thead>
           <tbody>${rows}</tbody>

@@ -669,3 +669,7 @@ body.light .quals-phase-row.current { background: #dbeafe; }
 .cmd-btn.orange { color: var(--orange); border-color: var(--orange); }
 
 .cmd-footer { padding: 5px 7px; font-size: 9px; color: var(--muted); font-style: italic; }
+
+/* ── Grade column in standings ────────────────────────────────── */
+td.grade { font-weight: 700; }
+td.grade:empty { display: none; }
