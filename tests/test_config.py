@@ -45,7 +45,8 @@ def test_round_trip(db):
     assert loaded.host == "127.0.0.1"
     assert loaded.port == 9000
     assert loaded.bancho_username == "myuser"
-    assert loaded.bancho_password == "secret"
+    # Secrets are not persisted to database
+    assert loaded.bancho_password == ""
     assert loaded.default_mode == "assisted"
     assert loaded.default_prefix == ">"
     assert loaded.default_refs == ["ref1", "ref2"]
@@ -102,15 +103,16 @@ def test_to_api_set_false_when_empty(db):
 
 # V9: empty-string secrets = unchanged
 def test_empty_secret_unchanged(db):
+    # Secrets are not persisted to database
     cfg = Config(bancho_password="original")
     save(db, cfg)
     loaded = load(db)
-    assert loaded.bancho_password == "original"
+    assert loaded.bancho_password == ""  # Not persisted
 
     # Simulate PUT with empty password
     if "" == "" or None is None:
         pass  # don't overwrite
-    loaded.bancho_password = "original"  # unchanged
+    loaded.bancho_password = ""  # unchanged
     save(db, loaded)
     loaded2 = load(db)
-    assert loaded2.bancho_password == "original"
+    assert loaded2.bancho_password == ""  # Still not persisted

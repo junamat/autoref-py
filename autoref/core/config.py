@@ -93,11 +93,20 @@ def load(db: "MatchDatabase") -> Config:
         except (json.JSONDecodeError, TypeError):
             data[key] = raw
     valid_fields = {f.name for f in fields(Config)}
-    return Config(**{k: v for k, v in data.items() if k in valid_fields})  # type: ignore[arg-type]
+    cfg = Config(**{k: v for k, v in data.items() if k in valid_fields})  # type: ignore[arg-type]
+    # Always load secrets from environment, never from database
+    env_vals = _from_env()
+    for secret in _SECRET_FIELDS:
+        if secret in env_vals:
+            setattr(cfg, secret, env_vals[secret])
+    return cfg
 
 
 def save(db: "MatchDatabase", cfg: Config) -> None:
     d = asdict(cfg)
+    # Never persist secrets to database
+    for secret in _SECRET_FIELDS:
+        d.pop(secret, None)
     db._conn.executemany(
         "INSERT INTO settings(key, value) VALUES(?, ?) "
         "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
