@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .storage import MatchDatabase
 
-_SECRET_FIELDS = {"bancho_password", "osu_client_secret"}
+_SECRET_FIELDS = {"bancho_password", "osu_client_id", "osu_client_secret"}
 
 _ENV_MAP: dict[str, tuple[str, type]] = {
     "BANCHO_USERNAME":          ("bancho_username",        str),

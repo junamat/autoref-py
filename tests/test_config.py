@@ -86,18 +86,21 @@ def test_env_seed_refs_comma_split(db, monkeypatch):
 
 # V2: to_api redacts secrets
 def test_to_api_redacts_secrets(db):
-    cfg = Config(bancho_password="secret", osu_client_secret="topsecret")
+    cfg = Config(bancho_password="secret", osu_client_id="123", osu_client_secret="topsecret")
     result = to_api(cfg)
     assert "bancho_password" not in result
+    assert "osu_client_id" not in result
     assert "osu_client_secret" not in result
     assert result["bancho_password_set"] is True
+    assert result["osu_client_id_set"] is True
     assert result["osu_client_secret_set"] is True
 
 
 def test_to_api_set_false_when_empty(db):
-    cfg = Config(bancho_password="", osu_client_secret="")
+    cfg = Config(bancho_password="", osu_client_id="", osu_client_secret="")
     result = to_api(cfg)
     assert result["bancho_password_set"] is False
+    assert result["osu_client_id_set"] is False
     assert result["osu_client_secret_set"] is False
 
 
