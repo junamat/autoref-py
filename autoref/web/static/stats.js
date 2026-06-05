@@ -3,7 +3,7 @@
 import { state } from '/static/stats/state.js';
 import { loadFilterOptions, loadContext, refreshPoolOptions } from '/static/stats/filters.js';
 import { applyPoolDefaults } from '/static/stats/methods.js';
-import { load, loadMappool } from '/static/stats/tabs/performances.js';
+import { load, loadMappool, resetMappoolCache } from '/static/stats/tabs/performances.js';
 import { loadExtras } from '/static/stats/tabs/extras.js';
 import { loadStandings } from '/static/stats/tabs/standings.js';
 import { loadResults } from '/static/stats/tabs/results.js';
@@ -11,7 +11,19 @@ import { loadTeamPerformances } from '/static/stats/tabs/teamPerf.js';
 import { initNav } from '/static/shared/nav.js';
 
 initNav({ active: 'stats' }).then(() => {
-  document.getElementById('theme-toggle').addEventListener('click', () => load('filter'));
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    state.extrasLoaded = false;
+    state.standingsLoaded = false;
+    state.resultsLoaded = false;
+    state.teamPerfLoaded = false;
+    resetMappoolCache();
+    const activeTab = document.querySelector('.stats-tab.active')?.dataset.tab;
+    if (activeTab === 'performances') load('filter');
+    else if (activeTab === 'mappool') loadMappool('filter');
+    else if (activeTab === 'standings') loadStandings();
+    else if (activeTab === 'results') loadResults();
+    else if (activeTab === 'extras') loadExtras();
+  });
 });
 
 /* ── tabs ────────────────────────────────────────────────────── */
