@@ -231,7 +231,7 @@ def test_get_z_sum_leaderboard_via_db():
 def test_methods_registry_has_all_keys():
     assert set(METHODS) == {
         "zscore", "avg_score", "placements", "percentile", "zipf", "pct_diff",
-        "mc_flashlight", "mc_bathbot", "beta_dist", "pp", "z_pp",
+        "mc_flashlight", "beta_dist", "pp", "z_pp",
     }
 
 

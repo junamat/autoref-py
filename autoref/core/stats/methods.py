@@ -28,7 +28,6 @@ METHODS: dict[str, tuple[str, bool]] = {
     "zipf":          ("Zipf's Law",                False),
     "pct_diff":      ("Percent Difference",        False),
     "mc_flashlight": ("Match Cost (Flashlight)",   False),
-    "mc_bathbot":    ("Match Cost (Bathbot)",       False),
     "beta_dist":     ("Beta Distribution",         False),
     "pp":            ("Performance Points",        False),
     "z_pp":          ("Z-PP",                      False),
