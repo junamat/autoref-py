@@ -7,6 +7,7 @@ import { currentFilterParams } from '../filters.js';
 
 export async function loadResults() {
   state.resultsLoaded = true;
+  const aggregate = activeVal('cfg-aggregate') || 'sum';
   const params = new URLSearchParams({
     count_failed: true, method: state.currentMethod, aggregate,
     ...currentFilterParams(),
