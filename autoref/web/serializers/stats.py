@@ -55,7 +55,7 @@ def enrich_leaderboard_rows(
     predicate: Any,
     code_by_bid: dict[int, str],
 ) -> list[dict[str, Any]]:
-    """Add avg_score, avg_acc, best fields to raw leaderboard rows."""
+    """Add avg_score, avg_acc, best, highest_score fields to raw leaderboard rows."""
     if all_scores.empty or not leaderboard_rows:
         return leaderboard_rows
 
@@ -68,8 +68,14 @@ def enrich_leaderboard_rows(
             .agg(avg_score=("score", "mean"), avg_acc=("accuracy", "mean"))
             .to_dict(orient="index")
     )
-    best_idx = filt.groupby("user_id")["score"].idxmax()
-    best_rows = filt.loc[best_idx].set_index("user_id")
+    best_score_idx = filt.groupby("user_id")["score"].idxmax()
+    best_score_rows = filt.loc[best_score_idx].set_index("user_id")
+
+    map_stats = filt.groupby("beatmap_id")["score"].agg(["mean", "std"])
+    filt = filt.join(map_stats, on="beatmap_id")
+    filt["z"] = ((filt["score"] - filt["mean"]) / filt["std"]).fillna(0.0)
+    best_z_idx = filt.groupby("user_id")["z"].idxmax()
+    best_z_rows = filt.loc[best_z_idx].set_index("user_id")
 
     enriched: list[dict[str, Any]] = []
     for r in leaderboard_rows:
@@ -78,8 +84,19 @@ def enrich_leaderboard_rows(
         agg = per_player.get(uid, {})
         row["avg_score"] = round(agg.get("avg_score", 0))
         row["avg_acc"] = round(agg.get("avg_acc", 0), 4)
-        if uid in best_rows.index:
-            b = best_rows.loc[uid]
+        if uid in best_score_rows.index:
+            b = best_score_rows.loc[uid]
+            bid = int(b["beatmap_id"])
+            row["highest_score"] = BestScore(
+                beatmap_id=bid,
+                name=code_by_bid.get(bid),
+                score=int(b["score"]),
+                accuracy=round(float(b["accuracy"]), 4),
+                rank=(b["rank"] if pd.notna(b["rank"]) else None),
+                mods=(json.loads(b["mods"]) if pd.notna(b["mods"]) and b["mods"] else []),
+            )
+        if uid in best_z_rows.index:
+            b = best_z_rows.loc[uid]
             bid = int(b["beatmap_id"])
             row["best"] = BestScore(
                 beatmap_id=bid,

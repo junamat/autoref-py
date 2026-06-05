@@ -17,6 +17,7 @@ class LeaderboardRow(TypedDict, total=False):
     avg_score: int
     avg_acc: float
     best: BestScore
+    highest_score: BestScore
 
 
 class MapPoolRow(TypedDict, total=False):
