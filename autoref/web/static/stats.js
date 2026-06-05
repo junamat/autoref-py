@@ -3,7 +3,7 @@
 import { state } from '/static/stats/state.js';
 import { loadFilterOptions, loadContext, refreshPoolOptions } from '/static/stats/filters.js';
 import { applyPoolDefaults } from '/static/stats/methods.js';
-import { load } from '/static/stats/tabs/performances.js';
+import { load, loadMappool } from '/static/stats/tabs/performances.js';
 import { loadExtras } from '/static/stats/tabs/extras.js';
 import { loadStandings } from '/static/stats/tabs/standings.js';
 import { loadResults } from '/static/stats/tabs/results.js';
@@ -26,7 +26,7 @@ tabs.forEach(tab => {
     if (target === 'standings' && !state.standingsLoaded) loadStandings();
     if (target === 'results' && !state.resultsLoaded) loadResults();
     if (target === 'performances' && !state.teamPerfLoaded) loadTeamPerformances();
-    if (target === 'mappool' && !state.mappoolLoaded) load('filter');
+    if (target === 'mappool' && !state.mappoolLoaded) loadMappool('filter');
   });
 });
 

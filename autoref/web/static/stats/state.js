@@ -25,7 +25,7 @@ export function invalidateTabs() {
 export function tabAffects(tab, changed) {
   const deps = {
     performances: ['method', 'count_failed', 'aggregate', 'filter'],
-    mappool: ['method', 'count_failed', 'aggregate', 'filter'],
+    mappool: ['count_failed', 'filter'],
     results: ['method', 'count_failed', 'aggregate', 'filter'],
     standings: ['count_failed', 'best_only', 'filter'],
     extras: ['count_failed', 'filter'],
