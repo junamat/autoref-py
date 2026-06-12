@@ -75,3 +75,9 @@ def register(app: FastAPI, server: "WebServer") -> None:
         if _is_restricted(request):
             return RedirectResponse("/stats", status_code=302)
         return FileResponse(server.static_dir / "mp_import.html")
+
+    @app.get("/score-editor")
+    async def score_editor_page(request: Request):
+        if _is_restricted(request):
+            return RedirectResponse("/", status_code=302)
+        return FileResponse(server.static_dir / "score_editor.html")
