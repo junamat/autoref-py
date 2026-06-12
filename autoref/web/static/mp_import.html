@@ -49,6 +49,25 @@
   .mi-status.loading { background: var(--panel); border: 1.5px solid var(--border); color: var(--muted); }
 
   .mi-hidden { display: none !important; }
+
+  .mi-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .mi-modal { background: var(--bg); border: 1.5px solid var(--border); border-radius: 6px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 1.5rem; }
+  .mi-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .mi-modal-title { font-size: 14px; font-weight: 700; }
+  .mi-modal-close { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 8px; }
+  .mi-modal-close:hover { color: var(--text); }
+
+  .mi-diff-game { background: var(--panel); border: 1.5px solid var(--border); border-radius: 3px; padding: 12px; margin-bottom: 8px; }
+  .mi-diff-game-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+  .mi-diff-score { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .mi-diff-score:last-child { border-bottom: none; }
+  .mi-diff-name { flex: 1; font-weight: 600; }
+  .mi-diff-value { font-family: monospace; font-weight: 700; }
+  .mi-diff-new { color: var(--green); }
+
+  .mi-refresh-btn { background: transparent; color: var(--blue); border: 1.5px solid var(--blue); border-radius: 3px; padding: 4px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: all 0.15s; }
+  .mi-refresh-btn:hover { background: var(--blue); color: var(--bg); }
+  .mi-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
 </head>
 <body>

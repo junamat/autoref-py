@@ -132,3 +132,115 @@ def register(app: FastAPI, server: "WebServer") -> None:
         if not deleted:
             return JSONResponse({"error": "not_found"}, status_code=404)
         return JSONResponse({"ok": True, "deleted": match_id})
+
+    @app.get("/api/mp/refresh/{match_id}")
+    async def refresh_match(match_id: int, user=Depends(require_not_player)):
+        """Fetch fresh data from osu! API and compare with existing scores."""
+        try:
+            row = server.db._conn.execute(
+                "SELECT osu_match_id FROM matches WHERE match_id = ?",
+                (match_id,),
+            ).fetchone()
+
+            if not row or not row[0]:
+                return JSONResponse({"error": "no_osu_match_id"}, status_code=400)
+
+            osu_match_id = row[0]
+
+            from ...core.mp_link import MpLink
+            mp_link = MpLink(osu_match_id)
+
+            async with make_client() as client:
+                imported = await fetch_mp_match(client, mp_link)
+
+            if not imported.games:
+                return JSONResponse({"error": "no_games_found"}, status_code=400)
+
+            existing = server.db.scores.by_match(match_id)
+            existing_keys = set()
+            for _, r in existing.iterrows():
+                existing_keys.add((int(r["turn"]), int(r["beatmap_id"]), int(r["user_id"])))
+
+            new_games = []
+            for turn_offset, game in enumerate(imported.games, start=1):
+                new_scores = []
+                for s in game.scores:
+                    key = (turn_offset, game.beatmap_id, s["user_id"])
+                    if key not in existing_keys:
+                        new_scores.append({
+                            "user_id": s["user_id"],
+                            "username": s.get("username"),
+                            "score": s["score"],
+                            "accuracy": s["accuracy"],
+                            "max_combo": s["max_combo"],
+                            "passed": s["passed"],
+                            "mods": s["mods"],
+                            "rank": s.get("rank"),
+                            "team_index": s.get("team_index"),
+                        })
+                if new_scores:
+                    new_games.append({
+                        "turn": turn_offset,
+                        "beatmap_id": game.beatmap_id,
+                        "scores": new_scores,
+                    })
+
+            sorted_users = sorted(imported.users.items())
+            players = [
+                {"user_id": uid, "username": uname, "team_index": i}
+                for i, (uid, uname) in enumerate(sorted_users)
+            ]
+
+            return JSONResponse({
+                "match_id": match_id,
+                "osu_match_id": osu_match_id,
+                "name": imported.name,
+                "total_games": len(imported.games),
+                "new_games": new_games,
+                "players": players,
+            })
+
+        except Exception:
+            logger.exception("failed to refresh match %d", match_id)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
+
+    @app.post("/api/mp/refresh/{match_id}/apply")
+    async def apply_refresh(match_id: int, request: Request, user=Depends(require_not_player)):
+        """Apply new scores from a refresh operation."""
+        try:
+            body = await request.json()
+            new_games = body.get("new_games", [])
+
+            if not new_games:
+                return JSONResponse({"error": "no_new_scores"}, status_code=400)
+
+            row = server.db._conn.execute(
+                "SELECT pool_id, round_name FROM matches WHERE match_id = ?",
+                (match_id,),
+            ).fetchone()
+
+            if not row:
+                return JSONResponse({"error": "not_found"}, status_code=404)
+
+            scores_iter = []
+            for game in new_games:
+                turn = game["turn"]
+                beatmap_id = game["beatmap_id"]
+                scores = game["scores"]
+                scores_iter.append((turn, beatmap_id, scores))
+
+            server.db.scores.insert_scores(match_id, scores_iter, {})
+            server.db._conn.commit()
+
+            total_new = sum(len(g["scores"]) for g in new_games)
+
+            return JSONResponse({
+                "ok": True,
+                "match_id": match_id,
+                "new_games": len(new_games),
+                "new_scores": total_new,
+            })
+
+        except Exception:
+            logger.exception("failed to apply refresh for match %d", match_id)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
