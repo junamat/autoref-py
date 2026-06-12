@@ -107,6 +107,17 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 if uid in enabled_players
             }
 
+            for uid, new_name in imported.users.items():
+                existing = server.db._conn.execute(
+                    "SELECT DISTINCT username FROM game_scores WHERE user_id = ? AND username != ? LIMIT 1",
+                    (uid, new_name),
+                ).fetchone()
+                if existing:
+                    server.db._conn.execute(
+                        "UPDATE game_scores SET username = ? WHERE user_id = ?",
+                        (new_name, uid),
+                    )
+
             mid = await save_imported_match_with_pp(
                 server.db,
                 imported,
@@ -248,8 +259,8 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 user_id = change["user_id"]
                 new_name = change["new_name"]
                 server.db._conn.execute(
-                    "UPDATE game_scores SET username = ? WHERE match_id = ? AND user_id = ?",
-                    (new_name, match_id, user_id),
+                    "UPDATE game_scores SET username = ? WHERE user_id = ?",
+                    (new_name, user_id),
                 )
 
             server.db._conn.commit()
