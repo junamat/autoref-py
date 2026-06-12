@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import matplotlib
 import numpy as np
 import pandas as pd
 
@@ -89,14 +90,14 @@ def player_mod_radar(
     n_mods = len(mod_groups)
     x = np.arange(n_mods)
     width = 0.8 / len(pivot)
-    colors = [p["blue"], p["green"], p["yellow"], p["red"],
-              p["muted"], "#a78bfa", "#f472b6", "#34d399",
-              "#fb923c", "#38bdf8"]
+
+    cmap = matplotlib.colormaps["tab20"]
+    colors = [cmap(i % 20) for i in range(len(pivot))]
 
     for i, (username, row) in enumerate(pivot.iterrows()):
         vals = [row.get(mg, 0) for mg in mod_groups]
         ax.bar(x + i * width, vals, width, label=username,
-               color=colors[i % len(colors)], alpha=0.7,
+               color=colors[i], alpha=0.7,
                edgecolor=p["border"], linewidth=0.3)
 
     ax.set_xticks(x + width * len(pivot) / 2)
@@ -104,7 +105,11 @@ def player_mod_radar(
     ax.set_ylabel("mean z-score")
     ax.set_title(f"player mod profile · top {top_n} by mean z")
     ax.axhline(0, color=p["muted"], linewidth=0.5, linestyle="--", alpha=0.5)
-    if len(pivot) <= 6:
-        ax.legend(facecolor=p["panel"], edgecolor=p["border"],
-                  labelcolor=p["text"], framealpha=0.9, fontsize=7)
+
+    ncol = max(1, len(pivot) // 5)
+    fontsize = max(5, 8 - len(pivot) // 10)
+    ax.legend(facecolor=p["panel"], edgecolor=p["border"],
+              labelcolor=p["text"], framealpha=0.9, fontsize=fontsize,
+              ncol=ncol, loc="upper right", bbox_to_anchor=(1.0, 1.0))
+
     return _encode(fig, fmt)
