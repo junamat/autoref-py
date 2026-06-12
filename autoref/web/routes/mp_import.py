@@ -158,8 +158,18 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
             existing = server.db.scores.by_match(match_id)
             existing_keys = set()
+            existing_usernames = {}
             for _, r in existing.iterrows():
                 existing_keys.add((int(r["turn"]), int(r["beatmap_id"]), int(r["user_id"])))
+                uid = int(r["user_id"])
+                if uid not in existing_usernames and r.get("username"):
+                    existing_usernames[uid] = r["username"]
+
+            name_changes = []
+            for uid, old_name in existing_usernames.items():
+                new_name = imported.users.get(uid)
+                if new_name and new_name != old_name:
+                    name_changes.append({"user_id": uid, "old_name": old_name, "new_name": new_name})
 
             new_games = []
             for turn_offset, game in enumerate(imported.games, start=1):
@@ -197,6 +207,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 "name": imported.name,
                 "total_games": len(imported.games),
                 "new_games": new_games,
+                "name_changes": name_changes,
                 "players": players,
             })
 
@@ -206,13 +217,14 @@ def register(app: FastAPI, server: "WebServer") -> None:
 
     @app.post("/api/mp/refresh/{match_id}/apply")
     async def apply_refresh(match_id: int, request: Request, user=Depends(require_not_player)):
-        """Apply new scores from a refresh operation."""
+        """Apply new scores and name changes from a refresh operation."""
         try:
             body = await request.json()
             new_games = body.get("new_games", [])
+            name_changes = body.get("name_changes", [])
 
-            if not new_games:
-                return JSONResponse({"error": "no_new_scores"}, status_code=400)
+            if not new_games and not name_changes:
+                return JSONResponse({"error": "no_changes"}, status_code=400)
 
             row = server.db._conn.execute(
                 "SELECT pool_id, round_name FROM matches WHERE match_id = ?",
@@ -229,7 +241,17 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 scores = game["scores"]
                 scores_iter.append((turn, beatmap_id, scores))
 
-            server.db.scores.insert_scores(match_id, scores_iter, {})
+            if scores_iter:
+                server.db.scores.insert_scores(match_id, scores_iter, {})
+
+            for change in name_changes:
+                user_id = change["user_id"]
+                new_name = change["new_name"]
+                server.db._conn.execute(
+                    "UPDATE game_scores SET username = ? WHERE match_id = ? AND user_id = ?",
+                    (new_name, match_id, user_id),
+                )
+
             server.db._conn.commit()
 
             total_new = sum(len(g["scores"]) for g in new_games)
@@ -239,6 +261,7 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 "match_id": match_id,
                 "new_games": len(new_games),
                 "new_scores": total_new,
+                "name_changes": len(name_changes),
             })
 
         except Exception:
