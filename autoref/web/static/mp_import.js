@@ -193,8 +193,12 @@ async function loadImportedMatches() {
           <span style="font-weight:700">match ${match.match_id}</span>
           <span style="color:var(--muted);font-size:10px;margin-left:8px">${match.pool_id || ''} ${match.round_name || ''}</span>
         </div>
+        <button class="mi-refresh-btn" data-match-id="${match.match_id}">refresh</button>
         <button class="mi-btn danger" style="padding:4px 10px;font-size:10px">delete</button>
       `;
+
+      const refreshBtn = div.querySelector('.mi-refresh-btn');
+      refreshBtn.addEventListener('click', () => openRefreshModal(match.match_id));
 
       const deleteBtn = div.querySelector('.mi-btn.danger');
       deleteBtn.addEventListener('click', async () => {

@@ -156,8 +156,8 @@ def save_imported_match(
     cursor = db._conn.execute(
         "INSERT INTO matches "
         "(ruleset_vs, gamemode, win_condition, best_of, bans_per_team, "
-        " protects_per_team, winner_team, pool_id, round_name, tb_beatmap_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " protects_per_team, winner_team, pool_id, round_name, tb_beatmap_id, osu_match_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             1,  # Always 1v1 format
             "STANDARD",
@@ -169,6 +169,7 @@ def save_imported_match(
             pool_id,
             round_name,
             None,
+            imported.match_id,
         ),
     )
     assert cursor.lastrowid is not None
