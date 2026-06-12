@@ -233,6 +233,135 @@ async function loadImportedMatches() {
 // Load imported matches on page load
 loadImportedMatches();
 
+async function openRefreshModal(matchId) {
+  const btn = document.querySelector(`.mi-refresh-btn[data-match-id="${matchId}"]`);
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(`/api/mp/refresh/${matchId}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(`Refresh failed: ${data.error || 'unknown error'}`);
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    const hasNewScores = data.new_games && data.new_games.length > 0;
+    const hasNameChanges = data.name_changes && data.name_changes.length > 0;
+
+    if (!hasNewScores && !hasNameChanges) {
+      alert('No new scores or name changes found.');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    let html = `
+      <div class="mi-modal-overlay" id="mi-modal-overlay">
+        <div class="mi-modal">
+          <div class="mi-modal-header">
+            <div class="mi-modal-title">refresh match ${matchId}</div>
+            <button class="mi-modal-close" id="mi-modal-close">×</button>
+          </div>
+    `;
+
+    if (hasNameChanges) {
+      html += `
+        <div class="mi-section-title">name changes (${data.name_changes.length})</div>
+        <div class="mi-diff-game">
+      `;
+      for (const change of data.name_changes) {
+        html += `
+          <div class="mi-diff-score">
+            <div class="mi-diff-name">user ${change.user_id}</div>
+            <div style="text-decoration:line-through;color:var(--muted)">${escapeHtml(change.old_name)}</div>
+            <div>→</div>
+            <div class="mi-diff-name mi-diff-new">${escapeHtml(change.new_name)}</div>
+          </div>
+        `;
+      }
+      html += `</div>`;
+    }
+
+    if (hasNewScores) {
+      html += `<div class="mi-section-title">new scores (${data.new_games.reduce((sum, g) => sum + g.scores.length, 0)})</div>`;
+      for (const game of data.new_games) {
+        html += `
+          <div class="mi-diff-game">
+            <div class="mi-diff-game-header">turn ${game.turn} — beatmap ${game.beatmap_id}</div>
+        `;
+        for (const score of game.scores) {
+          html += `
+            <div class="mi-diff-score">
+              <div class="mi-diff-name">${escapeHtml(score.username || `user ${score.user_id}`)}</div>
+              <div class="mi-diff-value mi-diff-new">${score.score.toLocaleString()}</div>
+            </div>
+          `;
+        }
+        html += `</div>`;
+      }
+    }
+
+    html += `
+          <div style="margin-top:1rem;display:flex;gap:8px;justify-content:flex-end">
+            <button class="mi-btn secondary" id="mi-modal-cancel">cancel</button>
+            <button class="mi-btn" id="mi-modal-apply">apply changes</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    const overlay = document.getElementById('mi-modal-overlay');
+    const closeBtn = document.getElementById('mi-modal-close');
+    const cancelBtn = document.getElementById('mi-modal-cancel');
+    const applyBtn = document.getElementById('mi-modal-apply');
+
+    const closeModal = () => overlay.remove();
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    applyBtn.addEventListener('click', async () => {
+      applyBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/mp/refresh/${matchId}/apply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            new_games: data.new_games || [],
+            name_changes: data.name_changes || [],
+          }),
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+          alert(`Failed to apply: ${result.error || 'unknown error'}`);
+          applyBtn.disabled = false;
+          return;
+        }
+
+        let msg = [];
+        if (result.new_scores > 0) msg.push(`${result.new_scores} new scores`);
+        if (result.name_changes > 0) msg.push(`${result.name_changes} name updates`);
+        alert(`Applied: ${msg.join(', ')}`);
+        closeModal();
+        loadImportedMatches();
+      } catch (err) {
+        alert(`Failed to apply: ${err.message}`);
+        applyBtn.disabled = false;
+      }
+    });
+
+  } catch (err) {
+    alert(`Refresh failed: ${err.message}`);
+    if (btn) btn.disabled = false;
+  }
+}
+
 // Refresh after successful import
 const originalDoImport = doImport;
 doImport = async function() {
