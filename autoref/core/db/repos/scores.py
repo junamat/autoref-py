@@ -105,3 +105,34 @@ class ScoreRepo:
             sql("scores.scores_with_round").format(filter=filt),
             self._conn, params=params,
         )
+
+    def delete_score(self, score_id: int) -> bool:
+        cursor = self._conn.execute("DELETE FROM game_scores WHERE id = ?", (score_id,))
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    def insert_single_score(self, match_id: int, turn: int, beatmap_id: int,
+                            user_id: int, username: str | None, team_index: int | None,
+                            score: int, accuracy: float, max_combo: int,
+                            mods: list[str], passed: bool, perfect: bool,
+                            rank: str | None, nmiss: int, n50: int, n100: int,
+                            n300: int, ngeki: int, nkatu: int) -> int:
+        cursor = self._conn.execute(
+            "INSERT INTO game_scores "
+            "(match_id, turn, beatmap_id, user_id, username, team_index, "
+            " score, accuracy, max_combo, mods, passed, perfect, rank, "
+            " nmiss, n50, n100, n300, ngeki, nkatu) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                match_id, turn, beatmap_id,
+                user_id, username, team_index,
+                score, accuracy, max_combo,
+                json.dumps(mods),
+                int(bool(passed)),
+                int(bool(perfect)),
+                rank,
+                nmiss, n50, n100, n300, ngeki, nkatu,
+            ),
+        )
+        self._conn.commit()
+        return cursor.lastrowid
