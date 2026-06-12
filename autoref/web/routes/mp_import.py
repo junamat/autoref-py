@@ -113,9 +113,14 @@ def register(app: FastAPI, server: "WebServer") -> None:
                     (uid, new_name),
                 ).fetchone()
                 if existing:
+                    old_name = existing[0]
                     server.db._conn.execute(
                         "UPDATE game_scores SET username = ? WHERE user_id = ?",
                         (new_name, uid),
+                    )
+                    server.db._conn.execute(
+                        "UPDATE match_teams SET team_name = ? WHERE team_name = ?",
+                        (new_name, old_name),
                     )
 
             mid = await save_imported_match_with_pp(
@@ -261,6 +266,10 @@ def register(app: FastAPI, server: "WebServer") -> None:
                 server.db._conn.execute(
                     "UPDATE game_scores SET username = ? WHERE user_id = ?",
                     (new_name, user_id),
+                )
+                server.db._conn.execute(
+                    "UPDATE match_teams SET team_name = ? WHERE team_name = ?",
+                    (new_name, change["old_name"]),
                 )
 
             server.db._conn.commit()
